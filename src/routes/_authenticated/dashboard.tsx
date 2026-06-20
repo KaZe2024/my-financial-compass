@@ -85,7 +85,7 @@ function Dashboard() {
   });
   const provisionsRows = useQuery({
     queryKey: ["provisions", "open"],
-    queryFn: async () => (await supabase.from("provisions").select("amount, due_date, status").neq("status","paid").neq("status","cancelled")).data ?? [],
+    queryFn: async () => (await supabase.from("provisions").select("amount, due_date, status").neq("status","settled").neq("status","cancelled")).data ?? [],
   });
   const incomeSrc = useQuery({
     queryKey: ["income_sources"],
