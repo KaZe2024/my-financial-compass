@@ -29,7 +29,7 @@ function SnapshotsPage() {
   });
   const wallets = useQuery({
     queryKey: ["wallets"],
-    queryFn: async () => (await supabase.from("wallets").select("current_balance").data ?? []),
+    queryFn: async () => (await supabase.from("wallets").select("current_balance")).data ?? [],
   });
 
   const capture = useMutation({
