@@ -179,7 +179,7 @@ function BudgetsPage() {
   });
 
   const updateNode = useMutation({
-    mutationFn: async (input: { id: string; patch: Record<string, unknown> }) => {
+    mutationFn: async (input: { id: string; patch: Partial<import("@/lib/budget-nodes").BudgetNode> }) => {
       const { error } = await supabase.from("budget_nodes").update(input.patch).eq("id", input.id);
       if (error) throw error;
     },
@@ -239,7 +239,7 @@ function BudgetsPage() {
 
       <Panel
         title={`Arbre · ${flat.length} nodes${view !== "month" ? ` · ${months.length} mois` : ""}`}
-        right={
+        action={
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -478,7 +478,7 @@ function CreateDialog({ open, onOpenChange, parent, onSubmit, pending }: {
 function EditDialog({ open, onOpenChange, node, onSubmit, pending }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   node: TreeNode | null;
-  onSubmit: (patch: Record<string, unknown>) => void;
+  onSubmit: (patch: Partial<import("@/lib/budget-nodes").BudgetNode>) => void;
   pending: boolean;
 }) {
   const [name, setName] = useState("");
