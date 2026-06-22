@@ -160,7 +160,7 @@ function AddTxDialog({ wallets, nodes, onDone }: { wallets: any[]; nodes: any[];
         currency: form.currency,
         exchange_rate: xr,
         base_amount: amt * xr,
-        budget_category_id: form.budget_category_id === "none" ? null : form.budget_category_id,
+        budget_node_id: form.budget_node_id,
         notes: form.notes || null,
       });
       if (error) throw error;
@@ -201,14 +201,8 @@ function AddTxDialog({ wallets, nodes, onDone }: { wallets: any[]; nodes: any[];
               </Field>
             )}
             {form.type !== "transfer" && (
-              <Field label="Catégorie">
-                <Select value={form.budget_category_id} onValueChange={(v) => set("budget_category_id", v)}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sans catégorie</SelectItem>
-                    {cats.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <Field label="Budget">
+                <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} />
               </Field>
             )}
           </div>
