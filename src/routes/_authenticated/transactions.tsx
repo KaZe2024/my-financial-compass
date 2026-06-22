@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { walletsQO, categoriesQO } from "@/lib/queries";
+import { walletsQO, budgetNodesQO } from "@/lib/queries";
+import { NodePicker } from "@/components/node-picker";
+import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +26,14 @@ const TX_TYPES = ["expense","income","transfer","investment","asset_purchase","a
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
-  const cats = useQuery(categoriesQO);
+  const nodesQ = useQuery(budgetNodesQO);
+  const nodeMap = (() => {
+    const tree = buildTree((nodesQ.data ?? []));
+    const flat = flattenTree(tree);
+    const m = new Map<string, string>();
+    for (const n of flat) m.set(n.id, pathLabel(n));
+    return m;
+  })();
   const [type, setType] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
@@ -32,7 +41,7 @@ function TxPage() {
   const txs = useQuery({
     queryKey: ["transactions", type, from, to],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("*, wallets:wallet_id(name), to:to_wallet_id(name), budget_categories(name)")
+      let q = supabase.from("transactions").select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
         .order("occurred_on", { ascending: false }).order("created_at", { ascending: false }).limit(200);
       if (type !== "all") q = q.eq("type", type as any);
       if (from) q = q.gte("occurred_on", from);
@@ -59,7 +68,7 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
-        <AddTxDialog wallets={wallets.data ?? []} cats={cats.data ?? []} onDone={() => qc.invalidateQueries()} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} onDone={() => qc.invalidateQueries()} />
       </header>
 
       <Panel title="Filtres">
@@ -97,7 +106,7 @@ function TxPage() {
                     <td className="num px-4 py-2 text-muted-foreground">{fmtDate(t.occurred_on)}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">{t.type}</span></td>
                     <td className="px-4 py-2">{t.description}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{t.budget_categories?.name ?? "—"}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{t.budget_node_id ? (nodeMap.get(t.budget_node_id) ?? "—") : "—"}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
                     <td className={`num px-4 py-2 text-right ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
                       {fmtMoney(Number(t.amount) * (sign || 1), t.currency, { sign: sign !== 0 })}
@@ -119,7 +128,7 @@ function TxPage() {
   );
 }
 
-function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; onDone: () => void }) {
+function AddTxDialog({ wallets, nodes, onDone }: { wallets: any[]; nodes: any[]; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     type: "expense" as (typeof TX_TYPES)[number],
@@ -130,7 +139,7 @@ function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; o
     amount: "",
     currency: "MGA",
     exchange_rate: "1",
-    budget_category_id: "none",
+    budget_node_id: null as string | null,
     notes: "",
   });
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm(s => ({ ...s, [k]: v })); }
@@ -151,7 +160,7 @@ function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; o
         currency: form.currency,
         exchange_rate: xr,
         base_amount: amt * xr,
-        budget_category_id: form.budget_category_id === "none" ? null : form.budget_category_id,
+        budget_node_id: form.budget_node_id,
         notes: form.notes || null,
       });
       if (error) throw error;
@@ -192,14 +201,8 @@ function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; o
               </Field>
             )}
             {form.type !== "transfer" && (
-              <Field label="Catégorie">
-                <Select value={form.budget_category_id} onValueChange={(v) => set("budget_category_id", v)}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sans catégorie</SelectItem>
-                    {cats.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <Field label="Budget">
+                <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} />
               </Field>
             )}
           </div>
