@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
-import { walletsQO, profileQO } from "@/lib/queries";
+import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
+import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import {
   Wallet, TrendingUp, TrendingDown, PiggyBank, Receipt, HandCoins, Landmark, Activity,
   ShieldCheck, Target, LineChart as LineIcon,
@@ -66,12 +67,13 @@ function Dashboard() {
     },
   });
 
-  const catSpend = useQuery({
-    queryKey: ["catspend", "month", monthStartISO],
+  const nodesQ = useQuery(budgetNodesQO);
+  const nodeSpend = useQuery({
+    queryKey: ["nodespend", "month", monthStartISO],
     queryFn: async () => {
-      const { data, error } = await supabase.from("v_category_spend").select("*").eq("month", monthStartISO);
+      const { data, error } = await supabase.from("v_node_spend").select("*").eq("month", monthStartISO);
       if (error) throw error;
-      return (data ?? []).filter((r: any) => r.spent > 0).sort((a: any, b: any) => b.spent - a.spent).slice(0, 6);
+      return data ?? [];
     },
   });
 
