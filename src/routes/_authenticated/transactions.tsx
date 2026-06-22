@@ -41,7 +41,7 @@ function TxPage() {
   const txs = useQuery({
     queryKey: ["transactions", type, from, to],
     queryFn: async () => {
-      let q = supabase.from("transactions").select("*, wallets:wallet_id(name), to:to_wallet_id(name), budget_categories(name)")
+      let q = supabase.from("transactions").select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
         .order("occurred_on", { ascending: false }).order("created_at", { ascending: false }).limit(200);
       if (type !== "all") q = q.eq("type", type as any);
       if (from) q = q.gte("occurred_on", from);
