@@ -68,7 +68,7 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
-        <AddTxDialog wallets={wallets.data ?? []} cats={cats.data ?? []} onDone={() => qc.invalidateQueries()} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} onDone={() => qc.invalidateQueries()} />
       </header>
 
       <Panel title="Filtres">
