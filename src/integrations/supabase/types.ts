@@ -281,6 +281,103 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_node_amounts: {
+        Row: {
+          created_at: string
+          id: string
+          node_id: string
+          notes: string | null
+          period_month: string
+          planned: number
+          revised: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          node_id: string
+          notes?: string | null
+          period_month: string
+          planned?: number
+          revised?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          node_id?: string
+          notes?: string | null
+          period_month?: string
+          planned?: number
+          revised?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_node_amounts_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_nodes: {
+        Row: {
+          archived: boolean
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          is_income: boolean
+          name: string
+          notes: string | null
+          parent_id: string | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_income?: boolean
+          name: string
+          notes?: string | null
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_income?: boolean
+          name?: string
+          notes?: string | null
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_nodes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_periods: {
         Row: {
           category_id: string
@@ -470,6 +567,7 @@ export type Database = {
       }
       financial_goals: {
         Row: {
+          budget_node_id: string | null
           created_at: string
           currency: string
           current_amount: number
@@ -483,6 +581,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          budget_node_id?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
@@ -496,6 +595,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          budget_node_id?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
@@ -509,6 +609,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "financial_goals_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "financial_goals_currency_fkey"
             columns: ["currency"]
@@ -892,6 +999,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          budget_node_id: string | null
           color: string | null
           created_at: string
           currency: string
@@ -907,6 +1015,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          budget_node_id?: string | null
           color?: string | null
           created_at?: string
           currency?: string
@@ -922,6 +1031,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          budget_node_id?: string | null
           color?: string | null
           created_at?: string
           currency?: string
@@ -937,6 +1047,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_currency_fkey"
             columns: ["currency"]
@@ -957,6 +1074,7 @@ export type Database = {
         Row: {
           actual_amount: number | null
           amount: number
+          budget_node_id: string | null
           category: string | null
           created_at: string
           currency: string
@@ -970,6 +1088,7 @@ export type Database = {
         Insert: {
           actual_amount?: number | null
           amount: number
+          budget_node_id?: string | null
           category?: string | null
           created_at?: string
           currency?: string
@@ -983,6 +1102,7 @@ export type Database = {
         Update: {
           actual_amount?: number | null
           amount?: number
+          budget_node_id?: string | null
           category?: string | null
           created_at?: string
           currency?: string
@@ -994,6 +1114,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "provisions_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "provisions_currency_fkey"
             columns: ["currency"]
@@ -1331,6 +1458,7 @@ export type Database = {
           attachment_url: string | null
           base_amount: number
           budget_category_id: string | null
+          budget_node_id: string | null
           counterparty_id: string | null
           created_at: string
           currency: string
@@ -1352,6 +1480,7 @@ export type Database = {
           attachment_url?: string | null
           base_amount: number
           budget_category_id?: string | null
+          budget_node_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           currency?: string
@@ -1373,6 +1502,7 @@ export type Database = {
           attachment_url?: string | null
           base_amount?: number
           budget_category_id?: string | null
+          budget_node_id?: string | null
           counterparty_id?: string | null
           created_at?: string
           currency?: string
@@ -1401,6 +1531,13 @@ export type Database = {
             columns: ["budget_category_id"]
             isOneToOne: false
             referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
             referencedColumns: ["id"]
           },
           {
@@ -1551,6 +1688,26 @@ export type Database = {
       }
     }
     Views: {
+      v_budget_node_tree: {
+        Row: {
+          archived: boolean | null
+          color: string | null
+          created_at: string | null
+          depth: number | null
+          icon: string | null
+          id: string | null
+          is_income: boolean | null
+          name: string | null
+          notes: string | null
+          parent_id: string | null
+          path_text: string | null
+          sort_order: number | null
+          sort_path: number[] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_category_spend: {
         Row: {
           budget_category_id: string | null
@@ -1575,6 +1732,32 @@ export type Database = {
           income: number | null
           month: string | null
           net: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      v_node_spend: {
+        Row: {
+          month: string | null
+          node_id: string | null
+          spent: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_budget_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_node_spend_rollup: {
+        Row: {
+          month: string | null
+          node_id: string | null
+          spent_rollup: number | null
           user_id: string | null
         }
         Relationships: []
