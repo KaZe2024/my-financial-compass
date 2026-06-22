@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
+import type { BudgetNode } from "@/lib/budget-nodes";
 
 export const qkWallets = ["wallets"] as const;
 export const walletsQO = queryOptions({
@@ -11,6 +12,7 @@ export const walletsQO = queryOptions({
   },
 });
 
+// Legacy categories — kept for back-compat reads only. Prefer budgetNodesQO.
 export const qkCategories = ["budget_categories"] as const;
 export const categoriesQO = queryOptions({
   queryKey: qkCategories,
@@ -18,6 +20,20 @@ export const categoriesQO = queryOptions({
     const { data, error } = await supabase.from("budget_categories").select("*, budget_groups(name, color)").order("name");
     if (error) throw error;
     return data;
+  },
+});
+
+export const qkBudgetNodes = ["budget_nodes"] as const;
+export const budgetNodesQO = queryOptions({
+  queryKey: qkBudgetNodes,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("budget_nodes")
+      .select("*")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as BudgetNode[];
   },
 });
 
