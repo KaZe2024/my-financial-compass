@@ -59,8 +59,8 @@ function BudgetsPage() {
   const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
 
   const months = useMemo(() => monthsFor(new Date(anchorMonth), view), [anchorMonth, view]);
-  const monthStartISO = months[0];
-  const monthEndExclusive = months[months.length - 1];
+  const monthStartISO = months[0]!;
+  const monthEndExclusive = months[months.length - 1]!;
 
   const amounts = useQuery({
     queryKey: ["bna", monthStartISO, monthEndExclusive],
