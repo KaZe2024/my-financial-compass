@@ -26,7 +26,14 @@ const TX_TYPES = ["expense","income","transfer","investment","asset_purchase","a
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
-  const cats = useQuery(categoriesQO);
+  const nodesQ = useQuery(budgetNodesQO);
+  const nodeMap = (() => {
+    const tree = buildTree((nodesQ.data ?? []));
+    const flat = flattenTree(tree);
+    const m = new Map<string, string>();
+    for (const n of flat) m.set(n.id, pathLabel(n));
+    return m;
+  })();
   const [type, setType] = useState<string>("all");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
