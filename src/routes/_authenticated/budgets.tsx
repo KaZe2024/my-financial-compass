@@ -1,115 +1,446 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
-import { profileQO } from "@/lib/queries";
+import {
+  ChevronRight, ChevronDown, Plus, Pencil, Trash2, Archive, ArchiveRestore,
+  ArrowUp, ArrowDown, Search, FolderTree,
+} from "lucide-react";
+import { profileQO, budgetNodesQO } from "@/lib/queries";
+import { buildTree, flattenTree, pathLabel, type TreeNode } from "@/lib/budget-nodes";
 import { fmtMoney, fmtPct, monthStart, toISODate } from "@/lib/format";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/budgets")({
   head: () => ({ meta: [{ title: "Budgets — Personal CFO" }] }),
   component: BudgetsPage,
 });
 
+function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[] {
+  const out: string[] = [];
+  const start = new Date(viewMonth);
+  start.setDate(1);
+  if (view === "month") return [toISODate(start)];
+  const count = view === "quarter" ? 3 : 12;
+  // Anchor: month for "month", quarter start for "quarter", year start for "year"
+  if (view === "quarter") {
+    const q = Math.floor(start.getMonth() / 3) * 3;
+    start.setMonth(q);
+  } else {
+    start.setMonth(0);
+  }
+  for (let i = 0; i < count; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    out.push(toISODate(d));
+  }
+  return out;
+}
+
 function BudgetsPage() {
   const qc = useQueryClient();
   const profile = useQuery(profileQO);
+  const nodesQ = useQuery(budgetNodesQO);
   const cur = profile.data?.base_currency ?? "MGA";
-  const month = toISODate(monthStart());
 
-  const groups = useQuery({
-    queryKey: ["bgroups"],
-    queryFn: async () => (await supabase.from("budget_groups").select("*").order("sort_order").order("name")).data ?? [],
+  const [anchorMonth, setAnchorMonth] = useState<string>(toISODate(monthStart()));
+  const [view, setView] = useState<"month" | "quarter" | "year">("month");
+  const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [editing, setEditing] = useState<TreeNode | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null } | null>(null);
+  const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
+
+  const months = useMemo(() => monthsFor(new Date(anchorMonth), view), [anchorMonth, view]);
+  const monthStartISO = months[0];
+  const monthEndExclusive = months[months.length - 1];
+
+  const amounts = useQuery({
+    queryKey: ["bna", monthStartISO, monthEndExclusive],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("budget_node_amounts")
+        .select("*")
+        .gte("period_month", monthStartISO)
+        .lte("period_month", monthEndExclusive);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
-  const cats = useQuery({
-    queryKey: ["bcats"],
-    queryFn: async () => (await supabase.from("budget_categories").select("*").order("name")).data ?? [],
-  });
+
   const spend = useQuery({
-    queryKey: ["catspend", month],
-    queryFn: async () => (await supabase.from("v_category_spend").select("*").eq("month", month)).data ?? [],
+    queryKey: ["nodespend-roll", monthStartISO, monthEndExclusive],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_node_spend_rollup")
+        .select("*")
+        .gte("month", monthStartISO)
+        .lte("month", monthEndExclusive);
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
-  const totalPlan = (cats.data ?? []).reduce((s, c: any) => s + Number(c.planned_monthly || 0), 0);
-  const totalSpent = (spend.data ?? []).reduce((s: number, r: any) => s + Number(r.spent || 0), 0);
-  const totalPct = totalPlan > 0 ? (totalSpent / totalPlan) * 100 : 0;
+  const directSpend = useQuery({
+    queryKey: ["nodespend", monthStartISO, monthEndExclusive],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("v_node_spend")
+        .select("*")
+        .gte("month", monthStartISO)
+        .lte("month", monthEndExclusive);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
-  const today = new Date();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const dayOfMonth = today.getDate();
-  const projection = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
-  const dailyAllowed = Math.max(0, (totalPlan - totalSpent) / Math.max(1, daysInMonth - dayOfMonth + 1));
+  const tree = useMemo(() => {
+    const visible = (nodesQ.data ?? []).filter((n) => showArchived || !n.archived);
+    return buildTree(visible);
+  }, [nodesQ.data, showArchived]);
+
+  // Aggregate planned per node across the visible window (sum of months)
+  const plannedByNode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of amounts.data ?? []) {
+      const v = Number(a.revised ?? a.planned ?? 0);
+      m.set(a.node_id, (m.get(a.node_id) ?? 0) + v);
+    }
+    return m;
+  }, [amounts.data]);
+
+  const spentRollupByNode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of spend.data ?? []) m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent_rollup));
+    return m;
+  }, [spend.data]);
+
+  const directSpendByNode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of directSpend.data ?? []) m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent));
+    return m;
+  }, [directSpend.data]);
+
+  // Planned rollup = planned of self + planned of all descendants
+  const plannedRollupByNode = useMemo(() => {
+    const out = new Map<string, number>();
+    function compute(n: TreeNode): number {
+      let total = plannedByNode.get(n.id) ?? 0;
+      for (const c of n.children) total += compute(c);
+      out.set(n.id, total);
+      return total;
+    }
+    for (const root of tree) compute(root);
+    return out;
+  }, [tree, plannedByNode]);
+
+  // Filter by search
+  const flat = useMemo(() => flattenTree(tree), [tree]);
+  const matchedIds = useMemo(() => {
+    if (!search.trim()) return null;
+    const q = search.toLowerCase();
+    return new Set(flat.filter((n) => pathLabel(n).toLowerCase().includes(q)).map((n) => n.id));
+  }, [search, flat]);
+
+  // Totals (roots only to avoid double counting)
+  const totals = useMemo(() => {
+    let planned = 0;
+    let spent = 0;
+    for (const root of tree) {
+      planned += plannedRollupByNode.get(root.id) ?? 0;
+      spent += spentRollupByNode.get(root.id) ?? 0;
+    }
+    return { planned, spent };
+  }, [tree, plannedRollupByNode, spentRollupByNode]);
+
+  const totalPct = totals.planned > 0 ? (totals.spent / totals.planned) * 100 : 0;
+  const variance = totals.planned - totals.spent;
+
+  // Mutations
+  const createNode = useMutation({
+    mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean }) => {
+      const { data: u } = await supabase.auth.getUser();
+      const siblings = (nodesQ.data ?? []).filter((n) => n.parent_id === input.parent_id);
+      const sort_order = (siblings.reduce((max, n) => Math.max(max, n.sort_order), -1) + 1);
+      const { error } = await supabase.from("budget_nodes").insert({
+        user_id: u.user!.id, name: input.name.trim(), parent_id: input.parent_id, is_income: input.is_income, sort_order,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Node créé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); setCreatingUnder(null); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateNode = useMutation({
+    mutationFn: async (input: { id: string; patch: Record<string, unknown> }) => {
+      const { error } = await supabase.from("budget_nodes").update(input.patch).eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteNode = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("budget_nodes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Supprimé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); qc.invalidateQueries({ queryKey: ["bna"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function toggle(id: string) { setExpanded((s) => ({ ...s, [id]: !s[id] })); }
+  function expandAll() { const all: Record<string, boolean> = {}; for (const n of flat) all[n.id] = true; setExpanded(all); }
+  function collapseAll() { setExpanded({}); }
+
+  function move(node: TreeNode, dir: -1 | 1) {
+    const siblings = (nodesQ.data ?? []).filter((n) => n.parent_id === node.parent_id).sort((a, b) => a.sort_order - b.sort_order);
+    const idx = siblings.findIndex((n) => n.id === node.id);
+    const target = siblings[idx + dir];
+    if (!target) return;
+    updateNode.mutate({ id: node.id, patch: { sort_order: target.sort_order } });
+    updateNode.mutate({ id: target.id, patch: { sort_order: node.sort_order } });
+  }
 
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Planification · {new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</p>
-          <h1 className="mt-1 text-2xl font-semibold">Budgets</h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Planification</p>
+          <h1 className="mt-1 text-2xl font-semibold">Budgets · Arborescence</h1>
         </div>
-        <div className="flex gap-2">
-          <AddGroupDialog onDone={() => qc.invalidateQueries({ queryKey: ["bgroups"] })} />
-          <AddCategoryDialog groups={groups.data ?? []} onDone={() => qc.invalidateQueries({ queryKey: ["bcats"] })} />
+        <div className="flex flex-wrap gap-2">
+          <Select value={view} onValueChange={(v) => setView(v as typeof view)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Mensuel</SelectItem>
+              <SelectItem value="quarter">Trimestriel</SelectItem>
+              <SelectItem value="year">Annuel</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="month" value={anchorMonth.slice(0, 7)} onChange={(e) => setAnchorMonth(`${e.target.value}-01`)} className="w-40" />
+          <Button onClick={() => setCreatingUnder({ parent: null })}><Plus className="mr-2 h-4 w-4" /> Racine</Button>
         </div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Planifié" value={fmtMoney(totalPlan, cur)} />
-        <Stat label="Dépensé" value={fmtMoney(totalSpent, cur)} />
+        <Stat label="Planifié" value={fmtMoney(totals.planned, cur)} />
+        <Stat label="Dépensé" value={fmtMoney(totals.spent, cur)} />
         <Stat label="Consommation" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
-        <Stat label="Projection fin de mois" value={fmtMoney(projection, cur)} />
+        <Stat label="Variance" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
       </section>
 
-      <Panel title="Recommandation quotidienne">
-        <p className="num text-sm">
-          Vous pouvez dépenser jusqu'à <span className="font-semibold text-primary">{fmtMoney(dailyAllowed, cur)}</span> par jour pour tenir vos budgets ce mois-ci.
-        </p>
+      <Panel
+        title={`Arbre · ${flat.length} nodes${view !== "month" ? ` · ${months.length} mois` : ""}`}
+        right={
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…" className="h-8 w-44 pl-7 text-xs" />
+            </div>
+            <Button variant="ghost" size="sm" onClick={expandAll}>Déplier</Button>
+            <Button variant="ghost" size="sm" onClick={collapseAll}>Replier</Button>
+            <label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+              archivés
+            </label>
+          </div>
+        }
+      >
+        {tree.length === 0 ? (
+          <div className="py-10 text-center">
+            <FolderTree className="mx-auto h-8 w-8 text-muted-foreground" />
+            <p className="mt-3 text-sm text-muted-foreground">Aucun budget. Créez une branche racine pour démarrer.</p>
+          </div>
+        ) : (
+          <div className="-mx-4 overflow-x-auto">
+            <table className="w-full min-w-[800px] text-sm">
+              <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2">Node</th>
+                  <th className="px-4 py-2 text-right">Planifié</th>
+                  <th className="px-4 py-2 text-right">Dépensé</th>
+                  <th className="px-4 py-2 text-right w-24">%</th>
+                  <th className="px-4 py-2 text-right">Variance</th>
+                  <th className="px-4 py-2 w-44 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tree.map((n) => (
+                  <Row
+                    key={n.id}
+                    node={n}
+                    cur={cur}
+                    expanded={expanded}
+                    matchedIds={matchedIds}
+                    toggle={toggle}
+                    onAddChild={(p) => setCreatingUnder({ parent: p })}
+                    onEdit={setEditing}
+                    onDelete={(id) => { if (confirm("Supprimer ce node et tous ses enfants ?")) deleteNode.mutate(id); }}
+                    onArchive={(node, val) => updateNode.mutate({ id: node.id, patch: { archived: val } })}
+                    onMove={move}
+                    onAmount={setAmountFor}
+                    plannedRollup={plannedRollupByNode}
+                    plannedDirect={plannedByNode}
+                    spentRollup={spentRollupByNode}
+                    spentDirect={directSpendByNode}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Panel>
 
-      <div className="space-y-4">
-        {(groups.data ?? []).map((g: any) => {
-          const groupCats = (cats.data ?? []).filter((c: any) => c.group_id === g.id);
-          if (groupCats.length === 0) return null;
-          return (
-            <Panel key={g.id} title={g.name}>
-              <div className="space-y-3">
-                {groupCats.map((c: any) => {
-                  const spent = Number((spend.data ?? []).find((r: any) => r.budget_category_id === c.id)?.spent ?? 0);
-                  const plan = Number(c.planned_monthly || 0);
-                  const pct = plan > 0 ? (spent / plan) * 100 : 0;
-                  const tone = pct >= 100 ? "bg-negative" : pct >= 90 ? "bg-warning" : pct >= 75 ? "bg-accent" : "bg-primary";
-                  return (
-                    <div key={c.id}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{c.name}</span>
-                        <span className="num text-muted-foreground">{fmtMoney(spent, cur)} / {fmtMoney(plan, cur)} · <span className={pct >= 100 ? "text-negative" : "text-foreground"}>{fmtPct(pct)}</span></span>
-                      </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div className={`h-full ${tone}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Panel>
-          );
-        })}
-        {(groups.data ?? []).length === 0 && (
-          <Panel title="Démarrer"><p className="py-6 text-center text-sm text-muted-foreground">Créez un groupe budgétaire (ex: Alimentation, Logement) puis des catégories.</p></Panel>
-        )}
-      </div>
+      <CreateDialog
+        open={!!creatingUnder}
+        onOpenChange={(v) => !v && setCreatingUnder(null)}
+        parent={creatingUnder?.parent ?? null}
+        onSubmit={(name, isIncome) => createNode.mutate({ name, parent_id: creatingUnder?.parent?.id ?? null, is_income: isIncome })}
+        pending={createNode.isPending}
+      />
+      <EditDialog
+        open={!!editing}
+        onOpenChange={(v) => !v && setEditing(null)}
+        node={editing}
+        onSubmit={(patch) => editing && updateNode.mutate({ id: editing.id, patch }, { onSuccess: () => { toast.success("Mis à jour"); setEditing(null); } })}
+        pending={updateNode.isPending}
+      />
+      <AmountDialog
+        open={!!amountFor}
+        onOpenChange={(v) => !v && setAmountFor(null)}
+        node={amountFor}
+        months={months}
+        amounts={amounts.data ?? []}
+        onDone={() => { qc.invalidateQueries({ queryKey: ["bna"] }); setAmountFor(null); }}
+        cur={cur}
+      />
     </div>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive"|"negative"|"warning" }) {
+function Row({
+  node, cur, expanded, matchedIds, toggle, onAddChild, onEdit, onDelete, onArchive, onMove, onAmount,
+  plannedRollup, plannedDirect, spentRollup, spentDirect,
+}: {
+  node: TreeNode; cur: string;
+  expanded: Record<string, boolean>;
+  matchedIds: Set<string> | null;
+  toggle: (id: string) => void;
+  onAddChild: (n: TreeNode | null) => void;
+  onEdit: (n: TreeNode) => void;
+  onDelete: (id: string) => void;
+  onArchive: (n: TreeNode, val: boolean) => void;
+  onMove: (n: TreeNode, dir: -1 | 1) => void;
+  onAmount: (n: TreeNode) => void;
+  plannedRollup: Map<string, number>;
+  plannedDirect: Map<string, number>;
+  spentRollup: Map<string, number>;
+  spentDirect: Map<string, number>;
+}) {
+  // Match filter: render only if self or any descendant matches
+  if (matchedIds && !matchedIds.has(node.id)) {
+    const anyDesc = node.children.some((c) => subtreeHasMatch(c, matchedIds));
+    if (!anyDesc) return null;
+  }
+  const isOpen = expanded[node.id] ?? !!matchedIds; // expand all when searching
+  const planned = node.childCount > 0 ? (plannedRollup.get(node.id) ?? 0) : (plannedDirect.get(node.id) ?? 0);
+  const spent = node.childCount > 0 ? (spentRollup.get(node.id) ?? 0) : (spentDirect.get(node.id) ?? 0);
+  const pct = planned > 0 ? (spent / planned) * 100 : 0;
+  const variance = planned - spent;
+  const toneBar = pct >= 100 ? "bg-negative" : pct >= 90 ? "bg-warning" : pct >= 75 ? "bg-accent" : "bg-primary";
+
+  return (
+    <>
+      <tr className={cn("border-t border-border/60 hover:bg-muted/40", node.archived && "opacity-50")}>
+        <td className="px-4 py-2">
+          <div className="flex items-center gap-1" style={{ paddingLeft: node.depth * 18 }}>
+            {node.childCount > 0 ? (
+              <button onClick={() => toggle(node.id)} className="text-muted-foreground hover:text-foreground">
+                {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              </button>
+            ) : <span className="inline-block w-3.5" />}
+            <span className={cn("font-medium", node.is_income && "text-positive")}>{node.name}</span>
+            {node.childCount > 0 && (
+              <span className="ml-1.5 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">{node.childCount}</span>
+            )}
+            {node.archived && <span className="ml-1.5 font-mono text-[9px] uppercase text-muted-foreground">archivé</span>}
+          </div>
+        </td>
+        <td className="num px-4 py-2 text-right">{fmtMoney(planned, cur)}</td>
+        <td className="num px-4 py-2 text-right">{fmtMoney(spent, cur)}</td>
+        <td className="px-4 py-2 text-right">
+          {planned > 0 ? (
+            <div className="ml-auto w-20">
+              <div className="text-right text-[10px] text-muted-foreground">{fmtPct(pct)}</div>
+              <div className="mt-0.5 h-1 rounded-sm bg-muted">
+                <div className={cn("h-full rounded-sm", toneBar)} style={{ width: `${Math.min(100, pct)}%` }} />
+              </div>
+            </div>
+          ) : <span className="text-muted-foreground">—</span>}
+        </td>
+        <td className={cn("num px-4 py-2 text-right", variance < 0 ? "text-negative" : "text-positive")}>
+          {planned > 0 ? fmtMoney(variance, cur) : "—"}
+        </td>
+        <td className="px-4 py-2">
+          <div className="flex justify-end gap-0.5 text-muted-foreground">
+            <IconBtn title="Monter" onClick={() => onMove(node, -1)}><ArrowUp className="h-3.5 w-3.5" /></IconBtn>
+            <IconBtn title="Descendre" onClick={() => onMove(node, 1)}><ArrowDown className="h-3.5 w-3.5" /></IconBtn>
+            <IconBtn title="Montant mensuel" onClick={() => onAmount(node)}><span className="font-mono text-[10px]">$</span></IconBtn>
+            <IconBtn title="Ajouter enfant" onClick={() => onAddChild(node)}><Plus className="h-3.5 w-3.5" /></IconBtn>
+            <IconBtn title="Renommer" onClick={() => onEdit(node)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
+            <IconBtn title={node.archived ? "Désarchiver" : "Archiver"} onClick={() => onArchive(node, !node.archived)}>
+              {node.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+            </IconBtn>
+            <IconBtn title="Supprimer" onClick={() => onDelete(node.id)} hoverClass="hover:text-negative"><Trash2 className="h-3.5 w-3.5" /></IconBtn>
+          </div>
+        </td>
+      </tr>
+      {isOpen && node.children.map((c) => (
+        <Row
+          key={c.id}
+          node={c}
+          cur={cur}
+          expanded={expanded}
+          matchedIds={matchedIds}
+          toggle={toggle}
+          onAddChild={onAddChild}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onArchive={onArchive}
+          onMove={onMove}
+          onAmount={onAmount}
+          plannedRollup={plannedRollup}
+          plannedDirect={plannedDirect}
+          spentRollup={spentRollup}
+          spentDirect={spentDirect}
+        />
+      ))}
+    </>
+  );
+}
+
+function subtreeHasMatch(n: TreeNode, ids: Set<string>): boolean {
+  if (ids.has(n.id)) return true;
+  return n.children.some((c) => subtreeHasMatch(c, ids));
+}
+
+function IconBtn({ children, onClick, title, hoverClass }: { children: React.ReactNode; onClick: () => void; title: string; hoverClass?: string }) {
+  return (
+    <button title={title} onClick={onClick} className={cn("rounded-sm p-1 hover:bg-muted hover:text-foreground", hoverClass)}>
+      {children}
+    </button>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" | "warning" }) {
   const c = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : tone === "warning" ? "text-warning" : "";
   return (
     <div className="rounded-md border border-border bg-card p-4">
@@ -119,63 +450,121 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "po
   );
 }
 
-function AddGroupDialog({ onDone }: { onDone: () => void }) {
-  const [open, setOpen] = useState(false);
+function CreateDialog({ open, onOpenChange, parent, onSubmit, pending }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  parent: TreeNode | null;
+  onSubmit: (name: string, isIncome: boolean) => void;
+  pending: boolean;
+}) {
   const [name, setName] = useState("");
-  const m = useMutation({
-    mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("budget_groups").insert({ user_id: u.user!.id, name });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Groupe créé"); setOpen(false); setName(""); onDone(); },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const [isIncome, setIsIncome] = useState(false);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="secondary"><Plus className="mr-2 h-4 w-4" /> Groupe</Button></DialogTrigger>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (v) { setName(""); setIsIncome(parent?.is_income ?? false); } }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Nouveau groupe budgétaire</DialogTitle></DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
-          <DialogFooter><Button type="submit" disabled={m.isPending}>Créer</Button></DialogFooter>
+        <DialogHeader><DialogTitle>{parent ? `Nouveau sous-node de « ${parent.name} »` : "Nouveau node racine"}</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSubmit(name, isIncome); }} className="space-y-3">
+          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus /></div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
+            Branche de revenu
+          </label>
+          <DialogFooter><Button type="submit" disabled={pending}>Créer</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
 
-function AddCategoryDialog({ groups, onDone }: { groups: any[]; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
+function EditDialog({ open, onOpenChange, node, onSubmit, pending }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  node: TreeNode | null;
+  onSubmit: (patch: Record<string, unknown>) => void;
+  pending: boolean;
+}) {
   const [name, setName] = useState("");
-  const [groupId, setGroupId] = useState("");
-  const [planned, setPlanned] = useState("0");
-  const m = useMutation({
+  const [color, setColor] = useState("");
+  const [isIncome, setIsIncome] = useState(false);
+  useMemoSetter(node, (n) => { setName(n.name); setColor(n.color ?? ""); setIsIncome(n.is_income); });
+  if (!node) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Modifier « {node.name} »</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name: name.trim(), color: color || null, is_income: isIncome }); }} className="space-y-3">
+          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
+          <div className="space-y-1.5"><Label>Couleur (hex)</Label><Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#10b981" /></div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
+            Branche de revenu
+          </label>
+          <DialogFooter><Button type="submit" disabled={pending}>Enregistrer</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function useMemoSetter<T>(value: T | null, fn: (v: T) => void) {
+  useMemo(() => { if (value) fn(value); }, [value]);
+}
+
+function AmountDialog({ open, onOpenChange, node, months, amounts, onDone, cur }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  node: TreeNode | null; months: string[]; amounts: any[]; onDone: () => void; cur: string;
+}) {
+  const qc = useQueryClient();
+  const initial: Record<string, { planned: string; revised: string }> = {};
+  for (const m of months) {
+    const row = amounts.find((a) => a.node_id === node?.id && a.period_month === m);
+    initial[m] = { planned: row ? String(row.planned) : "0", revised: row?.revised != null ? String(row.revised) : "" };
+  }
+  const [vals, setVals] = useState(initial);
+  useMemoSetter(node, () => setVals(initial));
+
+  const save = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("budget_categories").insert({
-        user_id: u.user!.id, name, group_id: groupId || null, planned_monthly: Number(planned || 0),
-      });
+      const rows = months.map((m) => ({
+        user_id: u.user!.id,
+        node_id: node!.id,
+        period_month: m,
+        planned: Number(vals[m]?.planned || 0),
+        revised: vals[m]?.revised === "" ? null : Number(vals[m]!.revised),
+      }));
+      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Catégorie créée"); setOpen(false); setName(""); setPlanned("0"); onDone(); },
+    onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (!node) return null;
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Catégorie</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Nouvelle catégorie</DialogTitle></DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
-          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
-          <div className="space-y-1.5"><Label>Groupe</Label>
-            <Select value={groupId} onValueChange={setGroupId}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>{groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
-            </Select>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Montants · {pathLabel(node)} <span className="ml-2 font-mono text-[10px] text-muted-foreground">{cur}</span></DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+          <div className="scroll-thin max-h-[50vh] overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr><th className="py-2">Mois</th><th className="py-2">Planifié</th><th className="py-2">Révisé</th></tr>
+              </thead>
+              <tbody>
+                {months.map((m) => (
+                  <tr key={m} className="border-t border-border/60">
+                    <td className="py-1.5 pr-3 font-mono text-xs">{m.slice(0, 7)}</td>
+                    <td className="py-1.5 pr-3">
+                      <Input type="number" step="any" value={vals[m]?.planned ?? "0"} onChange={(e) => setVals((s) => ({ ...s, [m]: { ...s[m], planned: e.target.value } }))} className="h-8" />
+                    </td>
+                    <td className="py-1.5">
+                      <Input type="number" step="any" value={vals[m]?.revised ?? ""} placeholder="—" onChange={(e) => setVals((s) => ({ ...s, [m]: { ...s[m], revised: e.target.value } }))} className="h-8" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="space-y-1.5"><Label>Budget mensuel</Label><Input type="number" step="any" value={planned} onChange={(e) => setPlanned(e.target.value)} /></div>
-          <DialogFooter><Button type="submit" disabled={m.isPending}>Créer</Button></DialogFooter>
+          <DialogFooter><Button type="submit" disabled={save.isPending}>Enregistrer</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
