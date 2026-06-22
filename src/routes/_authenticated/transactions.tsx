@@ -106,7 +106,7 @@ function TxPage() {
                     <td className="num px-4 py-2 text-muted-foreground">{fmtDate(t.occurred_on)}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">{t.type}</span></td>
                     <td className="px-4 py-2">{t.description}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{t.budget_categories?.name ?? "—"}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{t.budget_node_id ? (nodeMap.get(t.budget_node_id) ?? "—") : "—"}</td>
                     <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
                     <td className={`num px-4 py-2 text-right ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
                       {fmtMoney(Number(t.amount) * (sign || 1), t.currency, { sign: sign !== 0 })}
