@@ -128,7 +128,7 @@ function TxPage() {
   );
 }
 
-function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; onDone: () => void }) {
+function AddTxDialog({ wallets, nodes, onDone }: { wallets: any[]; nodes: any[]; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     type: "expense" as (typeof TX_TYPES)[number],
@@ -139,7 +139,7 @@ function AddTxDialog({ wallets, cats, onDone }: { wallets: any[]; cats: any[]; o
     amount: "",
     currency: "MGA",
     exchange_rate: "1",
-    budget_category_id: "none",
+    budget_node_id: null as string | null,
     notes: "",
   });
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) { setForm(s => ({ ...s, [k]: v })); }
