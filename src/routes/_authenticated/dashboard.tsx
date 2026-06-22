@@ -353,19 +353,47 @@ function Dashboard() {
           </div>
         </Panel>
 
-        <Panel title="Dépenses du mois · catégories">
-          <div className="h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={(catSpend.data ?? []).map((r: any) => ({ name: r.category_name ?? "Sans catégorie", value: Number(r.spent) }))}
-                  dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
-                  {(catSpend.data ?? []).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        <Panel title="Dépenses du mois · branches">
+          {(() => {
+            const tree = buildTree(nodesQ.data ?? []);
+            const flat = flattenTree(tree);
+            // Sum per root, rolling up all descendants
+            const spendByNode = new Map<string, number>();
+            for (const r of nodeSpend.data ?? []) if (r.node_id) spendByNode.set(r.node_id, Number(r.spent));
+            function sumSubtree(id: string): number {
+              const n = flat.find((x) => x.id === id);
+              if (!n) return 0;
+              let s = spendByNode.get(id) ?? 0;
+              for (const c of n.children) s += sumSubtree(c.id);
+              return s;
+            }
+            const rootData = tree
+              .map((r) => ({ name: pathLabel(r), value: sumSubtree(r.id) }))
+              .filter((x) => x.value > 0)
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 8);
+            // Also: unassigned
+            const assignedIds = new Set(flat.map((n) => n.id));
+            const unassigned = (nodeSpend.data ?? []).filter((r) => !r.node_id || !assignedIds.has(r.node_id))
+              .reduce((s, r) => s + Number(r.spent), 0);
+            if (unassigned > 0) rootData.push({ name: "Non assigné", value: unassigned });
+            return (
+              <>
+                <div className="h-64">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={rootData} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
+                        {rootData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                {rootData.length === 0 && <p className="mt-2 text-center text-xs text-muted-foreground">Aucune dépense liée à un budget ce mois-ci.</p>}
+              </>
+            );
+          })()}
         </Panel>
       </section>
 
