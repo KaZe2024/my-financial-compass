@@ -511,7 +511,7 @@ function EditDialog({ open, onOpenChange, node, onSubmit, pending }: {
 }
 
 function useMemoSetter<T>(value: T | null, fn: (v: T) => void) {
-  useMemo(() => { if (value) fn(value); }, [value]);
+  useEffect(() => { if (value) fn(value); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [value]);
 }
 
 function AmountDialog({ open, onOpenChange, node, months, amounts, onDone, cur }: {
