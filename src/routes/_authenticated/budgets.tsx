@@ -118,13 +118,19 @@ function BudgetsPage() {
 
   const spentRollupByNode = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of spend.data ?? []) m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent_rollup));
+    for (const r of spend.data ?? []) {
+      if (!r.node_id) continue;
+      m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent_rollup));
+    }
     return m;
   }, [spend.data]);
 
   const directSpendByNode = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of directSpend.data ?? []) m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent));
+    for (const r of directSpend.data ?? []) {
+      if (!r.node_id) continue;
+      m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent));
+    }
     return m;
   }, [directSpend.data]);
 
