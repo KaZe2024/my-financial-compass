@@ -379,8 +379,12 @@ function Row({
               </button>
             ) : <span className="inline-block w-3.5" />}
             <span className={cn("font-medium", node.is_income && "text-positive")}>{node.name}</span>
+            <span className="ml-1.5 rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">{levelLabel}</span>
             {node.childCount > 0 && (
-              <span className="ml-1.5 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">{node.childCount}</span>
+              <span className="ml-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">{node.childCount}</span>
+            )}
+            {isLocked && (
+              <span className="ml-1 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-warning" title="Montant calculé = somme des enfants">∑</span>
             )}
             {node.archived && <span className="ml-1.5 font-mono text-[9px] uppercase text-muted-foreground">archivé</span>}
           </div>
@@ -404,9 +408,16 @@ function Row({
           <div className="flex justify-end gap-0.5 text-muted-foreground">
             <IconBtn title="Monter" onClick={() => onMove(node, -1)}><ArrowUp className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="Descendre" onClick={() => onMove(node, 1)}><ArrowDown className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="Montant mensuel" onClick={() => onAmount(node)}><span className="font-mono text-[10px]">$</span></IconBtn>
-            <IconBtn title="Ajouter enfant" onClick={() => onAddChild(node)}><Plus className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn title="Renommer" onClick={() => onEdit(node)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
+            <IconBtn
+              title={isLocked ? "Verrouillé · somme des enfants" : "Montant mensuel"}
+              onClick={() => { if (isLocked) { toast.info("Montant calculé automatiquement à partir des sous-éléments"); return; } onAmount(node); }}
+            >
+              <span className={cn("font-mono text-[10px]", isLocked && "opacity-40")}>$</span>
+            </IconBtn>
+            {canAddChild ? (
+              <IconBtn title="Ajouter enfant" onClick={() => onAddChild(node)}><Plus className="h-3.5 w-3.5" /></IconBtn>
+            ) : <span className="inline-block w-6" />}
+            <IconBtn title="Modifier" onClick={() => onEdit(node)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title={node.archived ? "Désarchiver" : "Archiver"} onClick={() => onArchive(node, !node.archived)}>
               {node.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
             </IconBtn>
@@ -432,6 +443,7 @@ function Row({
           plannedDirect={plannedDirect}
           spentRollup={spentRollup}
           spentDirect={spentDirect}
+          maxDepth={maxDepth}
         />
       ))}
     </>
