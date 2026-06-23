@@ -335,7 +335,7 @@ function BudgetsPage() {
 
 function Row({
   node, cur, expanded, matchedIds, toggle, onAddChild, onEdit, onDelete, onArchive, onMove, onAmount,
-  plannedRollup, plannedDirect, spentRollup, spentDirect,
+  plannedRollup, plannedDirect, spentRollup, spentDirect, maxDepth = 2,
 }: {
   node: TreeNode; cur: string;
   expanded: Record<string, boolean>;
@@ -351,6 +351,7 @@ function Row({
   plannedDirect: Map<string, number>;
   spentRollup: Map<string, number>;
   spentDirect: Map<string, number>;
+  maxDepth?: number;
 }) {
   // Match filter: render only if self or any descendant matches
   if (matchedIds && !matchedIds.has(node.id)) {
@@ -363,6 +364,9 @@ function Row({
   const pct = planned > 0 ? (spent / planned) * 100 : 0;
   const variance = planned - spent;
   const toneBar = pct >= 100 ? "bg-negative" : pct >= 90 ? "bg-warning" : pct >= 75 ? "bg-accent" : "bg-primary";
+  const canAddChild = node.depth < maxDepth;
+  const isLocked = node.childCount > 0;
+  const levelLabel = node.depth === 0 ? "Ligne" : node.depth === 1 ? "Catégorie" : "Sous-cat.";
 
   return (
     <>
