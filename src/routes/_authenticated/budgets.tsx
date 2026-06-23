@@ -297,6 +297,7 @@ function BudgetsPage() {
                     plannedDirect={plannedByNode}
                     spentRollup={spentRollupByNode}
                     spentDirect={directSpendByNode}
+                    maxDepth={2}
                   />
                 ))}
               </tbody>
