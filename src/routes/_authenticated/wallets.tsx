@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { walletsQO, profileQO } from "@/lib/queries";
 import { Panel } from "@/components/stat-card";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Wallet as WalletIcon, ArrowLeftRight } from "lucide-react";
+import { Plus, Wallet as WalletIcon, ArrowLeftRight, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -26,8 +26,28 @@ function WalletsPage() {
   const wallets = useQuery(walletsQO);
   const profile = useQuery(profileQO);
   const baseCur = profile.data?.base_currency ?? "MGA";
+  const [showArchived, setShowArchived] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
 
-  const total = (wallets.data ?? []).reduce((s, w) => s + Number(w.current_balance), 0);
+  const visible = (wallets.data ?? []).filter((w: any) => showArchived || w.status !== "archived");
+  const total = visible.filter((w: any) => w.status === "active").reduce((s: number, w: any) => s + Number(w.current_balance), 0);
+
+  const update = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
+      const { error } = await supabase.from("wallets").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("wallets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); toast.success("Portefeuille supprimé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -38,14 +58,20 @@ function WalletsPage() {
           <p className="num mt-1 text-sm text-muted-foreground">Solde consolidé · <span className="text-foreground">{fmtMoney(total, baseCur)}</span></p>
         </div>
         <div className="flex gap-2">
-          <TransferDialog wallets={wallets.data ?? []} onDone={() => qc.invalidateQueries()} />
+          <label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            archivés
+          </label>
+          <TransferDialog wallets={(wallets.data ?? []).filter((w: any) => w.status === "active")} onDone={() => qc.invalidateQueries()} />
           <AddWalletDialog defaultCur={baseCur} onDone={() => qc.invalidateQueries({ queryKey: ["wallets"] })} />
         </div>
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(wallets.data ?? []).map((w) => (
-          <div key={w.id} className="group rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40">
+        {visible.map((w: any) => {
+          const isArchived = w.status === "archived";
+          return (
+          <div key={w.id} className={`group rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40 ${isArchived ? "opacity-60" : ""}`}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium">
@@ -59,14 +85,42 @@ function WalletsPage() {
               {fmtMoney(Number(w.current_balance), w.currency)}
             </div>
             <div className="mt-1 text-xs text-muted-foreground">Ouverture · {fmtMoney(Number(w.opening_balance), w.currency)}</div>
+            <div className="mt-3 flex justify-end gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              <button title="Modifier" onClick={() => setEditing(w)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                title={isArchived ? "Désarchiver" : "Archiver"}
+                onClick={() => update.mutate({ id: w.id, patch: { status: isArchived ? "active" : "archived" } })}
+                className="rounded-sm p-1 hover:bg-muted hover:text-foreground"
+              >
+                {isArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                title="Supprimer"
+                onClick={() => confirm("Supprimer ce portefeuille ? Les transactions liées bloqueront la suppression.") && remove.mutate(w.id)}
+                className="rounded-sm p-1 hover:bg-muted hover:text-negative"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-        ))}
-        {(wallets.data ?? []).length === 0 && (
+          );
+        })}
+        {visible.length === 0 && (
           <Panel title="Vide" className="sm:col-span-2 lg:col-span-3">
             <p className="py-8 text-center text-sm text-muted-foreground">Créez votre premier portefeuille pour commencer.</p>
           </Panel>
         )}
       </section>
+
+      {editing && (
+        <EditWalletDialog
+          wallet={editing}
+          onClose={() => setEditing(null)}
+          onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["wallets"] }); }}
+        />
+      )}
     </div>
   );
 }
@@ -114,6 +168,61 @@ function AddWalletDialog({ defaultCur, onDone }: { defaultCur: string; onDone: (
           </div>
           <Field label="Solde d'ouverture"><Input type="number" step="any" value={opening} onChange={(e) => setOpening(e.target.value)} /></Field>
           <DialogFooter><Button type="submit" disabled={m.isPending}>{m.isPending ? "..." : "Créer"}</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditWalletDialog({ wallet, onClose, onDone }: { wallet: any; onClose: () => void; onDone: () => void }) {
+  const [name, setName] = useState(wallet.name);
+  const [type, setType] = useState<(typeof TYPES)[number]>(wallet.type);
+  const [currency, setCurrency] = useState(wallet.currency);
+  const [status, setStatus] = useState(wallet.status);
+  const [notes, setNotes] = useState(wallet.notes ?? "");
+  useEffect(() => {
+    setName(wallet.name); setType(wallet.type); setCurrency(wallet.currency); setStatus(wallet.status); setNotes(wallet.notes ?? "");
+  }, [wallet]);
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("wallets").update({ name, type, currency, status, notes: notes || null }).eq("id", wallet.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Portefeuille modifié"); onDone(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Modifier · {wallet.name}</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+          <Field label="Nom"><Input value={name} onChange={(e) => setName(e.target.value)} required /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Type">
+              <Select value={type} onValueChange={(v) => setType(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field label="Devise">
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Field label="Statut">
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["active","archived","closed"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Notes"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+          <DialogFooter><Button type="submit" disabled={m.isPending}>Enregistrer</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
