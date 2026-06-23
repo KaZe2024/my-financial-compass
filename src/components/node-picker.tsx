@@ -58,18 +58,19 @@ export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionne
             <CommandGroup>
               {flat.map((n: TreeNode) => {
                 const disabled = !allowBranches && n.childCount > 0;
+                const label = hidePath ? n.name : pathLabel(n);
                 return (
                   <CommandItem
                     key={n.id}
-                    value={`${n.id}|${pathLabel(n)}`}
+                    value={`${n.id}|${label}`}
                     disabled={disabled}
                     onSelect={() => { onChange(n.id); setOpen(false); }}
                     className={cn("flex items-center gap-2", disabled && "opacity-40")}
-                    style={{ paddingLeft: 8 + n.depth * 14 }}
+                    style={{ paddingLeft: onlyDepth != null ? 8 : 8 + n.depth * 14 }}
                   >
                     <Check className={cn("h-3.5 w-3.5", n.id === value ? "opacity-100" : "opacity-0")} />
-                    <span className="truncate">{n.name}</span>
-                    {n.childCount > 0 && (
+                    <span className="truncate">{hidePath ? n.name : label}</span>
+                    {onlyDepth == null && n.childCount > 0 && (
                       <span className="ml-auto font-mono text-[9px] text-muted-foreground">{n.descendantCount}</span>
                     )}
                   </CommandItem>
