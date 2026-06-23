@@ -13,13 +13,18 @@ type Props = {
   placeholder?: string;
   /** When true, allow non-leaf nodes to be picked. Defaults to true. */
   allowBranches?: boolean;
+  /** Restrict selectable / visible nodes to a specific tree depth (0 = root). */
+  onlyDepth?: number;
+  /** When true, render only the leaf name (no parent path). */
+  hidePath?: boolean;
 };
 
-export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true }: Props) {
+export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true, onlyDepth, hidePath = false }: Props) {
   const [open, setOpen] = useState(false);
   const tree = useMemo(() => buildTree(nodes.filter((n) => !n.archived)), [nodes]);
-  const flat = useMemo(() => flattenTree(tree), [tree]);
-  const selected = flat.find((n) => n.id === value) ?? null;
+  const flatAll = useMemo(() => flattenTree(tree), [tree]);
+  const flat = useMemo(() => onlyDepth != null ? flatAll.filter((n) => n.depth === onlyDepth) : flatAll, [flatAll, onlyDepth]);
+  const selected = flatAll.find((n) => n.id === value) ?? null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
