@@ -31,7 +31,7 @@ export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionne
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
           <span className="truncate text-left">
-            {selected ? pathLabel(selected) : <span className="text-muted-foreground">{placeholder}</span>}
+            {selected ? (hidePath ? selected.name : pathLabel(selected)) : <span className="text-muted-foreground">{placeholder}</span>}
           </span>
           <div className="flex items-center gap-1">
             {selected && (
