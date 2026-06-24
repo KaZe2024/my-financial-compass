@@ -333,6 +333,7 @@ export type Database = {
           icon: string | null
           id: string
           is_income: boolean
+          kind: string
           name: string
           notes: string | null
           parent_id: string | null
@@ -347,6 +348,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_income?: boolean
+          kind?: string
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -361,6 +363,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_income?: boolean
+          kind?: string
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -975,6 +978,9 @@ export type Database = {
           full_name: string | null
           id: string
           locale: string
+          shopping_default_node_id: string | null
+          shopping_default_tag_ids: string[]
+          shopping_default_wallet_id: string | null
           updated_at: string
         }
         Insert: {
@@ -984,6 +990,9 @@ export type Database = {
           full_name?: string | null
           id: string
           locale?: string
+          shopping_default_node_id?: string | null
+          shopping_default_tag_ids?: string[]
+          shopping_default_wallet_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -993,9 +1002,27 @@ export type Database = {
           full_name?: string | null
           id?: string
           locale?: string
+          shopping_default_node_id?: string | null
+          shopping_default_tag_ids?: string[]
+          shopping_default_wallet_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_shopping_default_node_id_fkey"
+            columns: ["shopping_default_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_shopping_default_wallet_id_fkey"
+            columns: ["shopping_default_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
