@@ -333,6 +333,7 @@ export type Database = {
           icon: string | null
           id: string
           is_income: boolean
+          kind: string
           name: string
           notes: string | null
           parent_id: string | null
@@ -347,6 +348,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_income?: boolean
+          kind?: string
           name: string
           notes?: string | null
           parent_id?: string | null
@@ -361,6 +363,7 @@ export type Database = {
           icon?: string | null
           id?: string
           is_income?: boolean
+          kind?: string
           name?: string
           notes?: string | null
           parent_id?: string | null
@@ -975,6 +978,9 @@ export type Database = {
           full_name: string | null
           id: string
           locale: string
+          shopping_default_node_id: string | null
+          shopping_default_tag_ids: string[]
+          shopping_default_wallet_id: string | null
           updated_at: string
         }
         Insert: {
@@ -984,6 +990,9 @@ export type Database = {
           full_name?: string | null
           id: string
           locale?: string
+          shopping_default_node_id?: string | null
+          shopping_default_tag_ids?: string[]
+          shopping_default_wallet_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -993,9 +1002,27 @@ export type Database = {
           full_name?: string | null
           id?: string
           locale?: string
+          shopping_default_node_id?: string | null
+          shopping_default_tag_ids?: string[]
+          shopping_default_wallet_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_shopping_default_node_id_fkey"
+            columns: ["shopping_default_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_shopping_default_wallet_id_fkey"
+            columns: ["shopping_default_wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
@@ -1265,6 +1292,7 @@ export type Database = {
       }
       shopping_list_items: {
         Row: {
+          checked: boolean
           created_at: string
           id: string
           list_id: string
@@ -1277,6 +1305,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          checked?: boolean
           created_at?: string
           id?: string
           list_id: string
@@ -1289,6 +1318,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          checked?: boolean
           created_at?: string
           id?: string
           list_id?: string
@@ -1319,39 +1349,58 @@ export type Database = {
       }
       shopping_lists: {
         Row: {
+          budget_node_id: string | null
           created_at: string
           currency: string
           id: string
           notes: string | null
           occurred_on: string
           store: string | null
+          tag_ids: string[]
+          title: string | null
           total: number
           transaction_id: string | null
           user_id: string
+          wallet_id: string | null
         }
         Insert: {
+          budget_node_id?: string | null
           created_at?: string
           currency?: string
           id?: string
           notes?: string | null
           occurred_on?: string
           store?: string | null
+          tag_ids?: string[]
+          title?: string | null
           total?: number
           transaction_id?: string | null
           user_id: string
+          wallet_id?: string | null
         }
         Update: {
+          budget_node_id?: string | null
           created_at?: string
           currency?: string
           id?: string
           notes?: string | null
           occurred_on?: string
           store?: string | null
+          tag_ids?: string[]
+          title?: string | null
           total?: number
           transaction_id?: string | null
           user_id?: string
+          wallet_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "shopping_lists_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "shopping_lists_currency_fkey"
             columns: ["currency"]
@@ -1364,6 +1413,13 @@ export type Database = {
             columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_lists_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
             referencedColumns: ["id"]
           },
         ]

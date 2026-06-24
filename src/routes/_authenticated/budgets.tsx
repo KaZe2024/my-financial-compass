@@ -10,10 +10,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ChevronRight, ChevronDown, Plus, Pencil, Trash2, Archive, ArchiveRestore,
-  ArrowUp, ArrowDown, Search, FolderTree,
+  ArrowUp, ArrowDown, Search, FolderTree, GripVertical, Sigma,
 } from "lucide-react";
 import { profileQO, budgetNodesQO } from "@/lib/queries";
-import { buildTree, flattenTree, pathLabel, type TreeNode } from "@/lib/budget-nodes";
+import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
 import { fmtMoney, fmtPct, monthStart, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,6 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   start.setDate(1);
   if (view === "month") return [toISODate(start)];
   const count = view === "quarter" ? 3 : 12;
-  // Anchor: month for "month", quarter start for "quarter", year start for "year"
   if (view === "quarter") {
     const q = Math.floor(start.getMonth() / 3) * 3;
     start.setMonth(q);
@@ -43,6 +42,8 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   return out;
 }
 
+type DropZone = "before" | "after" | "child";
+
 function BudgetsPage() {
   const qc = useQueryClient();
   const profile = useQuery(profileQO);
@@ -55,7 +56,7 @@ function BudgetsPage() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<TreeNode | null>(null);
-  const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null } | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null; kind: "normal" | "subtotal" } | null>(null);
   const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
 
   const months = useMemo(() => monthsFor(new Date(anchorMonth), view), [anchorMonth, view]);
@@ -106,7 +107,6 @@ function BudgetsPage() {
     return buildTree(visible);
   }, [nodesQ.data, showArchived]);
 
-  // Aggregate planned per node across the visible window (sum of months)
   const plannedByNode = useMemo(() => {
     const m = new Map<string, number>();
     for (const a of amounts.data ?? []) {
@@ -134,10 +134,10 @@ function BudgetsPage() {
     return m;
   }, [directSpend.data]);
 
-  // Planned rollup = planned of self + planned of all descendants
   const plannedRollupByNode = useMemo(() => {
     const out = new Map<string, number>();
     function compute(n: TreeNode): number {
+      if (n.kind === "subtotal") { out.set(n.id, 0); return 0; }
       let total = plannedByNode.get(n.id) ?? 0;
       for (const c of n.children) total += compute(c);
       out.set(n.id, total);
@@ -147,7 +147,12 @@ function BudgetsPage() {
     return out;
   }, [tree, plannedByNode]);
 
-  // Filter by search
+  // Subtotal aggregates (planned and spent), based on rollups of preceding normal siblings.
+  const subtotals = useMemo(
+    () => computeSubtotals(tree, plannedRollupByNode, spentRollupByNode),
+    [tree, plannedRollupByNode, spentRollupByNode],
+  );
+
   const flat = useMemo(() => flattenTree(tree), [tree]);
   const matchedIds = useMemo(() => {
     if (!search.trim()) return null;
@@ -155,11 +160,10 @@ function BudgetsPage() {
     return new Set(flat.filter((n) => pathLabel(n).toLowerCase().includes(q)).map((n) => n.id));
   }, [search, flat]);
 
-  // Totals (roots only to avoid double counting)
   const totals = useMemo(() => {
-    let planned = 0;
-    let spent = 0;
+    let planned = 0, spent = 0;
     for (const root of tree) {
+      if (root.kind === "subtotal") continue;
       planned += plannedRollupByNode.get(root.id) ?? 0;
       spent += spentRollupByNode.get(root.id) ?? 0;
     }
@@ -169,23 +173,23 @@ function BudgetsPage() {
   const totalPct = totals.planned > 0 ? (totals.spent / totals.planned) * 100 : 0;
   const variance = totals.planned - totals.spent;
 
-  // Mutations
   const createNode = useMutation({
-    mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean }) => {
+    mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
       const { data: u } = await supabase.auth.getUser();
       const siblings = (nodesQ.data ?? []).filter((n) => n.parent_id === input.parent_id);
       const sort_order = (siblings.reduce((max, n) => Math.max(max, n.sort_order), -1) + 1);
       const { error } = await supabase.from("budget_nodes").insert({
-        user_id: u.user!.id, name: input.name.trim(), parent_id: input.parent_id, is_income: input.is_income, sort_order,
+        user_id: u.user!.id, name: input.name.trim(), parent_id: input.parent_id,
+        is_income: input.is_income, sort_order, kind: input.kind,
       });
       if (error) throw error;
     },
-    onSuccess: () => { toast.success("Node créé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); setCreatingUnder(null); },
+    onSuccess: () => { toast.success("Créé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); setCreatingUnder(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const updateNode = useMutation({
-    mutationFn: async (input: { id: string; patch: Partial<import("@/lib/budget-nodes").BudgetNode> }) => {
+    mutationFn: async (input: { id: string; patch: Partial<BudgetNode> }) => {
       const { error } = await supabase.from("budget_nodes").update(input.patch).eq("id", input.id);
       if (error) throw error;
     },
@@ -202,6 +206,36 @@ function BudgetsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Reorder/reparent with batched sort_order renumbering.
+  const reorder = useMutation({
+    mutationFn: async ({ moved, newParentId, atIndex }: { moved: BudgetNode; newParentId: string | null; atIndex: number }) => {
+      const all = nodesQ.data ?? [];
+      // Build sibling list excluding moved node
+      const siblings = all
+        .filter((n) => n.parent_id === newParentId && n.id !== moved.id)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      const insertAt = Math.max(0, Math.min(siblings.length, atIndex));
+      const reordered = [...siblings.slice(0, insertAt), { ...moved, parent_id: newParentId }, ...siblings.slice(insertAt)];
+
+      // Renumber every sibling whose sort_order changes; also flip parent_id on moved if needed.
+      for (let i = 0; i < reordered.length; i++) {
+        const n = reordered[i];
+        const wantSort = i * 10;
+        if (n.id === moved.id) {
+          if (moved.parent_id !== newParentId || moved.sort_order !== wantSort) {
+            const { error } = await supabase.from("budget_nodes").update({ parent_id: newParentId, sort_order: wantSort }).eq("id", n.id);
+            if (error) throw error;
+          }
+        } else if (n.sort_order !== wantSort) {
+          const { error } = await supabase.from("budget_nodes").update({ sort_order: wantSort }).eq("id", n.id);
+          if (error) throw error;
+        }
+      }
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   function toggle(id: string) { setExpanded((s) => ({ ...s, [id]: !s[id] })); }
   function expandAll() { const all: Record<string, boolean> = {}; for (const n of flat) all[n.id] = true; setExpanded(all); }
   function collapseAll() { setExpanded({}); }
@@ -213,6 +247,45 @@ function BudgetsPage() {
     if (!target) return;
     updateNode.mutate({ id: node.id, patch: { sort_order: target.sort_order } });
     updateNode.mutate({ id: target.id, patch: { sort_order: node.sort_order } });
+  }
+
+  // DnD state lifted to page so any row can react.
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  function handleDrop(target: TreeNode, zone: DropZone) {
+    if (!dragId || dragId === target.id) return;
+    const all = nodesQ.data ?? [];
+    const moved = all.find((n) => n.id === dragId);
+    if (!moved) return;
+
+    // Prevent dropping into self/descendant
+    const isDescendant = (parentId: string | null): boolean => {
+      if (!parentId) return false;
+      if (parentId === dragId) return true;
+      const p = all.find((n) => n.id === parentId);
+      return p ? isDescendant(p.parent_id) : false;
+    };
+
+    let newParentId: string | null;
+    let atIndex: number;
+    const siblings = all
+      .filter((n) => n.parent_id === target.parent_id && n.id !== moved.id)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const tIdx = siblings.findIndex((n) => n.id === target.id);
+
+    if (zone === "child") {
+      if (target.depth >= 2 && moved.kind !== "subtotal") { toast.error("Profondeur max atteinte"); return; }
+      if (isDescendant(target.id)) { toast.error("Cible invalide"); return; }
+      newParentId = target.id;
+      const tChildren = all.filter((n) => n.parent_id === target.id && n.id !== moved.id);
+      atIndex = tChildren.length;
+    } else {
+      newParentId = target.parent_id;
+      if (isDescendant(newParentId)) { toast.error("Cible invalide"); return; }
+      atIndex = zone === "before" ? tIdx : tIdx + 1;
+    }
+    setDragId(null);
+    reorder.mutate({ moved, newParentId, atIndex });
   }
 
   return (
@@ -232,7 +305,8 @@ function BudgetsPage() {
             </SelectContent>
           </Select>
           <Input type="month" value={anchorMonth.slice(0, 7)} onChange={(e) => setAnchorMonth(`${e.target.value}-01`)} className="w-40" />
-          <Button onClick={() => setCreatingUnder({ parent: null })}><Plus className="mr-2 h-4 w-4" /> Racine</Button>
+          <Button variant="secondary" onClick={() => setCreatingUnder({ parent: null, kind: "subtotal" })}><Sigma className="mr-2 h-4 w-4" /> Sous-total</Button>
+          <Button onClick={() => setCreatingUnder({ parent: null, kind: "normal" })}><Plus className="mr-2 h-4 w-4" /> Racine</Button>
         </div>
       </header>
 
@@ -267,7 +341,7 @@ function BudgetsPage() {
           </div>
         ) : (
           <div className="-mx-4 overflow-x-auto">
-            <table className="w-full min-w-[800px] text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2">Node</th>
@@ -275,7 +349,7 @@ function BudgetsPage() {
                   <th className="px-4 py-2 text-right">Dépensé</th>
                   <th className="px-4 py-2 text-right w-24">%</th>
                   <th className="px-4 py-2 text-right">Variance</th>
-                  <th className="px-4 py-2 w-44 text-right">Actions</th>
+                  <th className="px-4 py-2 w-48 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -287,7 +361,7 @@ function BudgetsPage() {
                     expanded={expanded}
                     matchedIds={matchedIds}
                     toggle={toggle}
-                    onAddChild={(p) => setCreatingUnder({ parent: p })}
+                    onAddChild={(p, kind) => setCreatingUnder({ parent: p, kind })}
                     onEdit={setEditing}
                     onDelete={(id) => { if (confirm("Supprimer ce node et tous ses enfants ?")) deleteNode.mutate(id); }}
                     onArchive={(node, val) => updateNode.mutate({ id: node.id, patch: { archived: val } })}
@@ -297,6 +371,11 @@ function BudgetsPage() {
                     plannedDirect={plannedByNode}
                     spentRollup={spentRollupByNode}
                     spentDirect={directSpendByNode}
+                    subPlanned={subtotals.planned}
+                    subSpent={subtotals.spent}
+                    dragId={dragId}
+                    setDragId={setDragId}
+                    onDrop={handleDrop}
                     maxDepth={2}
                   />
                 ))}
@@ -310,7 +389,8 @@ function BudgetsPage() {
         open={!!creatingUnder}
         onOpenChange={(v) => !v && setCreatingUnder(null)}
         parent={creatingUnder?.parent ?? null}
-        onSubmit={(name, isIncome) => createNode.mutate({ name, parent_id: creatingUnder?.parent?.id ?? null, is_income: isIncome })}
+        kind={creatingUnder?.kind ?? "normal"}
+        onSubmit={(name, isIncome) => createNode.mutate({ name, parent_id: creatingUnder?.parent?.id ?? null, is_income: isIncome, kind: creatingUnder?.kind ?? "normal" })}
         pending={createNode.isPending}
       />
       <EditDialog
@@ -335,13 +415,14 @@ function BudgetsPage() {
 
 function Row({
   node, cur, expanded, matchedIds, toggle, onAddChild, onEdit, onDelete, onArchive, onMove, onAmount,
-  plannedRollup, plannedDirect, spentRollup, spentDirect, maxDepth = 2,
+  plannedRollup, plannedDirect, spentRollup, spentDirect, subPlanned, subSpent,
+  dragId, setDragId, onDrop, maxDepth = 2,
 }: {
   node: TreeNode; cur: string;
   expanded: Record<string, boolean>;
   matchedIds: Set<string> | null;
   toggle: (id: string) => void;
-  onAddChild: (n: TreeNode | null) => void;
+  onAddChild: (n: TreeNode | null, kind: "normal" | "subtotal") => void;
   onEdit: (n: TreeNode) => void;
   onDelete: (id: string) => void;
   onArchive: (n: TreeNode, val: boolean) => void;
@@ -351,35 +432,79 @@ function Row({
   plannedDirect: Map<string, number>;
   spentRollup: Map<string, number>;
   spentDirect: Map<string, number>;
+  subPlanned: Map<string, number>;
+  subSpent: Map<string, number>;
+  dragId: string | null;
+  setDragId: (id: string | null) => void;
+  onDrop: (target: TreeNode, zone: DropZone) => void;
   maxDepth?: number;
 }) {
-  // Match filter: render only if self or any descendant matches
+  const [zone, setZone] = useState<DropZone | null>(null);
+
   if (matchedIds && !matchedIds.has(node.id)) {
     const anyDesc = node.children.some((c) => subtreeHasMatch(c, matchedIds));
     if (!anyDesc) return null;
   }
-  const isOpen = expanded[node.id] ?? !!matchedIds; // expand all when searching
-  const planned = node.childCount > 0 ? (plannedRollup.get(node.id) ?? 0) : (plannedDirect.get(node.id) ?? 0);
-  const spent = node.childCount > 0 ? (spentRollup.get(node.id) ?? 0) : (spentDirect.get(node.id) ?? 0);
+  const isOpen = expanded[node.id] ?? !!matchedIds;
+  const isSubtotal = node.kind === "subtotal";
+  const planned = isSubtotal ? (subPlanned.get(node.id) ?? 0)
+    : node.childCount > 0 ? (plannedRollup.get(node.id) ?? 0) : (plannedDirect.get(node.id) ?? 0);
+  const spent = isSubtotal ? (subSpent.get(node.id) ?? 0)
+    : node.childCount > 0 ? (spentRollup.get(node.id) ?? 0) : (spentDirect.get(node.id) ?? 0);
   const pct = planned > 0 ? (spent / planned) * 100 : 0;
   const variance = planned - spent;
   const toneBar = pct >= 100 ? "bg-negative" : pct >= 90 ? "bg-warning" : pct >= 75 ? "bg-accent" : "bg-primary";
-  const canAddChild = node.depth < maxDepth;
-  const isLocked = node.childCount > 0;
-  const levelLabel = node.depth === 0 ? "Ligne" : node.depth === 1 ? "Catégorie" : "Sous-cat.";
+  const canAddChild = !isSubtotal && node.depth < maxDepth;
+  const isLocked = !isSubtotal && node.childCount > 0;
+  const levelLabel = isSubtotal ? "Σ Sous-total" : node.depth === 0 ? "Ligne" : node.depth === 1 ? "Catégorie" : "Sous-cat.";
+
+  function handleDragOver(e: React.DragEvent<HTMLTableRowElement>) {
+    if (!dragId || dragId === node.id) return;
+    e.preventDefault();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const y = e.clientY - r.top;
+    const h = r.height;
+    let z: DropZone;
+    if (y < h * 0.3) z = "before";
+    else if (y > h * 0.7) z = "after";
+    else z = isSubtotal ? "after" : "child";
+    setZone(z);
+  }
+  function handleDragLeave() { setZone(null); }
+  function handleDropEv(e: React.DragEvent) {
+    e.preventDefault();
+    if (zone) onDrop(node, zone);
+    setZone(null);
+  }
+
+  const dropBorder =
+    zone === "before" ? "shadow-[inset_0_2px_0_0_hsl(var(--primary))]"
+    : zone === "after" ? "shadow-[inset_0_-2px_0_0_hsl(var(--primary))]"
+    : zone === "child" ? "bg-primary/10 outline outline-1 outline-primary/40"
+    : "";
 
   return (
     <>
-      <tr className={cn("border-t border-border/60 hover:bg-muted/40", node.archived && "opacity-50")}>
+      <tr
+        className={cn("border-t border-border/60 hover:bg-muted/40 transition-shadow", node.archived && "opacity-50", dropBorder, isSubtotal && "bg-muted/30 font-medium")}
+        draggable
+        onDragStart={(e) => { setDragId(node.id); e.dataTransfer.effectAllowed = "move"; }}
+        onDragEnd={() => { setDragId(null); setZone(null); }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDropEv}
+      >
         <td className="px-4 py-2">
           <div className="flex items-center gap-1" style={{ paddingLeft: node.depth * 18 }}>
+            <GripVertical className="h-3.5 w-3.5 cursor-grab text-muted-foreground/50 hover:text-foreground" />
             {node.childCount > 0 ? (
               <button onClick={() => toggle(node.id)} className="text-muted-foreground hover:text-foreground">
                 {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
               </button>
             ) : <span className="inline-block w-3.5" />}
-            <span className={cn("font-medium", node.is_income && "text-positive")}>{node.name}</span>
-            <span className="ml-1.5 rounded-sm bg-muted/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">{levelLabel}</span>
+            <span className={cn("font-medium", node.is_income && "text-positive", isSubtotal && "text-accent")}>{node.name}</span>
+            <span className={cn("ml-1.5 rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+              isSubtotal ? "bg-accent/20 text-accent" : "bg-muted/60 text-muted-foreground")}>{levelLabel}</span>
             {node.childCount > 0 && (
               <span className="ml-1 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">{node.childCount}</span>
             )}
@@ -408,15 +533,20 @@ function Row({
           <div className="flex justify-end gap-0.5 text-muted-foreground">
             <IconBtn title="Monter" onClick={() => onMove(node, -1)}><ArrowUp className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title="Descendre" onClick={() => onMove(node, 1)}><ArrowDown className="h-3.5 w-3.5" /></IconBtn>
-            <IconBtn
-              title={isLocked ? "Verrouillé · somme des enfants" : "Montant mensuel"}
-              onClick={() => { if (isLocked) { toast.info("Montant calculé automatiquement à partir des sous-éléments"); return; } onAmount(node); }}
-            >
-              <span className={cn("font-mono text-[10px]", isLocked && "opacity-40")}>$</span>
-            </IconBtn>
+            {!isSubtotal && (
+              <IconBtn
+                title={isLocked ? "Verrouillé · somme des enfants" : "Montant mensuel"}
+                onClick={() => { if (isLocked) { toast.info("Montant calculé automatiquement à partir des sous-éléments"); return; } onAmount(node); }}
+              >
+                <span className={cn("font-mono text-[10px]", isLocked && "opacity-40")}>$</span>
+              </IconBtn>
+            )}
             {canAddChild ? (
-              <IconBtn title="Ajouter enfant" onClick={() => onAddChild(node)}><Plus className="h-3.5 w-3.5" /></IconBtn>
-            ) : <span className="inline-block w-6" />}
+              <>
+                <IconBtn title="Ajouter enfant" onClick={() => onAddChild(node, "normal")}><Plus className="h-3.5 w-3.5" /></IconBtn>
+                <IconBtn title="Ajouter sous-total ici" onClick={() => onAddChild(node, "subtotal")}><Sigma className="h-3.5 w-3.5" /></IconBtn>
+              </>
+            ) : <span className="inline-block w-12" />}
             <IconBtn title="Modifier" onClick={() => onEdit(node)}><Pencil className="h-3.5 w-3.5" /></IconBtn>
             <IconBtn title={node.archived ? "Désarchiver" : "Archiver"} onClick={() => onArchive(node, !node.archived)}>
               {node.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
@@ -443,6 +573,11 @@ function Row({
           plannedDirect={plannedDirect}
           spentRollup={spentRollup}
           spentDirect={spentDirect}
+          subPlanned={subPlanned}
+          subSpent={subSpent}
+          dragId={dragId}
+          setDragId={setDragId}
+          onDrop={onDrop}
           maxDepth={maxDepth}
         />
       ))}
@@ -473,24 +608,33 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "po
   );
 }
 
-function CreateDialog({ open, onOpenChange, parent, onSubmit, pending }: {
+function CreateDialog({ open, onOpenChange, parent, kind, onSubmit, pending }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   parent: TreeNode | null;
+  kind: "normal" | "subtotal";
   onSubmit: (name: string, isIncome: boolean) => void;
   pending: boolean;
 }) {
   const [name, setName] = useState("");
   const [isIncome, setIsIncome] = useState(false);
+  const title = kind === "subtotal"
+    ? (parent ? `Sous-total dans « ${parent.name} »` : "Sous-total racine")
+    : (parent ? `Nouveau sous-node de « ${parent.name} »` : "Nouveau node racine");
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (v) { setName(""); setIsIncome(parent?.is_income ?? false); } }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{parent ? `Nouveau sous-node de « ${parent.name} »` : "Nouveau node racine"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSubmit(name, isIncome); }} className="space-y-3">
-          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus /></div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
-            Branche de revenu
-          </label>
+          <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder={kind === "subtotal" ? "ex: Total Logement" : ""} /></div>
+          {kind === "normal" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
+              Branche de revenu
+            </label>
+          )}
+          {kind === "subtotal" && (
+            <p className="text-xs text-muted-foreground">Un sous-total agrège les lignes <strong>frères situées au-dessus</strong> (jusqu'au sous-total précédent), ou ses propres enfants si vous lui en attachez. Vous pouvez le déplacer librement par glisser-déposer.</p>
+          )}
           <DialogFooter><Button type="submit" disabled={pending}>Créer</Button></DialogFooter>
         </form>
       </DialogContent>
@@ -501,7 +645,7 @@ function CreateDialog({ open, onOpenChange, parent, onSubmit, pending }: {
 function EditDialog({ open, onOpenChange, node, onSubmit, pending }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   node: TreeNode | null;
-  onSubmit: (patch: Partial<import("@/lib/budget-nodes").BudgetNode>) => void;
+  onSubmit: (patch: Partial<BudgetNode>) => void;
   pending: boolean;
 }) {
   const [name, setName] = useState("");
@@ -516,10 +660,12 @@ function EditDialog({ open, onOpenChange, node, onSubmit, pending }: {
         <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name: name.trim(), color: color || null, is_income: isIncome }); }} className="space-y-3">
           <div className="space-y-1.5"><Label>Nom</Label><Input value={name} onChange={(e) => setName(e.target.value)} required /></div>
           <div className="space-y-1.5"><Label>Couleur (hex)</Label><Input value={color} onChange={(e) => setColor(e.target.value)} placeholder="#10b981" /></div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
-            Branche de revenu
-          </label>
+          {node.kind !== "subtotal" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={isIncome} onChange={(e) => setIsIncome(e.target.checked)} />
+              Branche de revenu
+            </label>
+          )}
           <DialogFooter><Button type="submit" disabled={pending}>Enregistrer</Button></DialogFooter>
         </form>
       </DialogContent>

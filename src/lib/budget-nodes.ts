@@ -1,3 +1,5 @@
+export type BudgetNodeKind = "normal" | "subtotal";
+
 export type BudgetNode = {
   id: string;
   user_id: string;
@@ -9,6 +11,7 @@ export type BudgetNode = {
   is_income: boolean;
   archived: boolean;
   notes: string | null;
+  kind: BudgetNodeKind;
   created_at: string;
   updated_at: string;
 };
@@ -21,8 +24,8 @@ export type TreeNode = BudgetNode & {
   descendantCount: number;
 };
 
-export function buildTree(nodes: BudgetNode[]): TreeNode[] {
-  const byParent = new Map<string | null, BudgetNode[]>();
+export function buildTree(nodes: Array<Partial<BudgetNode> & { id: string; parent_id: string | null; name: string; sort_order: number }>): TreeNode[] {
+  const byParent = new Map<string | null, any[]>();
   for (const n of nodes) {
     const k = n.parent_id;
     if (!byParent.has(k)) byParent.set(k, []);
@@ -37,12 +40,13 @@ export function buildTree(nodes: BudgetNode[]): TreeNode[] {
       const descendantCount = children.reduce((s, c) => s + 1 + c.descendantCount, 0);
       return {
         ...n,
+        kind: (n.kind ?? "normal") as BudgetNodeKind,
         depth,
         path: newPath,
         children,
         childCount: children.length,
         descendantCount,
-      };
+      } as TreeNode;
     });
   }
   return build(null, 0, []);
@@ -64,4 +68,41 @@ export function descendantIds(tree: TreeNode[], id: string): string[] {
 
 export function pathLabel(node: { path: string[] }, sep = " › ") {
   return node.path.join(sep);
+}
+
+/**
+ * For each subtotal node, compute the sum of its preceding "normal" siblings
+ * (until the previous subtotal at the same level). Returns Maps keyed by subtotal id.
+ */
+export function computeSubtotals(
+  tree: TreeNode[],
+  plannedByNode: Map<string, number>,
+  spentByNode: Map<string, number>,
+): { planned: Map<string, number>; spent: Map<string, number> } {
+  const planned = new Map<string, number>();
+  const spent = new Map<string, number>();
+  function walk(siblings: TreeNode[]) {
+    let bufP = 0, bufS = 0;
+    for (const n of siblings) {
+      if (n.kind === "subtotal") {
+        // If subtotal has its own children, use those rollups too.
+        let p = bufP, s = bufS;
+        if (n.children.length > 0) {
+          for (const c of n.children) {
+            p += plannedByNode.get(c.id) ?? 0;
+            s += spentByNode.get(c.id) ?? 0;
+          }
+        }
+        planned.set(n.id, p);
+        spent.set(n.id, s);
+        bufP = 0; bufS = 0;
+      } else {
+        bufP += plannedByNode.get(n.id) ?? 0;
+        bufS += spentByNode.get(n.id) ?? 0;
+      }
+      walk(n.children);
+    }
+  }
+  walk(tree);
+  return { planned, spent };
 }
