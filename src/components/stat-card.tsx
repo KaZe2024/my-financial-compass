@@ -36,7 +36,7 @@ export function StatCard({
   );
 }
 
-export function Panel({ title, action, children, className }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Panel({ title, action, children, className }: { title: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <section className={cn("rounded-md border border-border bg-card", className)}>
       <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
