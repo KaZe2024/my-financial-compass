@@ -218,22 +218,19 @@ function BudgetsPage() {
       const reordered = [...siblings.slice(0, insertAt), { ...moved, parent_id: newParentId }, ...siblings.slice(insertAt)];
 
       // Renumber every sibling whose sort_order changes; also flip parent_id on moved if needed.
-      const updates: Array<Promise<any>> = [];
       for (let i = 0; i < reordered.length; i++) {
         const n = reordered[i];
         const wantSort = i * 10;
         if (n.id === moved.id) {
           if (moved.parent_id !== newParentId || moved.sort_order !== wantSort) {
-            updates.push(supabase.from("budget_nodes").update({ parent_id: newParentId, sort_order: wantSort }).eq("id", n.id));
+            const { error } = await supabase.from("budget_nodes").update({ parent_id: newParentId, sort_order: wantSort }).eq("id", n.id);
+            if (error) throw error;
           }
         } else if (n.sort_order !== wantSort) {
-          updates.push(supabase.from("budget_nodes").update({ sort_order: wantSort }).eq("id", n.id));
+          const { error } = await supabase.from("budget_nodes").update({ sort_order: wantSort }).eq("id", n.id);
+          if (error) throw error;
         }
       }
-      const res = await Promise.all(updates);
-      const firstErr = res.find((r) => r.error)?.error;
-      if (firstErr) throw firstErr;
-    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
