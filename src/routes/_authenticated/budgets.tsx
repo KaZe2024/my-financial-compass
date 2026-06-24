@@ -231,6 +231,7 @@ function BudgetsPage() {
           if (error) throw error;
         }
       }
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
