@@ -17,11 +17,13 @@ type Props = {
   onlyDepth?: number;
   /** When true, render only the leaf name (no parent path). */
   hidePath?: boolean;
+  /** When true, exclude subtotal-kind nodes. Defaults to true. */
+  excludeSubtotals?: boolean;
 };
 
-export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true, onlyDepth, hidePath = false }: Props) {
+export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true, onlyDepth, hidePath = false, excludeSubtotals = true }: Props) {
   const [open, setOpen] = useState(false);
-  const tree = useMemo(() => buildTree(nodes.filter((n) => !n.archived)), [nodes]);
+  const tree = useMemo(() => buildTree(nodes.filter((n) => !n.archived && (!excludeSubtotals || n.kind !== "subtotal"))), [nodes, excludeSubtotals]);
   const flatAll = useMemo(() => flattenTree(tree), [tree]);
   const flat = useMemo(() => onlyDepth != null ? flatAll.filter((n) => n.depth === onlyDepth) : flatAll, [flatAll, onlyDepth]);
   const selected = flatAll.find((n) => n.id === value) ?? null;
