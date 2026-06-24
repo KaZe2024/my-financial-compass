@@ -29,8 +29,45 @@ function WalletsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
+  // All transactions in base_amount (MGA) — drives the reference balance.
+  const allTx = useQuery({
+    queryKey: ["wallet_tx_mga"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("type, wallet_id, to_wallet_id, base_amount, amount, exchange_rate, currency")
+        .limit(5000);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Per-wallet MGA balance = opening (converted if not MGA via latest rate seen) + Σ signed base_amount
+  const balancesMga = useMemo(() => {
+    const sums = new Map<string, number>();
+    const lastRate = new Map<string, number>();
+    for (const t of allTx.data ?? []) {
+      const ba = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+      if (t.type === "transfer") {
+        if (t.wallet_id) sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) - ba);
+        if (t.to_wallet_id) sums.set(t.to_wallet_id, (sums.get(t.to_wallet_id) ?? 0) + ba);
+      } else if (t.wallet_id) {
+        const sign = t.type === "income" || t.type === "asset_sale" || t.type === "adjustment" ? 1 : -1;
+        sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) + sign * ba);
+      }
+      if (t.wallet_id && t.exchange_rate) lastRate.set(t.wallet_id, Number(t.exchange_rate));
+    }
+    const out = new Map<string, number>();
+    for (const w of wallets.data ?? []) {
+      const rate = w.currency === "MGA" ? 1 : (lastRate.get(w.id) ?? 1);
+      const opening = Number(w.opening_balance) * rate;
+      out.set(w.id, opening + (sums.get(w.id) ?? 0));
+    }
+    return out;
+  }, [allTx.data, wallets.data]);
+
   const visible = (wallets.data ?? []).filter((w: any) => showArchived || w.status !== "archived");
-  const total = visible.filter((w: any) => w.status === "active").reduce((s: number, w: any) => s + Number(w.current_balance), 0);
+  const totalMga = visible.filter((w: any) => w.status === "active").reduce((s: number, w: any) => s + (balancesMga.get(w.id) ?? 0), 0);
 
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
@@ -53,9 +90,9 @@ function WalletsPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie · Référence MGA</p>
           <h1 className="mt-1 text-2xl font-semibold">Portefeuilles</h1>
-          <p className="num mt-1 text-sm text-muted-foreground">Solde consolidé · <span className="text-foreground">{fmtMoney(total, baseCur)}</span></p>
+          <p className="num mt-1 text-sm text-muted-foreground">Solde consolidé · <span className="text-foreground">{fmtMoney(totalMga, "MGA")}</span></p>
         </div>
         <div className="flex gap-2">
           <label className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -70,6 +107,7 @@ function WalletsPage() {
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((w: any) => {
           const isArchived = w.status === "archived";
+          const mga = balancesMga.get(w.id) ?? 0;
           return (
           <div key={w.id} className={`group rounded-md border border-border bg-card p-4 transition-colors hover:border-primary/40 ${isArchived ? "opacity-60" : ""}`}>
             <div className="flex items-start justify-between">
@@ -81,9 +119,12 @@ function WalletsPage() {
               </div>
               <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${w.status === "active" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>{w.status}</span>
             </div>
-            <div className={`num mt-4 text-2xl font-semibold ${Number(w.current_balance) < 0 ? "text-negative" : ""}`}>
-              {fmtMoney(Number(w.current_balance), w.currency)}
+            <div className={`num mt-4 text-2xl font-semibold ${mga < 0 ? "text-negative" : ""}`}>
+              {fmtMoney(mga, "MGA")}
             </div>
+            {w.currency !== "MGA" && (
+              <div className="num mt-0.5 text-xs text-muted-foreground">≈ {fmtMoney(Number(w.current_balance), w.currency)} <span className="opacity-60">natif</span></div>
+            )}
             <div className="mt-1 text-xs text-muted-foreground">Ouverture · {fmtMoney(Number(w.opening_balance), w.currency)}</div>
             <div className="mt-3 flex justify-end gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
               <button title="Modifier" onClick={() => setEditing(w)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
