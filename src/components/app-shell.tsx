@@ -2,7 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
-  HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3,
+  HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,8 +29,12 @@ const NAV = [
     { to: "/products", label: "Prix produits", icon: Package },
   ]},
   { group: "Tiers", items: [
+    { to: "/counterparties", label: "Comptes de tiers", icon: Users },
     { to: "/debts", label: "Dettes", icon: Receipt },
     { to: "/receivables", label: "Créances", icon: HandCoins },
+  ]},
+  { group: "Marchés", items: [
+    { to: "/fx", label: "Taux de change", icon: TrendingUp },
   ]},
   { group: "Système", items: [
     { to: "/settings", label: "Paramètres", icon: Settings },
