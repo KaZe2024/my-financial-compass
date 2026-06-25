@@ -81,10 +81,12 @@ export type Database = {
       }
       assets: {
         Row: {
+          archived: boolean
           created_at: string
           currency: string
           current_value: number
           id: string
+          linked_transaction_id: string | null
           name: string
           notes: string | null
           purchase_date: string | null
@@ -97,10 +99,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           created_at?: string
           currency?: string
           current_value?: number
           id?: string
+          linked_transaction_id?: string | null
           name: string
           notes?: string | null
           purchase_date?: string | null
@@ -113,10 +117,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           created_at?: string
           currency?: string
           current_value?: number
           id?: string
+          linked_transaction_id?: string | null
           name?: string
           notes?: string | null
           purchase_date?: string | null
@@ -135,6 +141,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "assets_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -424,27 +437,39 @@ export type Database = {
       }
       counterparties: {
         Row: {
+          archived: boolean
           created_at: string
+          group_name: string | null
           id: string
           kind: string | null
           name: string
           notes: string | null
+          service_name: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
+          archived?: boolean
           created_at?: string
+          group_name?: string | null
           id?: string
           kind?: string | null
           name: string
           notes?: string | null
+          service_name?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
+          archived?: boolean
           created_at?: string
+          group_name?: string | null
           id?: string
           kind?: string | null
           name?: string
           notes?: string | null
+          service_name?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -469,12 +494,14 @@ export type Database = {
       }
       debts: {
         Row: {
+          archived: boolean
           created_at: string
           creditor: string
           currency: string
           description: string | null
           due_date: string | null
           id: string
+          linked_transaction_id: string | null
           notes: string | null
           original_amount: number
           outstanding: number
@@ -483,12 +510,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           created_at?: string
           creditor: string
           currency?: string
           description?: string | null
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           original_amount: number
           outstanding: number
@@ -497,12 +526,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           created_at?: string
           creditor?: string
           currency?: string
           description?: string | null
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           original_amount?: number
           outstanding?: number
@@ -517,6 +548,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "debts_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -570,12 +608,14 @@ export type Database = {
       }
       financial_goals: {
         Row: {
+          archived: boolean
           budget_node_id: string | null
           created_at: string
           currency: string
           current_amount: number
           description: string | null
           id: string
+          linked_transaction_id: string | null
           name: string
           status: Database["public"]["Enums"]["goal_status"]
           target_amount: number
@@ -584,12 +624,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           budget_node_id?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
           description?: string | null
           id?: string
+          linked_transaction_id?: string | null
           name: string
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount: number
@@ -598,12 +640,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           budget_node_id?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
           description?: string | null
           id?: string
+          linked_transaction_id?: string | null
           name?: string
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount?: number
@@ -625,6 +669,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "financial_goals_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1026,50 +1077,62 @@ export type Database = {
       }
       projects: {
         Row: {
+          archived: boolean
           budget_node_id: string | null
           color: string | null
           created_at: string
           currency: string
           current_amount: number
           description: string | null
+          envelope_balance: number
           funding_wallet_id: string | null
           id: string
+          linked_transaction_id: string | null
           name: string
           status: Database["public"]["Enums"]["project_status"]
           target_amount: number
           target_date: string | null
+          total_spent: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          archived?: boolean
           budget_node_id?: string | null
           color?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
           description?: string | null
+          envelope_balance?: number
           funding_wallet_id?: string | null
           id?: string
+          linked_transaction_id?: string | null
           name: string
           status?: Database["public"]["Enums"]["project_status"]
           target_amount?: number
           target_date?: string | null
+          total_spent?: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          archived?: boolean
           budget_node_id?: string | null
           color?: string | null
           created_at?: string
           currency?: string
           current_amount?: number
           description?: string | null
+          envelope_balance?: number
           funding_wallet_id?: string | null
           id?: string
+          linked_transaction_id?: string | null
           name?: string
           status?: Database["public"]["Enums"]["project_status"]
           target_amount?: number
           target_date?: string | null
+          total_spent?: number
           updated_at?: string
           user_id?: string
         }
@@ -1093,6 +1156,13 @@ export type Database = {
             columns: ["funding_wallet_id"]
             isOneToOne: false
             referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -1159,12 +1229,14 @@ export type Database = {
       }
       receivables: {
         Row: {
+          archived: boolean
           created_at: string
           currency: string
           debtor: string
           description: string | null
           due_date: string | null
           id: string
+          linked_transaction_id: string | null
           notes: string | null
           original_amount: number
           outstanding: number
@@ -1173,12 +1245,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           created_at?: string
           currency?: string
           debtor: string
           description?: string | null
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           original_amount: number
           outstanding: number
@@ -1187,12 +1261,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           created_at?: string
           currency?: string
           debtor?: string
           description?: string | null
           due_date?: string | null
           id?: string
+          linked_transaction_id?: string | null
           notes?: string | null
           original_amount?: number
           outstanding?: number
@@ -1207,6 +1283,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "receivables_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1516,6 +1599,7 @@ export type Database = {
           budget_category_id: string | null
           budget_node_id: string | null
           counterparty_id: string | null
+          counterparty_label: string | null
           created_at: string
           currency: string
           description: string
@@ -1524,6 +1608,8 @@ export type Database = {
           notes: string | null
           occurred_on: string
           project_id: string | null
+          source_id: string | null
+          source_kind: string | null
           to_wallet_id: string | null
           type: Database["public"]["Enums"]["txn_type"]
           updated_at: string
@@ -1538,6 +1624,7 @@ export type Database = {
           budget_category_id?: string | null
           budget_node_id?: string | null
           counterparty_id?: string | null
+          counterparty_label?: string | null
           created_at?: string
           currency?: string
           description: string
@@ -1546,6 +1633,8 @@ export type Database = {
           notes?: string | null
           occurred_on?: string
           project_id?: string | null
+          source_id?: string | null
+          source_kind?: string | null
           to_wallet_id?: string | null
           type: Database["public"]["Enums"]["txn_type"]
           updated_at?: string
@@ -1560,6 +1649,7 @@ export type Database = {
           budget_category_id?: string | null
           budget_node_id?: string | null
           counterparty_id?: string | null
+          counterparty_label?: string | null
           created_at?: string
           currency?: string
           description?: string
@@ -1568,6 +1658,8 @@ export type Database = {
           notes?: string | null
           occurred_on?: string
           project_id?: string | null
+          source_id?: string | null
+          source_kind?: string | null
           to_wallet_id?: string | null
           type?: Database["public"]["Enums"]["txn_type"]
           updated_at?: string
@@ -1854,6 +1946,8 @@ export type Database = {
         | "asset_purchase"
         | "asset_sale"
         | "adjustment"
+        | "enveloppe_projet"
+        | "enveloppe_emprunt"
       utility_type: "water" | "electricity" | "gas" | "other"
       wallet_status: "active" | "archived" | "closed"
       wallet_type:
@@ -2026,6 +2120,8 @@ export const Constants = {
         "asset_purchase",
         "asset_sale",
         "adjustment",
+        "enveloppe_projet",
+        "enveloppe_emprunt",
       ],
       utility_type: ["water", "electricity", "gas", "other"],
       wallet_status: ["active", "archived", "closed"],
