@@ -110,7 +110,7 @@ export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo 
   const qc = useQueryClient();
   const arch = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from(table).update({ archived: !archived }).eq("id", id);
+      const { error } = await (supabase as any).from(table).update({ archived: !archived }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success(archived ? "Restauré" : "Archivé"); },
@@ -122,7 +122,7 @@ export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo 
         await supabase.from("transaction_tags").delete().eq("transaction_id", linkedTxId);
         await supabase.from("transactions").delete().eq("id", linkedTxId);
       }
-      const { error } = await supabase.from(table).delete().eq("id", id);
+      const { error } = await (supabase as any).from(table).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
