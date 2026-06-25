@@ -12,7 +12,6 @@ export const walletsQO = queryOptions({
   },
 });
 
-// Legacy categories — kept for back-compat reads only. Prefer budgetNodesQO.
 export const qkCategories = ["budget_categories"] as const;
 export const categoriesQO = queryOptions({
   queryKey: qkCategories,
@@ -46,5 +45,25 @@ export const profileQO = queryOptions({
     const { data, error } = await supabase.from("profiles").select("*").eq("id", u.user.id).maybeSingle();
     if (error) throw error;
     return data;
+  },
+});
+
+export const qkCounterparties = ["counterparties"] as const;
+export const counterpartiesQO = queryOptions({
+  queryKey: qkCounterparties,
+  queryFn: async () => {
+    const { data, error } = await supabase.from("counterparties").select("*").order("name");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const qkProjects = ["projects"] as const;
+export const projectsQO = queryOptions({
+  queryKey: qkProjects,
+  queryFn: async () => {
+    const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
   },
 });
