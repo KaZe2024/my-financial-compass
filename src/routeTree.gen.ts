@@ -24,6 +24,7 @@ import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedFxRouteImport } from './routes/_authenticated/fx'
 import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/debts'
+import { Route as AuthenticatedDataRouteImport } from './routes/_authenticated/data'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCounterpartiesRouteImport } from './routes/_authenticated/counterparties'
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
@@ -105,6 +106,11 @@ const AuthenticatedDebtsRoute = AuthenticatedDebtsRouteImport.update({
   path: '/debts',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDataRoute = AuthenticatedDataRouteImport.update({
+  id: '/data',
+  path: '/data',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/data': typeof AuthenticatedDataRoute
   '/debts': typeof AuthenticatedDebtsRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/data': typeof AuthenticatedDataRoute
   '/debts': typeof AuthenticatedDebtsRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
   '/_authenticated/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/data': typeof AuthenticatedDataRoute
   '/_authenticated/debts': typeof AuthenticatedDebtsRoute
   '/_authenticated/fx': typeof AuthenticatedFxRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/budgets'
     | '/counterparties'
     | '/dashboard'
+    | '/data'
     | '/debts'
     | '/fx'
     | '/goals'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/budgets'
     | '/counterparties'
     | '/dashboard'
+    | '/data'
     | '/debts'
     | '/fx'
     | '/goals'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authenticated/budgets'
     | '/_authenticated/counterparties'
     | '/_authenticated/dashboard'
+    | '/_authenticated/data'
     | '/_authenticated/debts'
     | '/_authenticated/fx'
     | '/_authenticated/goals'
@@ -367,6 +379,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDebtsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/data': {
+      id: '/_authenticated/data'
+      path: '/data'
+      fullPath: '/data'
+      preLoaderRoute: typeof AuthenticatedDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -403,6 +422,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
   AuthenticatedCounterpartiesRoute: typeof AuthenticatedCounterpartiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDataRoute: typeof AuthenticatedDataRoute
   AuthenticatedDebtsRoute: typeof AuthenticatedDebtsRoute
   AuthenticatedFxRoute: typeof AuthenticatedFxRoute
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
@@ -421,6 +441,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
   AuthenticatedCounterpartiesRoute: AuthenticatedCounterpartiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDataRoute: AuthenticatedDataRoute,
   AuthenticatedDebtsRoute: AuthenticatedDebtsRoute,
   AuthenticatedFxRoute: AuthenticatedFxRoute,
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,

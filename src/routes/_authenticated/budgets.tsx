@@ -54,7 +54,11 @@ function BudgetsPage() {
   const [view, setView] = useState<"month" | "quarter" | "year">("month");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(localStorage.getItem("budgets:expanded") ?? "{}"); } catch { return {}; }
+  });
+  useEffect(() => { if (typeof window !== "undefined") localStorage.setItem("budgets:expanded", JSON.stringify(expanded)); }, [expanded]);
   const [editing, setEditing] = useState<TreeNode | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null; kind: "normal" | "subtotal" } | null>(null);
   const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
@@ -486,7 +490,14 @@ function Row({
   return (
     <>
       <tr
-        className={cn("border-t border-border/60 hover:bg-muted/40 transition-shadow", node.archived && "opacity-50", dropBorder, isSubtotal && "bg-muted/30 font-medium")}
+        className={cn(
+          "border-t border-border/60 hover:bg-muted/40 transition-shadow",
+          node.archived && "opacity-50",
+          dropBorder,
+          isSubtotal && "bg-muted/30 font-medium",
+          !isSubtotal && node.depth === 0 && "bg-muted/60 font-semibold border-l-2 border-l-primary",
+          !isSubtotal && node.depth === 1 && "bg-muted/10",
+        )}
         draggable
         onDragStart={(e) => { setDragId(node.id); e.dataTransfer.effectAllowed = "move"; }}
         onDragEnd={() => { setDragId(null); setZone(null); }}

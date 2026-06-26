@@ -5,6 +5,8 @@ import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
 import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
+import { PeriodPicker, usePeriodState } from "@/components/period-picker";
+import { resolvePeriod, isoDate } from "@/lib/period";
 import {
   Wallet, TrendingUp, TrendingDown, PiggyBank, Receipt, HandCoins, Landmark, Activity,
   ShieldCheck, Target, LineChart as LineIcon,
@@ -31,21 +33,28 @@ function Dashboard() {
   const profile = useQuery(profileQO);
   const wallets = useQuery(walletsQO);
 
+  const period = usePeriodState("month");
+  const resolved = resolvePeriod(period.preset, new Date(), period.custom);
+  const periodFrom = isoDate(resolved.from);
+  const periodTo = isoDate(resolved.to);
+
   const now = new Date();
   const monthStartISO = toISODate(monthStart(now));
   const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
   const ninetyAgo = new Date(now.getTime() - 90 * 86_400_000);
 
   const txMonth = useQuery({
-    queryKey: ["tx", "month", monthStartISO],
+    queryKey: ["tx", "period", periodFrom, periodTo],
     queryFn: async () => {
       const { data, error } = await supabase.from("transactions")
         .select("type, base_amount, occurred_on")
-        .gte("occurred_on", monthStartISO);
+        .gte("occurred_on", periodFrom)
+        .lte("occurred_on", periodTo);
       if (error) throw error;
       return data;
     },
   });
+
 
   const tx90 = useQuery({
     queryKey: ["tx", "90d"],
@@ -206,10 +215,12 @@ function Dashboard() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Vue d'ensemble — {now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Vue d'ensemble — {resolved.label}</p>
           <h1 className="mt-1 text-2xl font-semibold">Bienvenue, {profile.data?.full_name ?? "propriétaire"}.</h1>
         </div>
+        <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
       </header>
+
 
       {/* KPI tiles */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -217,8 +228,9 @@ function Dashboard() {
         <StatCard label="Score santé" value={`${health.score}/100`} sub={`Croissance 3m ${fmtPct(health.growth)}`} tone={scoreTone(health.score)} icon={<ShieldCheck className="h-4 w-4" />} />
         <StatCard label="Trésorerie" value={fmtMoney(cash, cur)} sub={`${(wallets.data ?? []).length} portefeuilles`} icon={<Wallet className="h-4 w-4" />} />
         <StatCard label="Fonds d'urgence" value={`${health.emergencyMonths.toFixed(1)} mois`} sub="Cible: 6 mois" tone={health.emergencyMonths >= 6 ? "positive" : health.emergencyMonths >= 3 ? "neutral" : "warning"} icon={<PiggyBank className="h-4 w-4" />} />
-        <StatCard label="Revenus du mois" value={fmtMoney(income, cur)} tone="positive" icon={<TrendingUp className="h-4 w-4" />} />
-        <StatCard label="Dépenses du mois" value={fmtMoney(expense, cur)} tone="negative" icon={<TrendingDown className="h-4 w-4" />} />
+        <StatCard label={`Revenus · ${resolved.label}`} value={fmtMoney(income, cur)} tone="positive" icon={<TrendingUp className="h-4 w-4" />} />
+        <StatCard label={`Dépenses · ${resolved.label}`} value={fmtMoney(expense, cur)} tone="negative" icon={<TrendingDown className="h-4 w-4" />} />
+
         <StatCard label="Dettes en cours" value={fmtMoney(totalDebt, cur)} tone={totalDebt > 0 ? "warning" : "neutral"} icon={<Receipt className="h-4 w-4" />} />
         <StatCard label="Actifs" value={fmtMoney(totalAssets, cur)} sub={`Créances ${fmtMoney(totalRec, cur, { compact: true })}`} icon={<Landmark className="h-4 w-4" />} />
       </section>

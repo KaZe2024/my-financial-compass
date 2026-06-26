@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel, StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { Camera, TrendingUp, Activity, PiggyBank } from "lucide-react";
 import { toast } from "sonner";
 import { Area, AreaChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { buildAllocation, growthRate } from "@/lib/analytics";
+import { PeriodPicker, usePeriodState } from "@/components/period-picker";
+import { resolvePeriod, isoDate } from "@/lib/period";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
   head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
@@ -19,6 +22,10 @@ const tooltipStyle = { background: "#111827", border: "1px solid #1f2937", borde
 
 function SnapshotsPage() {
   const qc = useQueryClient();
+  const period = usePeriodState("ltm");
+  const resolved = resolvePeriod(period.preset, new Date(), period.custom);
+  const pFrom = isoDate(resolved.from);
+  const pTo = isoDate(resolved.to);
   const snaps = useQuery({
     queryKey: ["snapshots"],
     queryFn: async () => (await supabase.from("monthly_snapshots").select("*").order("snapshot_month")).data ?? [],
@@ -69,7 +76,8 @@ function SnapshotsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const list = snaps.data ?? [];
+  const fullList = snaps.data ?? [];
+  const list = useMemo(() => fullList.filter((s: any) => s.snapshot_month >= pFrom && s.snapshot_month <= pTo), [fullList, pFrom, pTo]);
   const last = list[list.length - 1];
   const prev = list[list.length - 2];
   const yearAgo = list.find(s => {
@@ -109,7 +117,10 @@ function SnapshotsPage() {
           <h1 className="mt-1 text-2xl font-semibold">Clôture mensuelle</h1>
           <p className="mt-1 text-sm text-muted-foreground">Une photographie figée chaque mois : trésorerie, actifs, dettes, créances, revenus, dépenses.</p>
         </div>
-        <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
+          <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+        </div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
