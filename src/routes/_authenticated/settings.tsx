@@ -32,7 +32,10 @@ function SettingsPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("profiles").update(form).eq("id", profile.data!.id);
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw new Error("Non authentifié");
+      const payload = { id: profile.data?.id ?? u.user.id, ...form };
+      const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Préférences enregistrées"); qc.invalidateQueries({ queryKey: ["profile"] }); },

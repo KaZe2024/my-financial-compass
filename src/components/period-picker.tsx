@@ -13,10 +13,10 @@ type Props = {
 
 const LABELS: Record<PeriodPreset, string> = {
   ytd: "YTD (Year to date)",
-  month: "Mensuel",
-  quarter: "Trimestre",
-  semester: "Semestre",
-  year: "Annuel",
+  month: "Mois en cours",
+  quarter: "Trimestre en cours",
+  semester: "Semestre en cours",
+  year: "Année en cours",
   ltm: "LTM (12 derniers mois)",
   custom: "Plage de dates",
 };
