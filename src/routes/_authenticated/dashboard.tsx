@@ -33,21 +33,28 @@ function Dashboard() {
   const profile = useQuery(profileQO);
   const wallets = useQuery(walletsQO);
 
+  const period = usePeriodState("month");
+  const resolved = resolvePeriod(period.preset, new Date(), period.custom);
+  const periodFrom = isoDate(resolved.from);
+  const periodTo = isoDate(resolved.to);
+
   const now = new Date();
   const monthStartISO = toISODate(monthStart(now));
   const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
   const ninetyAgo = new Date(now.getTime() - 90 * 86_400_000);
 
   const txMonth = useQuery({
-    queryKey: ["tx", "month", monthStartISO],
+    queryKey: ["tx", "period", periodFrom, periodTo],
     queryFn: async () => {
       const { data, error } = await supabase.from("transactions")
         .select("type, base_amount, occurred_on")
-        .gte("occurred_on", monthStartISO);
+        .gte("occurred_on", periodFrom)
+        .lte("occurred_on", periodTo);
       if (error) throw error;
       return data;
     },
   });
+
 
   const tx90 = useQuery({
     queryKey: ["tx", "90d"],
