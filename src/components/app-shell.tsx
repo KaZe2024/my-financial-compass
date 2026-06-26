@@ -37,6 +37,7 @@ const NAV = [
     { to: "/fx", label: "Taux de change", icon: TrendingUp },
   ]},
   { group: "Système", items: [
+    { to: "/data", label: "Import / Export", icon: Database },
     { to: "/settings", label: "Paramètres", icon: Settings },
   ]},
 ] as const;
