@@ -117,7 +117,10 @@ function SnapshotsPage() {
           <h1 className="mt-1 text-2xl font-semibold">Clôture mensuelle</h1>
           <p className="mt-1 text-sm text-muted-foreground">Une photographie figée chaque mois : trésorerie, actifs, dettes, créances, revenus, dépenses.</p>
         </div>
-        <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
+          <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+        </div>
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
