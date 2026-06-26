@@ -215,10 +215,12 @@ function Dashboard() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Vue d'ensemble — {now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Vue d'ensemble — {resolved.label}</p>
           <h1 className="mt-1 text-2xl font-semibold">Bienvenue, {profile.data?.full_name ?? "propriétaire"}.</h1>
         </div>
+        <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
       </header>
+
 
       {/* KPI tiles */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
