@@ -22,6 +22,10 @@ const tooltipStyle = { background: "#111827", border: "1px solid #1f2937", borde
 
 function SnapshotsPage() {
   const qc = useQueryClient();
+  const period = usePeriodState("ltm");
+  const resolved = resolvePeriod(period.preset, new Date(), period.custom);
+  const pFrom = isoDate(resolved.from);
+  const pTo = isoDate(resolved.to);
   const snaps = useQuery({
     queryKey: ["snapshots"],
     queryFn: async () => (await supabase.from("monthly_snapshots").select("*").order("snapshot_month")).data ?? [],
