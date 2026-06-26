@@ -1,0 +1,194 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Panel } from "@/components/stat-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download, Upload, FileSpreadsheet, FileText, Image as ImgIcon } from "lucide-react";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import { toPng } from "html-to-image";
+
+export const Route = createFileRoute("/_authenticated/data")({
+  head: () => ({ meta: [{ title: "Données — Personal CFO" }] }),
+  component: DataPage,
+});
+
+const TABLES = [
+  { id: "transactions", label: "Transactions" },
+  { id: "wallets", label: "Portefeuilles" },
+  { id: "budget_nodes", label: "Budgets · Nodes" },
+  { id: "budget_node_amounts", label: "Budgets · Montants" },
+  { id: "counterparties", label: "Tiers" },
+  { id: "assets", label: "Actifs" },
+  { id: "debts", label: "Dettes" },
+  { id: "receivables", label: "Créances" },
+  { id: "projects", label: "Projets" },
+  { id: "financial_goals", label: "Objectifs" },
+  { id: "monthly_snapshots", label: "Snapshots" },
+  { id: "shopping_lists", label: "Listes d'achat" },
+  { id: "shopping_list_items", label: "Lignes d'achat" },
+  { id: "products", label: "Produits" },
+  { id: "product_prices", label: "Prix produits" },
+  { id: "analytical_tags", label: "Tags" },
+  { id: "subscriptions", label: "Abonnements" },
+  { id: "income_sources", label: "Sources de revenus" },
+] as const;
+
+async function fetchAll(table: string): Promise<any[]> {
+  const { data, error } = await (supabase as any).from(table).select("*").limit(50000);
+  if (error) throw error;
+  return data ?? [];
+}
+
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function DataPage() {
+  return (
+    <div className="space-y-6">
+      <header>
+        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Système</p>
+        <h1 className="mt-1 text-2xl font-semibold">Import / Export</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Sauvegarde et restauration des données. Excel par module ou complet, PDF, PNG.</p>
+      </header>
+
+      <Tabs defaultValue="export">
+        <TabsList>
+          <TabsTrigger value="export"><Download className="mr-2 h-4 w-4" /> Export</TabsTrigger>
+          <TabsTrigger value="import"><Upload className="mr-2 h-4 w-4" /> Import</TabsTrigger>
+          <TabsTrigger value="capture"><ImgIcon className="mr-2 h-4 w-4" /> Capture</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="export" className="space-y-4">
+          <Panel title="Excel — Multi-feuilles (tout)">
+            <p className="mb-3 text-xs text-muted-foreground">Un seul fichier .xlsx avec une feuille par module.</p>
+            <Button onClick={async () => {
+              try {
+                toast.info("Préparation du fichier…");
+                const wb = XLSX.utils.book_new();
+                for (const t of TABLES) {
+                  const rows = await fetchAll(t.id);
+                  const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ info: "vide" }]);
+                  XLSX.utils.book_append_sheet(wb, ws, t.label.slice(0, 31));
+                }
+                const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+                downloadBlob(new Blob([out], { type: "application/octet-stream" }), `personal-cfo-${new Date().toISOString().slice(0, 10)}.xlsx`);
+                toast.success("Export généré");
+              } catch (e: any) { toast.error(e.message); }
+            }}><FileSpreadsheet className="mr-2 h-4 w-4" /> Tout exporter</Button>
+          </Panel>
+
+          <Panel title="Excel — Par module">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {TABLES.map((t) => (
+                <Button key={t.id} variant="outline" onClick={async () => {
+                  try {
+                    const rows = await fetchAll(t.id);
+                    if (!rows.length) { toast.info("Aucune donnée"); return; }
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), t.label.slice(0, 31));
+                    const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+                    downloadBlob(new Blob([out], { type: "application/octet-stream" }), `${t.id}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+                    toast.success(`${t.label} exporté`);
+                  } catch (e: any) { toast.error(e.message); }
+                }}>{t.label}</Button>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel title="PDF — Récap rapide">
+            <p className="mb-3 text-xs text-muted-foreground">Génère un PDF listant le compte de chaque module.</p>
+            <Button variant="outline" onClick={async () => {
+              try {
+                const pdf = new jsPDF();
+                pdf.setFontSize(16); pdf.text("Personal CFO — Récapitulatif", 14, 18);
+                pdf.setFontSize(10); pdf.text(new Date().toLocaleString("fr-FR"), 14, 26);
+                let y = 38;
+                for (const t of TABLES) {
+                  const rows = await fetchAll(t.id);
+                  pdf.text(`${t.label} : ${rows.length} entrées`, 14, y);
+                  y += 7; if (y > 280) { pdf.addPage(); y = 18; }
+                }
+                pdf.save(`personal-cfo-${new Date().toISOString().slice(0, 10)}.pdf`);
+              } catch (e: any) { toast.error(e.message); }
+            }}><FileText className="mr-2 h-4 w-4" /> PDF récap</Button>
+          </Panel>
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-4">
+          <Panel title="Importer Excel">
+            <p className="mb-3 text-xs text-muted-foreground">Sélectionnez un module puis chargez un fichier .xlsx. Les colonnes doivent matcher la structure de la base. Conseil : exportez d'abord pour obtenir le modèle.</p>
+            <ImportForm />
+          </Panel>
+        </TabsContent>
+
+        <TabsContent value="capture" className="space-y-4">
+          <Panel title="Capture PNG de la page">
+            <p className="mb-3 text-xs text-muted-foreground">Ouvrez la page à capturer dans un autre onglet puis utilisez la capture du navigateur, ou exportez le dashboard via le bouton ci-dessous (capture du body courant).</p>
+            <Button variant="outline" onClick={async () => {
+              try {
+                const node = document.body;
+                const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 1 });
+                const a = document.createElement("a");
+                a.href = dataUrl; a.download = `capture-${Date.now()}.png`; a.click();
+              } catch (e: any) { toast.error(e.message); }
+            }}><ImgIcon className="mr-2 h-4 w-4" /> Capturer cette page</Button>
+          </Panel>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function ImportForm() {
+  const [table, setTable] = useState<string>("transactions");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label>Module</Label>
+          <select value={table} onChange={(e) => setTable(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+            {TABLES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label>Fichier .xlsx</Label>
+          <Input type="file" accept=".xlsx,.xls,.csv" disabled={busy} onChange={async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            setBusy(true);
+            try {
+              const buf = await file.arrayBuffer();
+              const wb = XLSX.read(buf, { type: "array" });
+              const ws = wb.Sheets[wb.SheetNames[0]];
+              const rows = XLSX.utils.sheet_to_json<any>(ws);
+              const { data: u } = await supabase.auth.getUser();
+              const stamped = rows.map((r) => ({ ...r, user_id: r.user_id ?? u.user!.id }));
+              // strip id if blank/null, plus created_at/updated_at to let DB defaults run
+              const cleaned = stamped.map((r) => {
+                const o: any = { ...r };
+                if (!o.id) delete o.id;
+                delete o.created_at; delete o.updated_at;
+                for (const k of Object.keys(o)) if (o[k] === "" || o[k] === null) delete o[k];
+                return o;
+              });
+              const { error } = await (supabase as any).from(table).insert(cleaned);
+              if (error) throw error;
+              toast.success(`${cleaned.length} lignes importées dans ${table}`);
+            } catch (err: any) { toast.error(err.message); }
+            finally { setBusy(false); (e.target as HTMLInputElement).value = ""; }
+          }} />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Les colonnes <code>created_at</code> / <code>updated_at</code> et les <code>id</code> vides sont régénérés automatiquement. Un <code>user_id</code> manquant prend l'utilisateur courant.</p>
+    </div>
+  );
+}
