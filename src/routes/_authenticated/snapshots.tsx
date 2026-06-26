@@ -76,7 +76,8 @@ function SnapshotsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const list = snaps.data ?? [];
+  const fullList = snaps.data ?? [];
+  const list = useMemo(() => fullList.filter((s: any) => s.snapshot_month >= pFrom && s.snapshot_month <= pTo), [fullList, pFrom, pTo]);
   const last = list[list.length - 1];
   const prev = list[list.length - 2];
   const yearAgo = list.find(s => {
