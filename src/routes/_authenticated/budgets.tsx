@@ -490,7 +490,14 @@ function Row({
   return (
     <>
       <tr
-        className={cn("border-t border-border/60 hover:bg-muted/40 transition-shadow", node.archived && "opacity-50", dropBorder, isSubtotal && "bg-muted/30 font-medium")}
+        className={cn(
+          "border-t border-border/60 hover:bg-muted/40 transition-shadow",
+          node.archived && "opacity-50",
+          dropBorder,
+          isSubtotal && "bg-muted/30 font-medium",
+          !isSubtotal && node.depth === 0 && "bg-muted/60 font-semibold border-l-2 border-l-primary",
+          !isSubtotal && node.depth === 1 && "bg-muted/10",
+        )}
         draggable
         onDragStart={(e) => { setDragId(node.id); e.dataTransfer.effectAllowed = "move"; }}
         onDragEnd={() => { setDragId(null); setZone(null); }}
