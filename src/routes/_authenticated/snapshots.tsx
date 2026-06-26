@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel, StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { Camera, TrendingUp, Activity, PiggyBank } from "lucide-react";
 import { toast } from "sonner";
 import { Area, AreaChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { buildAllocation, growthRate } from "@/lib/analytics";
+import { PeriodPicker, usePeriodState } from "@/components/period-picker";
+import { resolvePeriod, isoDate } from "@/lib/period";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
   head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
