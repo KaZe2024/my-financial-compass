@@ -228,8 +228,9 @@ function Dashboard() {
         <StatCard label="Score santé" value={`${health.score}/100`} sub={`Croissance 3m ${fmtPct(health.growth)}`} tone={scoreTone(health.score)} icon={<ShieldCheck className="h-4 w-4" />} />
         <StatCard label="Trésorerie" value={fmtMoney(cash, cur)} sub={`${(wallets.data ?? []).length} portefeuilles`} icon={<Wallet className="h-4 w-4" />} />
         <StatCard label="Fonds d'urgence" value={`${health.emergencyMonths.toFixed(1)} mois`} sub="Cible: 6 mois" tone={health.emergencyMonths >= 6 ? "positive" : health.emergencyMonths >= 3 ? "neutral" : "warning"} icon={<PiggyBank className="h-4 w-4" />} />
-        <StatCard label="Revenus du mois" value={fmtMoney(income, cur)} tone="positive" icon={<TrendingUp className="h-4 w-4" />} />
-        <StatCard label="Dépenses du mois" value={fmtMoney(expense, cur)} tone="negative" icon={<TrendingDown className="h-4 w-4" />} />
+        <StatCard label={`Revenus · ${resolved.label}`} value={fmtMoney(income, cur)} tone="positive" icon={<TrendingUp className="h-4 w-4" />} />
+        <StatCard label={`Dépenses · ${resolved.label}`} value={fmtMoney(expense, cur)} tone="negative" icon={<TrendingDown className="h-4 w-4" />} />
+
         <StatCard label="Dettes en cours" value={fmtMoney(totalDebt, cur)} tone={totalDebt > 0 ? "warning" : "neutral"} icon={<Receipt className="h-4 w-4" />} />
         <StatCard label="Actifs" value={fmtMoney(totalAssets, cur)} sub={`Créances ${fmtMoney(totalRec, cur, { compact: true })}`} icon={<Landmark className="h-4 w-4" />} />
       </section>
