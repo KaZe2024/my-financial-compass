@@ -123,7 +123,7 @@ function AssetsPage() {
                               if (amount !== 0) {
                                 await supabase.from("asset_events").insert({
                                   user_id: u.user!.id, asset_id: a.id, event_type: "depreciation",
-                                  occurred_on: today, amount, notes: `Amortissement linéaire (${amo.months}/${amo.life} mois)`,
+                                  event_date: today, amount, notes: `Amortissement linéaire (${amo.months}/${amo.life} mois)`,
                                 });
                               }
                               toast.success("Dépréciation appliquée");
