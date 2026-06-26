@@ -9,9 +9,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
+
+/** Linear depreciation: returns {months, cumul, vnc, pct} for a given asset. */
+function computeAmortization(a: any, refDate = new Date()) {
+  const life = Number(a.useful_life_months ?? 0);
+  const cost = Number(a.purchase_value ?? 0);
+  if (!life || !a.purchase_date || cost <= 0) return null;
+  const start = new Date(a.purchase_date);
+  const months = Math.max(0, Math.round((refDate.getFullYear() - start.getFullYear()) * 12 + (refDate.getMonth() - start.getMonth())));
+  const used = Math.min(months, life);
+  const cumul = (cost / life) * used;
+  const vnc = Math.max(0, cost - cumul);
+  return { months: used, life, cumul, vnc, pct: used / life };
+}
 
 export const Route = createFileRoute("/_authenticated/assets")({
   head: () => ({ meta: [{ title: "Actifs — Personal CFO" }] }),
