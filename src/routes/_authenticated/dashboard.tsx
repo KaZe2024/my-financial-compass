@@ -106,12 +106,13 @@ function Dashboard() {
   });
   const incomeSrc = useQuery({
     queryKey: ["income_sources"],
-    queryFn: async () => (await supabase.from("income_sources").select("amount, cycle, recurring, active")).data ?? [],
+    queryFn: async () => (await supabase.from("income_sources").select("*")).data ?? [],
   });
   const subs = useQuery({
     queryKey: ["subscriptions"],
-    queryFn: async () => (await supabase.from("subscriptions").select("amount, billing_cycle, active")).data ?? [],
+    queryFn: async () => (await supabase.from("subscriptions").select("*")).data ?? [],
   });
+  const nodesForToday = useQuery(budgetNodesQO);
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
     queryFn: async () => (await supabase.from("assets").select("type, current_value").eq("status","owned")).data ?? [],
