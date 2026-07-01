@@ -26,6 +26,14 @@ export const Route = createFileRoute("/_authenticated/transactions")({
 const TX_TYPES = ["expense","income","transfer","investment","asset_purchase","asset_sale","adjustment","enveloppe_projet","enveloppe_emprunt"] as const;
 const CURRENCIES = ["MGA","EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
 const PROJECT_TYPES = new Set(["investment","enveloppe_projet","enveloppe_emprunt"]);
+const LEAF_REQUIRED_TYPES = new Set(["income","expense"]);
+
+function assertLeafBudget(type: string, nodeId: string | null, nodes: any[]): void {
+  if (!LEAF_REQUIRED_TYPES.has(type)) return;
+  if (!nodeId) throw new Error("Une feuille budgétaire est requise pour un revenu ou une dépense.");
+  const hasChild = nodes.some((n) => n.parent_id === nodeId && !n.archived);
+  if (hasChild) throw new Error("Sélectionnez une feuille (niveau le plus fin), pas une catégorie intermédiaire.");
+}
 
 type Filters = {
   fromDate: string;
@@ -150,6 +158,8 @@ function TxPage() {
       await supabase.from("transaction_tags").delete().eq("transaction_id", id);
       const { error } = await supabase.from("transactions").delete().eq("id", id);
       if (error) throw error;
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit("transaction", id, "delete");
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
     onError: (e: Error) => toast.error(e.message),
@@ -213,8 +223,11 @@ function TxPage() {
           <Field label="Ligne budgétaire">
             <NodePicker nodes={nodesQ.data ?? []} value={f.lineId} onChange={(id) => set("lineId", id)} onlyDepth={0} hidePath placeholder="Toutes" />
           </Field>
-          <Field label="Catégorie">
+          <Field label="Catégorie (intermédiaire)">
             <NodePicker nodes={nodesQ.data ?? []} value={f.nodeId} onChange={(id) => set("nodeId", id)} onlyDepth={1} hidePath placeholder="Toutes" />
+          </Field>
+          <Field label="Feuille budgétaire">
+            <NodePicker nodes={nodesQ.data ?? []} value={f.nodeId} onChange={(id) => set("nodeId", id)} leafOnly placeholder="Toutes (feuilles)" />
           </Field>
           <Field label="Projet">
             <Select value={f.projectId} onValueChange={(v) => set("projectId", v)}>
@@ -362,6 +375,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
 
   const m = useMutation({
     mutationFn: async () => {
+      assertLeafBudget(form.type, form.budget_node_id, nodes);
       const { data: u } = await supabase.auth.getUser();
       const amt = Number(form.amount);
       const xr = Number(form.exchange_rate || 1);
@@ -386,6 +400,8 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
       }).select().single();
       if (error) throw error;
       if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids, []);
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
     },
     onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -427,6 +443,7 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
 
   const m = useMutation({
     mutationFn: async () => {
+      assertLeafBudget(form.type, form.budget_node_id, nodes);
       const { data: u } = await supabase.auth.getUser();
       const amt = Number(form.amount);
       const xr = Number(form.exchange_rate || 1);
@@ -450,6 +467,8 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
       }).eq("id", tx.id);
       if (error) throw error;
       await syncTags(tx.id, u.user!.id, form.tag_ids, currentTagIds);
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
     },
     onSuccess: () => { toast.success("Transaction mise à jour"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -511,14 +530,14 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
             </Select>
           </Field>
         ) : (
-          <Field label="Catégorie">
-            <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} onlyDepth={1} hidePath placeholder="Aucune" />
+          <Field label="Feuille budgétaire">
+            <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} leafOnly placeholder="Sélectionner une feuille" />
           </Field>
         )}
       </div>
       {isProj && (
-        <Field label="Catégorie budgétaire (optionnel)">
-          <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} onlyDepth={1} hidePath placeholder="Aucune" />
+        <Field label="Feuille budgétaire (optionnel)">
+          <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} leafOnly placeholder="Aucune" />
         </Field>
       )}
       <div className="grid grid-cols-3 gap-3">

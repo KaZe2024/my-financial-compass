@@ -70,9 +70,15 @@ function SettingsPage() {
         </form>
       </Panel>
 
+      <Panel title="Traçabilité">
+        <p className="text-sm text-muted-foreground">Toutes les créations, modifications, suppressions et archivages importants (transactions, actifs, dettes, créances, projets, objectifs, produits) sont enregistrés.</p>
+        <a href="/audit" className="mt-3 inline-flex items-center gap-2 rounded-sm border border-border bg-muted/30 px-3 py-1.5 text-sm hover:bg-muted">
+          Ouvrir le journal d'audit →
+        </a>
+      </Panel>
+
       <Panel title="Modules disponibles">
-        <p className="text-sm text-muted-foreground">Cette version inclut : Dashboard, Portefeuilles, Transactions, Budgets, Listes d'achat, Prix produits, Dettes, Créances, Projets, Actifs, Objectifs, Snapshots.</p>
-        <p className="mt-2 text-sm text-muted-foreground">Le schéma de base de données prend déjà en charge : Factures à émettre, Provisions, Prêts, Abonnements, Salaires, Compteurs (eau/électricité), Devises, Dépréciation/Revalorisation des actifs, Score de santé financière, Simulateur de scénarios, Pièces jointes, Journal d'audit.</p>
+        <p className="text-sm text-muted-foreground">Cette version inclut : Dashboard, Portefeuilles, Transactions, Budgets, Listes d'achat, Prix produits, Dettes, Créances, Projets, Actifs, Objectifs, Snapshots, Journal d'audit.</p>
       </Panel>
     </div>
   );

@@ -1,113 +1,110 @@
-Cette refonte touche presque tous les modules. Je découpe en 9 chantiers cohérents pour pouvoir livrer sans tout casser, avec 1 grosse migration SQL en tête.
+# Chantier Personal CFO — 6 corrections structurelles
 
----
+Respect strict des principes non négociables : transactions = source unique, réutilisation de l'existant, feuille budgétaire obligatoire, projets = enveloppes, objectifs = cibles calculées, migrations additives uniquement.
 
-## 0. Migration SQL (une seule)
+## Reconnaissance préalable (obligatoire avant tout code)
 
-- `transactions.type` : étendre l'enum/CHECK pour ajouter `enveloppe_projet` (mouvement de fonds vers/depuis un projet) et garder `investment` (dépense projet). Ajouter colonnes :
-  - `counterparty_id uuid` (FK `counterparties.id`) + `counterparty_label text` (saisie libre auto-créée)
-  - `project_id uuid` (FK `projects.id`)
-  - `source_kind text` (`manual` | `asset` | `debt` | `receivable` | `shopping_list` | `project_envelope`) + `source_id uuid` (id de l'entité source)
-- `counterparties` : ajouter `group_name text`, `service_name text` (Prestation), `notes text`, `archived bool default false`. Backfill depuis transactions existantes.
-- `assets`, `debts`, `receivables`, `projects`, `financial_goals` : ajouter `archived bool default false` si absent + colonne `linked_transaction_id uuid` pour la transaction d'origine.
-- `budget_nodes` : rien à changer côté schéma (kind existe). On utilisera seulement de l'UI pour collapse/styling.
-- `projects` : ajouter `envelope_balance numeric` (calculé via trigger sur transactions de type `enveloppe_projet` signé +/−) et `total_spent numeric` (somme des `investment` rattachées).
-- Trigger `apply_tx_to_projects` : à chaque insert/update/delete d'une transaction liée à un projet, recalcule `envelope_balance` et `total_spent`.
-- Grants + RLS standards.
+Lecture ciblée de :
+- `budget_nodes`, `NodePicker`, `buildTree` (déjà en place → réutiliser `allowBranches={false}` + exclusion des nœuds à enfants)
+- Formulaire transaction (`transactions.tsx`) + tous les endroits qui insèrent une transaction (assets, debts, receivables, projects, shopping)
+- `dashboard.tsx`, `snapshots.tsx` (lecture des objectifs / projets)
+- `goals.tsx`, `projects.tsx`, `products.tsx`
+- Tables existantes : `financial_goals` (colonnes actuelles), `projects` (envelope_balance, total_spent, linked_transaction_id), `audit_log` (déjà présent — à réutiliser, pas recréer), `subscriptions`, `income_sources` (pour "à traiter aujourd'hui")
 
----
+## 1. Feuille budgétaire obligatoire
 
-## 1. Dashboard — sélecteur de période
+- `NodePicker` : ajouter prop `leafOnly` qui filtre `flat` sur `childCount === 0 && kind !== "subtotal"` et force `allowBranches={false}`.
+- Formulaire transaction : passer `leafOnly` pour les types `income` et `expense` (transfer/investment/enveloppe_* gardent la logique actuelle). Validation submit : bloquer si nœud non-feuille sélectionné.
+- Filtre "feuille budgétaire" dans la liste transactions : nouveau `NodePicker leafOnly` dans la barre de filtres, applique `transactions.budget_node_id === selected`.
+- Vérifier assets/debts/receivables/shopping qui créent des transactions : forcer feuille pour les auto-transactions (ou nœud dédié "Achats d'actifs" etc. si déjà présent).
 
-Composant `<PeriodPicker>` réutilisable avec : YTD · Mensuel · Annuel · LTM · Plage personnalisée (du / au). Toutes les agrégations du dashboard (cash-flow, score santé, net worth growth, etc.) prennent la période active. Persisté en `localStorage`.
+## 2. Objectifs auto-calculés
 
-## 2. Snapshots — même sélecteur étendu
+Migration additive :
+```sql
+ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS goal_type text
+  CHECK (goal_type IN ('savings_balance','net_worth','debt_reduction','spending_cap','savings_rate','category_spend'));
+ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS watch_node_id uuid REFERENCES budget_nodes(id);
+ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_scope text
+  CHECK (period_scope IN ('ytd','ltm','mtd','qtd','all_time','custom'));
+ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_start date;
+ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_end date;
+```
+`current_amount` **conservée** (non exposée) et rafraîchie en arrière-plan par le client à chaque lecture (upsert silencieux) pour rester cohérente avec le calcul.
 
-`<PeriodPicker>` avec en plus : Trimestre · Semestre. Le tableau et les graphes du module Snapshots filtrent sur la plage choisie.
+Nouveau module `src/lib/goal-progress.ts` : `computeGoalProgress(goal, txs, wallets, debts, assets)` retourne `{current, target, pct}`. Un mapping par `goal_type` :
+- `savings_balance` → somme `wallets.current_balance` (wallets d'épargne = filtrés)
+- `net_worth` → assets − debts
+- `debt_reduction` → total dettes (inversé)
+- `spending_cap` / `category_spend` → somme transactions expense sur `watch_node_id` (+ descendants) dans période
+- `savings_rate` → (income − expense) / income sur période
 
-## 3. Transactions : Tiers + colonnes + filtres
+Formulaire `GoalDialog` : retirer champ "Déjà épargné", ajouter selects `goal_type` + `period_scope` + `NodePicker` conditionnel. Card affiche progression calculée.
 
-- Nouvelle colonne **Tiers** (combobox auto-complétée, crée le tiers s'il n'existe pas).
-- Ajout : **Projet** (visible si type = `investment` ou `enveloppe_projet`).
-- **Tableau visible** : Date · Type · Description · Tiers · Catégorie · Tags · Portefeuille · Montant MGA · Notes. (On retire Montant natif + Ligne budgétaire — toujours stockés et filtrables.)
-- **Filtres ré-ordonnés et regroupés sur 2-3 lignes** : Date du · Date au · Montant MGA min · Montant MGA max · Tiers · Type · Portefeuille · Devise · Mot-clé description · Mot-clé notes · Ligne budgétaire · Catégorie · Projet · Tags.
-- Dialog Add/Edit : champ Tiers (auto-complétion via `counterparties`) + champ Projet conditionnel.
+Dashboard : remplacer lecture de `current_amount` par `computeGoalProgress`. Idem partout où le champ est lu (grep `current_amount` sur financial_goals).
 
-## 4. Toutes les sources alimentent / sont alimentées par Transactions
+## 3. Projets = enveloppes
 
-Règle unique : créer un actif, une dette, une créance, un objectif/projet **doit** générer (ou être lié à) une ligne de transaction.
-
-- **Assets** : à la création, créer une transaction `asset_purchase` (type existant `expense` ou nouveau `asset_buy`) avec `source_kind='asset'`, `source_id=asset.id`. La carte asset affiche le lien "Voir transaction".
-- **Debts** (emprunt reçu) : créer transaction `income` avec `source_kind='debt'`. Remboursements = transactions liées.
-- **Receivables** (prêt accordé) : créer transaction `expense` `source_kind='receivable'` (sortie de cash), encaissements = transactions liées.
-- **Projects** : voir §8.
-- **Shopping lists** : déjà OK.
-
-Boutons **Modifier · Archiver · Supprimer** ajoutés sur chaque carte/ligne de : Debts, Receivables, Projects, Goals, Assets. La suppression d'une entité propose : "Supprimer aussi les transactions liées ?".
-
-## 5. Module Tiers / Comptes de Tiers
-
-Nouvelle page `/_authenticated/counterparties`.
-
-- Liste des tiers (depuis `counterparties`) avec colonnes : Nom · Groupe · Prestation · Solde net période · # mouvements · Notes.
-- Filtres : mot dans nom, mot dans notes, groupe, prestation, période (Mensuel / Trimestre / Semestre / Annuel / YTD).
-- Détail tiers : tableau des mouvements (transactions liées) + graphique entrées/sorties par période choisie + édition Groupe / Prestation / Notes / Archiver.
-- Création de tiers possible directement ou via auto-création depuis Transactions.
-
-## 6. Module Suivi Taux de change
-
-Nouvelle page `/_authenticated/fx`.
-
-- Source : `transactions.exchange_rate` + `transactions.currency` + `occurred_on`. On agrège (moyenne pondérée ou dernière obs.) par devise et par jour.
-- UI : sélecteur devise, plage de dates (preset YTD/LTM/Mensuel/Annuel/Plage), graphique en ligne, table des observations, min/max/moy/dernier, variation %.
-- Bonus : possibilité d'ajouter une observation manuelle (table `exchange_rates` existe déjà).
-
-## 7. Budgets — UX arborescence
-
-- Lignes **Groupe (depth 0)** : fond plus marqué (bg-muted/60, texte semi-bold, bordure latérale colorée) pour les distinguer.
-- **Sous-totaux repliables** : chevron permettant de masquer le bloc agrégé en dessous du subtotal (état persisté localStorage par node id).
-
-## 8. Refonte Projets vs Objectifs
-
-Séparation nette :
-
-- **Objectifs (`financial_goals`)** : épargne pure, suivi de cible — pas de mouvement automatique (statu quo).
-- **Projets (`projects`)** : 3 niveaux d'activité :
-  1. **Épargne & mouvements de fonds** → nouveau type transaction `enveloppe_projet`. Dans le formulaire transaction, si type = `enveloppe_projet`, le champ "Vers" devient "Projet" (select projets actifs). Signe : + alimente l'enveloppe (sortie du wallet, entrée projet) ou − retire (entrée wallet, sortie projet). Met à jour `projects.envelope_balance` via trigger.
-  2. **Dépenses du projet** → type `investment` rattaché à un `project_id`. Met à jour `projects.total_spent`.
-  3. **Emprunt à l'enveloppe** → cas particulier de (1) avec signe négatif et flag `is_loan_from_envelope=true` ; affiché en jaune dans la carte projet ("X emprunté à l'enveloppe, à rembourser"). Solde projet recalculé pareil.
-
-Carte projet enrichie : Solde enveloppe · Dépenses totales · Cible · % avancement · Emprunt en cours · boutons Modifier · Archiver · Supprimer.
-
-## 9. Import / Export universel
-
-- **Export Excel** par module (Transactions, Wallets, Budgets, Tiers, Assets, Debts, Receivables, Projects, Goals, Snapshots) + **Export Tout** (1 fichier multi-feuilles). Lib : `xlsx`.
-- **Export PDF** : reporting dashboard + snapshot mensuel (lib `jspdf` + `jspdf-autotable`).
-- **Export PNG/JPEG** : capture d'une section dashboard via `html-to-image`.
-- **Import Excel** : bouton "Télécharger le modèle" (génère un .xlsx vierge avec les bons en-têtes par feuille) + bouton "Importer". Parse, valide (Zod), affiche un récap "X lignes valides, Y erreurs", insère en transaction batch. Gère la création auto des tiers/wallets/catégories manquants (option à cocher).
-- Page dédiée `/_authenticated/data` avec onglets Export / Import / Modèles.
-
----
-
-## Technique
-
-- 1 migration SQL (chantier 0).
-- Nouveaux fichiers : `src/components/period-picker.tsx`, `src/components/counterparty-picker.tsx`, `src/lib/io/excel.ts`, `src/lib/io/pdf.ts`, `src/lib/io/png.ts`, `src/lib/io/import.ts`, `src/routes/_authenticated/counterparties.tsx`, `src/routes/_authenticated/fx.tsx`, `src/routes/_authenticated/data.tsx`.
-- Fichiers modifiés : `transactions.tsx`, `dashboard.tsx`, `snapshots.tsx`, `budgets.tsx`, `projects.tsx`, `goals.tsx`, `assets.tsx`, `debts.tsx`, `receivables.tsx`, `app-shell.tsx` (nav), `integrations/supabase/types.ts` (auto), `lib/queries.ts`.
-- Dépendances à installer : `xlsx`, `jspdf`, `jspdf-autotable`, `html-to-image`, `date-fns` (probablement déjà là).
-
-```text
-Volume estimé : ~15-18 fichiers, 1 migration, 0 breaking change majeur (ajouts + colonnes nullable).
+Migration additive :
+```sql
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS closed_at timestamptz;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS resulted_asset_id uuid REFERENCES assets(id);
 ```
 
-## Ordre de livraison proposé
+Formulaire projet : retirer "Déjà épargné" (`current_amount` reste en base, calculée = `envelope_balance` déjà maintenu par trigger `apply_tx_to_projects`).
 
-1. Migration SQL + types regen.
-2. Chantier 3 (Transactions: Tiers + colonnes + filtres) + 4 (sources ↔ transactions + CRUD partout).
-3. Chantier 1 + 2 (PeriodPicker Dashboard + Snapshots).
-4. Chantier 8 (Projets/Objectifs).
-5. Chantier 5 (Tiers) + 6 (FX).
-6. Chantier 7 (Budgets UX).
-7. Chantier 9 (Import/Export).
+Actions rapides sur chaque carte projet :
+- **Alimenter** → dialog qui crée une transaction `enveloppe_projet` (montant + wallet source + feuille budgétaire "Épargne projets" — la feuille peut être suggérée mais l'utilisateur confirme).
+- **Emprunter** → si `envelope_balance < montant demandé` : crée transaction `enveloppe_emprunt` (fonds dispo temporaires) **et** insère une ligne dans `debts` liée au projet (nouveau champ `debts.project_id` via migration additive) pour traçabilité.
+- **Finaliser** → dialog : montant, wallet, option "créer un actif lié" (nom, catégorie, valeur). Crée transaction `investment` (déjà supportée par trigger) et, si coché, insert `assets` + met `projects.resulted_asset_id` + `closed_at` + `status='completed'`.
 
-Confirme-moi qu'on part là-dessus (ou dis-moi par quel chantier commencer en priorité) et je lance la migration.
+Migration additive complémentaire :
+```sql
+ALTER TABLE debts ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES projects(id);
+```
+
+Historique projet : nouveau composant `ProjectHistoryDialog` qui lit `transactions WHERE project_id = X ORDER BY occurred_on DESC` en lecture seule.
+
+Dashboard / snapshots : cohérence via `envelope_balance` (déjà exposé).
+
+## 4. Prix produits
+
+- `products.tsx` : retirer bouton "Créer produit". Garder table avec actions Éditer (nom/unité/notes) + Archiver via `RowActions`.
+- Historique prix : déjà en lecture seule (alimenté par trigger `record_price_from_item`) — vérifier qu'aucun bouton "ajouter prix" n'existe, sinon retirer.
+
+## 5. Audit log
+
+`audit_log` déjà présent en base — réutiliser. 
+
+Créer helper `src/lib/audit.ts` :
+```ts
+export async function logAudit(entity: string, entity_id: string, action: 'create'|'update'|'delete'|'archive', diff?: any)
+```
+Appeler dans les mutations existantes de : transactions, assets, debts, receivables, projects, financial_goals, budget_nodes. Wrapper léger dans `RowActions` pour archive/delete.
+
+Nouvelle page `src/routes/_authenticated/audit.tsx` : table paginée avec filtre par `entity_type`, `action`, plage de date. Lien depuis `settings.tsx` ("Journal d'audit").
+
+## 6. "À traiter aujourd'hui" sur dashboard
+
+Nouvelle section entre KPIs et graphes :
+- Lit `subscriptions WHERE next_billing_date <= today AND active`
+- Lit `income_sources WHERE next_expected_date <= today AND active` (si champ existe, sinon dériver de `frequency` + `last_received`)
+- Chaque ligne = bouton "Générer" qui insère la transaction correspondante (expense pour sub, income pour source), rattache à la feuille budgétaire mémorisée sur la source, puis met à jour `next_billing_date` / `next_expected_date` selon la fréquence (helper `addPeriod(date, frequency)`).
+
+## Ordre d'exécution
+
+1. Migration additive unique (colonnes goals + projects + debts).
+2. `NodePicker` prop `leafOnly` + branchement formulaire tx + filtre.
+3. `goal-progress.ts` + refonte `goals.tsx` + patch dashboard/snapshots.
+4. Refonte `projects.tsx` (actions + historique) + patch dashboard.
+5. `products.tsx` cleanup.
+6. `audit.ts` helper + page audit + branchements mutations + lien settings.
+7. Dashboard "à traiter aujourd'hui".
+8. Revue finale : grep `current_amount`, tests navigation, mobile, cohérence visuelle.
+
+## Risques / non-régression
+
+- `current_amount` et `envelope_balance` restent alimentés (triggers en place) → aucun écran ne casse.
+- Pas de rename/drop de colonne. Enum `transaction.type` déjà étendu précédemment.
+- Formulaires existants gardent la même structure visuelle (Dialog + Label + Input).
+- Chaque mutation touchée conserve son toast + invalidateQueries actuels.

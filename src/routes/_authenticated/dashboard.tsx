@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
@@ -7,9 +8,14 @@ import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
+import { NodePicker } from "@/components/node-picker";
+import { advanceDate } from "@/lib/recurring";
+import { logAudit } from "@/lib/audit";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Wallet, TrendingUp, TrendingDown, PiggyBank, Receipt, HandCoins, Landmark, Activity,
-  ShieldCheck, Target, LineChart as LineIcon,
+  ShieldCheck, Target, LineChart as LineIcon, CalendarClock, Zap,
 } from "lucide-react";
 import {
   Area, AreaChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
@@ -100,12 +106,13 @@ function Dashboard() {
   });
   const incomeSrc = useQuery({
     queryKey: ["income_sources"],
-    queryFn: async () => (await supabase.from("income_sources").select("amount, cycle, recurring, active")).data ?? [],
+    queryFn: async () => (await supabase.from("income_sources").select("*")).data ?? [],
   });
   const subs = useQuery({
     queryKey: ["subscriptions"],
-    queryFn: async () => (await supabase.from("subscriptions").select("amount, billing_cycle, active")).data ?? [],
+    queryFn: async () => (await supabase.from("subscriptions").select("*")).data ?? [],
   });
+  const nodesForToday = useQuery(budgetNodesQO);
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
     queryFn: async () => (await supabase.from("assets").select("type, current_value").eq("status","owned")).data ?? [],
@@ -234,6 +241,10 @@ function Dashboard() {
         <StatCard label="Dettes en cours" value={fmtMoney(totalDebt, cur)} tone={totalDebt > 0 ? "warning" : "neutral"} icon={<Receipt className="h-4 w-4" />} />
         <StatCard label="Actifs" value={fmtMoney(totalAssets, cur)} sub={`Créances ${fmtMoney(totalRec, cur, { compact: true })}`} icon={<Landmark className="h-4 w-4" />} />
       </section>
+
+      <TodaySection subs={subs.data ?? []} sources={incomeSrc.data ?? []} nodes={nodesForToday.data ?? []} wallets={wallets.data ?? []} />
+
+
 
       {/* Wealth evolution */}
       <section className="grid gap-4 lg:grid-cols-3">
@@ -487,3 +498,92 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function TodaySection({ subs, sources, nodes, wallets }: { subs: any[]; sources: any[]; nodes: any[]; wallets: any[] }) {
+  const qc = useQueryClient();
+  const today = toISODate(new Date());
+  const dueSubs = subs.filter((s: any) => s.active && s.next_billing_date && s.next_billing_date <= today);
+  const dueSources = sources.filter((s: any) => s.active && s.recurring && s.next_date && s.next_date <= today);
+  const items: Array<{ kind: "sub" | "src"; row: any }> = [
+    ...dueSubs.map((row: any) => ({ kind: "sub" as const, row })),
+    ...dueSources.map((row: any) => ({ kind: "src" as const, row })),
+  ];
+  const [picks, setPicks] = useState<Record<string, { wallet_id: string; node_id: string | null }>>({});
+  const setPick = (id: string, patch: Partial<{ wallet_id: string; node_id: string | null }>) =>
+    setPicks((p) => {
+      const cur = p[id] ?? { wallet_id: "", node_id: null };
+      return { ...p, [id]: { ...cur, ...patch } };
+    });
+
+  const gen = useMutation({
+    mutationFn: async ({ kind, row }: { kind: "sub" | "src"; row: any }) => {
+      const pick = picks[row.id] ?? { wallet_id: "", node_id: null };
+      if (!pick.wallet_id) throw new Error("Portefeuille requis");
+      if (!pick.node_id) throw new Error("Feuille budgétaire requise");
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user!.id;
+      const isSub = kind === "sub";
+      const amt = Number(row.amount ?? 0);
+      const nextField = isSub ? "next_billing_date" : "next_date";
+      const cycle = isSub ? row.billing_cycle : row.cycle;
+      const currentNext = row[nextField] ?? today;
+      const { data: tx, error } = await supabase.from("transactions").insert({
+        user_id: uid,
+        type: isSub ? "expense" : "income",
+        occurred_on: currentNext,
+        description: `${isSub ? "Abonnement" : "Revenu"} · ${row.name}`,
+        wallet_id: pick.wallet_id,
+        amount: amt, currency: row.currency ?? "MGA", exchange_rate: 1, base_amount: amt,
+        budget_node_id: pick.node_id,
+        source_kind: isSub ? "subscription" : "income_source",
+        source_id: row.id,
+      }).select().single();
+      if (error) throw error;
+      const nextDate = advanceDate(currentNext, cycle);
+      await (supabase as any).from(isSub ? "subscriptions" : "income_sources")
+        .update({ [nextField]: nextDate }).eq("id", row.id);
+      await logAudit("transaction", tx?.id ?? null, "create", { source: kind === "sub" ? "subscription" : "income_source", source_id: row.id });
+      await logAudit(kind === "sub" ? "subscription" : "income_source", row.id, "update", { advanced_to: nextDate });
+    },
+    onSuccess: () => { toast.success("Transaction générée"); qc.invalidateQueries(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (items.length === 0) return null;
+
+  return (
+    <Panel title={<span className="flex items-center gap-2"><CalendarClock className="h-4 w-4 text-primary" /> À traiter aujourd'hui</span> as any}>
+      <div className="space-y-2">
+        {items.map(({ kind, row }) => {
+          const pick = picks[row.id] ?? { wallet_id: "", node_id: null };
+          const amt = Number(row.amount ?? 0);
+          const kindLabel = kind === "sub" ? "Abonnement" : "Revenu récurrent";
+          const nextDate = kind === "sub" ? row.next_billing_date : row.next_date;
+          return (
+            <div key={`${kind}-${row.id}`} className="grid grid-cols-1 md:grid-cols-[1fr_180px_220px_auto] items-center gap-2 rounded-md border border-border/60 bg-muted/20 p-2">
+              <div>
+                <div className="text-sm font-medium">{row.name} <span className="ml-2 font-mono text-[9px] uppercase text-muted-foreground">{kindLabel}</span></div>
+                <div className="num text-xs text-muted-foreground">Échéance {fmtDate(nextDate)} · {fmtMoney(amt, row.currency ?? "MGA")}</div>
+              </div>
+              <select
+                value={pick.wallet_id}
+                onChange={(e) => setPick(row.id, { wallet_id: e.target.value })}
+                className="rounded-sm border border-border bg-background px-2 py-1 text-xs"
+              >
+                <option value="">Portefeuille…</option>
+                {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+              <div className="min-w-0">
+                <NodePicker nodes={nodes} value={pick.node_id} onChange={(id) => setPick(row.id, { node_id: id })} leafOnly placeholder="Feuille…" />
+              </div>
+              <Button size="sm" onClick={() => gen.mutate({ kind, row })} disabled={gen.isPending}>
+                <Zap className="mr-1 h-3 w-3" /> Générer
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
