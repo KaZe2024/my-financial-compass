@@ -510,7 +510,10 @@ function TodaySection({ subs, sources, nodes, wallets }: { subs: any[]; sources:
   ];
   const [picks, setPicks] = useState<Record<string, { wallet_id: string; node_id: string | null }>>({});
   const setPick = (id: string, patch: Partial<{ wallet_id: string; node_id: string | null }>) =>
-    setPicks((p) => ({ ...p, [id]: { ...({ wallet_id: "", node_id: null } as { wallet_id: string; node_id: string | null }), ...(p[id] ?? {}), ...patch } }));
+    setPicks((p) => {
+      const cur = p[id] ?? { wallet_id: "", node_id: null };
+      return { ...p, [id]: { ...cur, ...patch } };
+    });
 
   const gen = useMutation({
     mutationFn: async ({ kind, row }: { kind: "sub" | "src"; row: any }) => {
