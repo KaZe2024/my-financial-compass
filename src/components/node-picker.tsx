@@ -19,13 +19,20 @@ type Props = {
   hidePath?: boolean;
   /** When true, exclude subtotal-kind nodes. Defaults to true. */
   excludeSubtotals?: boolean;
+  /** When true, only nodes with no children (feuilles) are selectable/visible. */
+  leafOnly?: boolean;
 };
 
-export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true, onlyDepth, hidePath = false, excludeSubtotals = true }: Props) {
+export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionner un budget…", allowBranches = true, onlyDepth, hidePath = false, excludeSubtotals = true, leafOnly = false }: Props) {
   const [open, setOpen] = useState(false);
   const tree = useMemo(() => buildTree(nodes.filter((n) => !n.archived && (!excludeSubtotals || n.kind !== "subtotal"))), [nodes, excludeSubtotals]);
   const flatAll = useMemo(() => flattenTree(tree), [tree]);
-  const flat = useMemo(() => onlyDepth != null ? flatAll.filter((n) => n.depth === onlyDepth) : flatAll, [flatAll, onlyDepth]);
+  const flat = useMemo(() => {
+    let f = flatAll;
+    if (onlyDepth != null) f = f.filter((n) => n.depth === onlyDepth);
+    if (leafOnly) f = f.filter((n) => n.childCount === 0);
+    return f;
+  }, [flatAll, onlyDepth, leafOnly]);
   const selected = flatAll.find((n) => n.id === value) ?? null;
 
   return (
@@ -59,7 +66,7 @@ export function NodePicker({ nodes, value, onChange, placeholder = "Sélectionne
             <CommandEmpty>Aucun résultat.</CommandEmpty>
             <CommandGroup>
               {flat.map((n: TreeNode) => {
-                const disabled = !allowBranches && n.childCount > 0;
+                const disabled = (!allowBranches && n.childCount > 0) || (leafOnly && n.childCount > 0);
                 const label = hidePath ? n.name : pathLabel(n);
                 return (
                   <CommandItem

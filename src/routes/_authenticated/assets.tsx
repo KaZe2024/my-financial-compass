@@ -151,12 +151,25 @@ function AssetsPage() {
   );
 }
 
+function tableToEntity(t: string): any {
+  const m: Record<string, string> = {
+    assets: "asset", debts: "debt", receivables: "receivable",
+    projects: "project", financial_goals: "goal", products: "product",
+    counterparties: "counterparty", subscriptions: "subscription", income_sources: "income_source",
+    budget_nodes: "budget_node", transactions: "transaction",
+  };
+  return m[t] ?? t;
+}
+
+
 export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo }: { table: string; id: string; archived: boolean; onEdit: () => void; linkedTxId?: string | null; cascadeTo?: string }) {
   const qc = useQueryClient();
   const arch = useMutation({
     mutationFn: async () => {
       const { error } = await (supabase as any).from(table).update({ archived: !archived }).eq("id", id);
       if (error) throw error;
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit(tableToEntity(table), id, archived ? "restore" : "archive");
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success(archived ? "Restauré" : "Archivé"); },
     onError: (e: Error) => toast.error(e.message),
@@ -169,6 +182,8 @@ export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo 
       }
       const { error } = await (supabase as any).from(table).delete().eq("id", id);
       if (error) throw error;
+      const { logAudit } = await import("@/lib/audit");
+      await logAudit(tableToEntity(table), id, "delete", alsoTx ? { linked_tx_deleted: linkedTxId } : undefined);
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
     onError: (e: Error) => toast.error(e.message),

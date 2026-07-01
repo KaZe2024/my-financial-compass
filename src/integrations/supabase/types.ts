@@ -505,6 +505,7 @@ export type Database = {
           notes: string | null
           original_amount: number
           outstanding: number
+          project_id: string | null
           status: Database["public"]["Enums"]["debt_status"]
           updated_at: string
           user_id: string
@@ -521,6 +522,7 @@ export type Database = {
           notes?: string | null
           original_amount: number
           outstanding: number
+          project_id?: string | null
           status?: Database["public"]["Enums"]["debt_status"]
           updated_at?: string
           user_id: string
@@ -537,6 +539,7 @@ export type Database = {
           notes?: string | null
           original_amount?: number
           outstanding?: number
+          project_id?: string | null
           status?: Database["public"]["Enums"]["debt_status"]
           updated_at?: string
           user_id?: string
@@ -554,6 +557,13 @@ export type Database = {
             columns: ["linked_transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "debts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -614,9 +624,13 @@ export type Database = {
           currency: string
           current_amount: number
           description: string | null
+          goal_type: string | null
           id: string
           linked_transaction_id: string | null
           name: string
+          period_end: string | null
+          period_scope: string | null
+          period_start: string | null
           status: Database["public"]["Enums"]["goal_status"]
           target_amount: number
           target_date: string | null
@@ -630,9 +644,13 @@ export type Database = {
           currency?: string
           current_amount?: number
           description?: string | null
+          goal_type?: string | null
           id?: string
           linked_transaction_id?: string | null
           name: string
+          period_end?: string | null
+          period_scope?: string | null
+          period_start?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount: number
           target_date?: string | null
@@ -646,9 +664,13 @@ export type Database = {
           currency?: string
           current_amount?: number
           description?: string | null
+          goal_type?: string | null
           id?: string
           linked_transaction_id?: string | null
           name?: string
+          period_end?: string | null
+          period_scope?: string | null
+          period_start?: string | null
           status?: Database["public"]["Enums"]["goal_status"]
           target_amount?: number
           target_date?: string | null
@@ -1079,6 +1101,7 @@ export type Database = {
         Row: {
           archived: boolean
           budget_node_id: string | null
+          closed_at: string | null
           color: string | null
           created_at: string
           currency: string
@@ -1089,6 +1112,7 @@ export type Database = {
           id: string
           linked_transaction_id: string | null
           name: string
+          resulted_asset_id: string | null
           status: Database["public"]["Enums"]["project_status"]
           target_amount: number
           target_date: string | null
@@ -1099,6 +1123,7 @@ export type Database = {
         Insert: {
           archived?: boolean
           budget_node_id?: string | null
+          closed_at?: string | null
           color?: string | null
           created_at?: string
           currency?: string
@@ -1109,6 +1134,7 @@ export type Database = {
           id?: string
           linked_transaction_id?: string | null
           name: string
+          resulted_asset_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           target_amount?: number
           target_date?: string | null
@@ -1119,6 +1145,7 @@ export type Database = {
         Update: {
           archived?: boolean
           budget_node_id?: string | null
+          closed_at?: string | null
           color?: string | null
           created_at?: string
           currency?: string
@@ -1129,6 +1156,7 @@ export type Database = {
           id?: string
           linked_transaction_id?: string | null
           name?: string
+          resulted_asset_id?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           target_amount?: number
           target_date?: string | null
@@ -1163,6 +1191,13 @@ export type Database = {
             columns: ["linked_transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_resulted_asset_id_fkey"
+            columns: ["resulted_asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
             referencedColumns: ["id"]
           },
         ]

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
@@ -7,9 +8,14 @@ import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
+import { NodePicker } from "@/components/node-picker";
+import { advanceDate } from "@/lib/recurring";
+import { logAudit } from "@/lib/audit";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Wallet, TrendingUp, TrendingDown, PiggyBank, Receipt, HandCoins, Landmark, Activity,
-  ShieldCheck, Target, LineChart as LineIcon,
+  ShieldCheck, Target, LineChart as LineIcon, CalendarClock, Zap,
 } from "lucide-react";
 import {
   Area, AreaChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
