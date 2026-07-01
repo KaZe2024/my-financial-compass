@@ -242,6 +242,10 @@ function Dashboard() {
         <StatCard label="Actifs" value={fmtMoney(totalAssets, cur)} sub={`Créances ${fmtMoney(totalRec, cur, { compact: true })}`} icon={<Landmark className="h-4 w-4" />} />
       </section>
 
+      <TodaySection subs={subs.data ?? []} sources={incomeSrc.data ?? []} nodes={nodesForToday.data ?? []} wallets={wallets.data ?? []} />
+
+
+
       {/* Wealth evolution */}
       <section className="grid gap-4 lg:grid-cols-3">
         <Panel title="Évolution du patrimoine" className="lg:col-span-2">
