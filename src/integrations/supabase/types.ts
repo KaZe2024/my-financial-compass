@@ -44,9 +44,11 @@ export type Database = {
           asset_id: string
           created_at: string
           event_date: string
+          event_month: string | null
           event_type: Database["public"]["Enums"]["asset_event_type"]
           id: string
           notes: string | null
+          transaction_id: string | null
           user_id: string
         }
         Insert: {
@@ -54,9 +56,11 @@ export type Database = {
           asset_id: string
           created_at?: string
           event_date: string
+          event_month?: string | null
           event_type: Database["public"]["Enums"]["asset_event_type"]
           id?: string
           notes?: string | null
+          transaction_id?: string | null
           user_id: string
         }
         Update: {
@@ -64,9 +68,11 @@ export type Database = {
           asset_id?: string
           created_at?: string
           event_date?: string
+          event_month?: string | null
           event_type?: Database["public"]["Enums"]["asset_event_type"]
           id?: string
           notes?: string | null
+          transaction_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -75,6 +81,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_events_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -636,6 +649,7 @@ export type Database = {
           target_date: string | null
           updated_at: string
           user_id: string
+          watch_node_ids: string[] | null
         }
         Insert: {
           archived?: boolean
@@ -656,6 +670,7 @@ export type Database = {
           target_date?: string | null
           updated_at?: string
           user_id: string
+          watch_node_ids?: string[] | null
         }
         Update: {
           archived?: boolean
@@ -676,6 +691,7 @@ export type Database = {
           target_date?: string | null
           updated_at?: string
           user_id?: string
+          watch_node_ids?: string[] | null
         }
         Relationships: [
           {
@@ -1210,10 +1226,12 @@ export type Database = {
           category: string | null
           created_at: string
           currency: string
+          direction: string
           due_date: string | null
           id: string
           name: string
           notes: string | null
+          settled_at: string | null
           status: Database["public"]["Enums"]["provision_status"]
           user_id: string
         }
@@ -1224,10 +1242,12 @@ export type Database = {
           category?: string | null
           created_at?: string
           currency?: string
+          direction?: string
           due_date?: string | null
           id?: string
           name: string
           notes?: string | null
+          settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
           user_id: string
         }
@@ -1238,10 +1258,12 @@ export type Database = {
           category?: string | null
           created_at?: string
           currency?: string
+          direction?: string
           due_date?: string | null
           id?: string
           name?: string
           notes?: string | null
+          settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
           user_id?: string
         }
@@ -1637,12 +1659,14 @@ export type Database = {
           counterparty_label: string | null
           created_at: string
           currency: string
+          debt_id: string | null
           description: string
           exchange_rate: number
           id: string
           notes: string | null
           occurred_on: string
           project_id: string | null
+          receivable_id: string | null
           source_id: string | null
           source_kind: string | null
           to_wallet_id: string | null
@@ -1662,12 +1686,14 @@ export type Database = {
           counterparty_label?: string | null
           created_at?: string
           currency?: string
+          debt_id?: string | null
           description: string
           exchange_rate?: number
           id?: string
           notes?: string | null
           occurred_on?: string
           project_id?: string | null
+          receivable_id?: string | null
           source_id?: string | null
           source_kind?: string | null
           to_wallet_id?: string | null
@@ -1687,12 +1713,14 @@ export type Database = {
           counterparty_label?: string | null
           created_at?: string
           currency?: string
+          debt_id?: string | null
           description?: string
           exchange_rate?: number
           id?: string
           notes?: string | null
           occurred_on?: string
           project_id?: string | null
+          receivable_id?: string | null
           source_id?: string | null
           source_kind?: string | null
           to_wallet_id?: string | null
@@ -1738,10 +1766,24 @@ export type Database = {
             referencedColumns: ["code"]
           },
           {
+            foreignKeyName: "transactions_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_receivable_id_fkey"
+            columns: ["receivable_id"]
+            isOneToOne: false
+            referencedRelation: "receivables"
             referencedColumns: ["id"]
           },
           {
@@ -1983,6 +2025,10 @@ export type Database = {
         | "adjustment"
         | "enveloppe_projet"
         | "enveloppe_emprunt"
+        | "debt_incur"
+        | "debt_repay"
+        | "receivable_grant"
+        | "receivable_collect"
       utility_type: "water" | "electricity" | "gas" | "other"
       wallet_status: "active" | "archived" | "closed"
       wallet_type:
@@ -2157,6 +2203,10 @@ export const Constants = {
         "adjustment",
         "enveloppe_projet",
         "enveloppe_emprunt",
+        "debt_incur",
+        "debt_repay",
+        "receivable_grant",
+        "receivable_collect",
       ],
       utility_type: ["water", "electricity", "gas", "other"],
       wallet_status: ["active", "archived", "closed"],
