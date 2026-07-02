@@ -138,9 +138,25 @@ function SnapshotsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
-          <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+          <Button onClick={() => setCaptureFor(toISODate(monthStart()).slice(0, 7))} disabled={capture.isPending}>
+            <Camera className="mr-2 h-4 w-4" />Clôturer une période
+          </Button>
         </div>
       </header>
+
+      {captureFor != null && (
+        <Dialog open onOpenChange={(v) => !v && setCaptureFor(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Choisir le mois à clôturer</DialogTitle></DialogHeader>
+            <p className="text-xs text-muted-foreground">La photographie sera figée pour le mois choisi. Utile pour une saisie en retard.</p>
+            <Input type="month" value={captureFor} onChange={(e) => setCaptureFor(e.target.value)} />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setCaptureFor(null)}>Annuler</Button>
+              <Button disabled={capture.isPending || !captureFor} onClick={() => capture.mutate(captureFor!)}>Clôturer {captureFor}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Valeur nette" value={last ? fmtMoney(Number(last.net_worth)) : "—"} tone={last && Number(last.net_worth) >= 0 ? "positive" : "neutral"} icon={<Activity className="h-4 w-4" />} />
