@@ -25,7 +25,7 @@ export const GOAL_TYPES_NEED_PERIOD: GoalType[] = ["spending_cap", "category_spe
 const SAVINGS_WALLET_TYPES = new Set(["savings", "hidden_cash"]);
 
 type Tx = { type: string; base_amount: number | string; occurred_on: string; budget_node_id: string | null };
-type Wallet = { current_balance: number | string };
+type Wallet = { current_balance: number | string; type?: string };
 type Debt = { outstanding: number | string; status?: string };
 type Asset = { current_value: number | string; status?: string };
 type Receivable = { outstanding: number | string; status?: string };
