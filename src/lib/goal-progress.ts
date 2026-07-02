@@ -125,12 +125,15 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   if (type === "savings_rate") {
     const inPeriod = data.txs.filter(inRange);
     const income = inPeriod.filter(t => t.type === "income").reduce((s, t) => s + num(t.base_amount), 0);
-    const expense = inPeriod.filter(t => t.type === "expense").reduce((s, t) => s + num(t.base_amount), 0);
-    const rate = income > 0 ? ((income - expense) / income) * 100 : 0;
+    // Épargne = solde des wallets de type "savings" ou "hidden_cash"
+    const saved = data.wallets
+      .filter(w => SAVINGS_WALLET_TYPES.has(w.type ?? ""))
+      .reduce((s, w) => s + num(w.current_balance), 0);
+    const rate = income > 0 ? (saved / income) * 100 : 0;
     return {
       current: rate, target,
       pct: target > 0 ? Math.min(100, Math.max(0, (rate / target) * 100)) : 0,
-      label: `Taux d'épargne · ${pLabel}`,
+      label: `Solde épargne / revenus · ${pLabel}`,
       inverse: false,
     };
   }
