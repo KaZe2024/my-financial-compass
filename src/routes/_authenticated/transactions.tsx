@@ -23,17 +23,16 @@ export const Route = createFileRoute("/_authenticated/transactions")({
   component: TxPage,
 });
 
-const TX_TYPES = ["expense","income","transfer","investment","asset_purchase","asset_sale","adjustment","enveloppe_projet","enveloppe_emprunt"] as const;
+const TX_TYPES = [
+  "expense","income","transfer","investment","asset_purchase","asset_sale","adjustment",
+  "enveloppe_projet","enveloppe_emprunt",
+  "debt_incur","debt_repay","receivable_grant","receivable_collect",
+] as const;
 const CURRENCIES = ["MGA","EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
 const PROJECT_TYPES = new Set(["investment","enveloppe_projet","enveloppe_emprunt"]);
-const LEAF_REQUIRED_TYPES = new Set(["income","expense"]);
-
-function assertLeafBudget(type: string, nodeId: string | null, nodes: any[]): void {
-  if (!LEAF_REQUIRED_TYPES.has(type)) return;
-  if (!nodeId) throw new Error("Une feuille budgétaire est requise pour un revenu ou une dépense.");
-  const hasChild = nodes.some((n) => n.parent_id === nodeId && !n.archived);
-  if (hasChild) throw new Error("Sélectionnez une feuille (niveau le plus fin), pas une catégorie intermédiaire.");
-}
+const DEBT_TYPES = new Set(["debt_incur","debt_repay"]);
+const RECEIVABLE_TYPES = new Set(["receivable_grant","receivable_collect"]);
+const NO_BUDGET_TYPES = new Set(["transfer","debt_incur","debt_repay","receivable_grant","receivable_collect"]);
 
 type Filters = {
   fromDate: string;
