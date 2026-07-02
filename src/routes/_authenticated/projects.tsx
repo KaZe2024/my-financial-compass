@@ -96,6 +96,10 @@ function ProjectsPage() {
                     className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
                     <ArrowUpFromLine className="h-3 w-3 text-warning" /> Emprunter
                   </button>
+                  <button onClick={() => setAction({ kind: "spend", project: p })}
+                    className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
+                    <ArrowUpFromLine className="h-3 w-3 text-negative" /> Dépenser
+                  </button>
                   <button onClick={() => setAction({ kind: "finalize", project: p })}
                     className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
                     <CheckCircle2 className="h-3 w-3 text-primary" /> Finaliser
