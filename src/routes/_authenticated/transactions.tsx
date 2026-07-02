@@ -374,7 +374,6 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
 
   const m = useMutation({
     mutationFn: async () => {
-      assertLeafBudget(form.type, form.budget_node_id, nodes);
       const { data: u } = await supabase.auth.getUser();
       const amt = Number(form.amount);
       const xr = Number(form.exchange_rate || 1);
