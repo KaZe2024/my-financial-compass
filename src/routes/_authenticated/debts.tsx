@@ -54,6 +54,10 @@ export function ObligationsPage(props: {
         </div>
       </header>
 
+      <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
+        Astuce : préférez saisir les mouvements ({props.tone === "negative" ? "emprunt / remboursement" : "prêt / encaissement"}) depuis <strong>Transactions</strong> avec les types <code>{props.tone === "negative" ? "debt_incur / debt_repay" : "receivable_grant / receivable_collect"}</code>. Le solde restant se met à jour automatiquement.
+      </div>
+
       <Panel title={`${visible.length} entrées`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
