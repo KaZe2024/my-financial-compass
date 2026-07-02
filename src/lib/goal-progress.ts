@@ -10,16 +10,19 @@ export type GoalType =
   | "category_spend";    // Dépense sur une feuille budgétaire précise
 
 export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
-  savings_balance: "Solde d'épargne (trésorerie)",
+  savings_balance: "Solde trésorerie disponible",
   net_worth: "Valeur nette (patrimoine)",
   debt_reduction: "Réduction de dette",
-  spending_cap: "Plafond de dépense",
+  spending_cap: "Plafond de dépense (catégorie)",
   savings_rate: "Taux d'épargne (%)",
   category_spend: "Dépense sur une feuille budgétaire",
 };
 
 export const GOAL_TYPES_NEED_NODE: GoalType[] = ["spending_cap", "category_spend"];
 export const GOAL_TYPES_NEED_PERIOD: GoalType[] = ["spending_cap", "category_spend", "savings_rate"];
+
+// Wallet types considered "savings buckets" for the savings_rate goal.
+const SAVINGS_WALLET_TYPES = new Set(["savings", "hidden_cash"]);
 
 type Tx = { type: string; base_amount: number | string; occurred_on: string; budget_node_id: string | null };
 type Wallet = { current_balance: number | string };
