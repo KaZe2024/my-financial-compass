@@ -92,6 +92,9 @@ function ProductsPage() {
                 <button title={p.archived ? "Restaurer" : "Archiver"} onClick={() => arch.mutate({ id: p.id, on: !p.archived })} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
                   {p.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
                 </button>
+                <button title="Supprimer" onClick={() => confirm(`Supprimer "${p.name}" et son historique de prix ?`) && del.mutate(p.id)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </li>
             ))}
             {(products.data ?? []).length === 0 && <li className="px-2 py-4 text-sm text-muted-foreground">Aucun produit. Ajoutez des articles à une liste d'achat pour peupler le catalogue.</li>}
