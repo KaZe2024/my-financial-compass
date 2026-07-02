@@ -466,6 +466,8 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
     counterparty: cpInitial,
     notes: tx.notes ?? "",
     tag_ids: currentTagIds,
+    debt_id: tx.debt_id ?? "",
+    receivable_id: tx.receivable_id ?? "",
   });
   useEffect(() => { setForm((s) => ({ ...s, tag_ids: currentTagIds })); /* eslint-disable-next-line */ }, [currentTagIds.join(",")]);
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm(s => ({ ...s, [k]: v })); }
@@ -477,6 +479,8 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
       const xr = Number(form.exchange_rate || 1);
       const cpId = form.counterparty.trim() ? await ensureCounterparty(form.counterparty, cps) : null;
       const isProjType = PROJECT_TYPES.has(form.type);
+      const isDebtType = DEBT_TYPES.has(form.type);
+      const isRecType = RECEIVABLE_TYPES.has(form.type);
       const { error } = await supabase.from("transactions").update({
         type: form.type,
         occurred_on: form.occurred_on,
@@ -487,12 +491,14 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
         currency: form.currency,
         exchange_rate: xr,
         base_amount: amt * xr,
-        budget_node_id: form.budget_node_id,
+        budget_node_id: NO_BUDGET_TYPES.has(form.type) ? null : form.budget_node_id,
         project_id: isProjType && form.project_id ? form.project_id : null,
         counterparty_id: cpId,
         counterparty_label: form.counterparty.trim() || null,
         notes: form.notes || null,
-      }).eq("id", tx.id);
+        debt_id: isDebtType ? (form.debt_id || null) : null,
+        receivable_id: isRecType ? (form.receivable_id || null) : null,
+      } as any).eq("id", tx.id);
       if (error) throw error;
       await syncTags(tx.id, u.user!.id, form.tag_ids, currentTagIds);
       const { logAudit } = await import("@/lib/audit");
