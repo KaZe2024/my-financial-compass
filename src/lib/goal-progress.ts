@@ -10,10 +10,10 @@ export type GoalType =
   | "category_spend";    // Dépense sur une feuille budgétaire précise
 
 export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
-  savings_balance: "Solde d'épargne (trésorerie)",
+  savings_balance: "Solde trésorerie disponible",
   net_worth: "Valeur nette (patrimoine)",
   debt_reduction: "Réduction de dette",
-  spending_cap: "Plafond de dépense",
+  spending_cap: "Plafond de dépense (catégorie)",
   savings_rate: "Taux d'épargne (%)",
   category_spend: "Dépense sur une feuille budgétaire",
 };
@@ -21,8 +21,11 @@ export const GOAL_TYPE_LABELS: Record<GoalType, string> = {
 export const GOAL_TYPES_NEED_NODE: GoalType[] = ["spending_cap", "category_spend"];
 export const GOAL_TYPES_NEED_PERIOD: GoalType[] = ["spending_cap", "category_spend", "savings_rate"];
 
+// Wallet types considered "savings buckets" for the savings_rate goal.
+const SAVINGS_WALLET_TYPES = new Set(["savings", "hidden_cash"]);
+
 type Tx = { type: string; base_amount: number | string; occurred_on: string; budget_node_id: string | null };
-type Wallet = { current_balance: number | string };
+type Wallet = { current_balance: number | string; type?: string };
 type Debt = { outstanding: number | string; status?: string };
 type Asset = { current_value: number | string; status?: string };
 type Receivable = { outstanding: number | string; status?: string };
@@ -58,11 +61,14 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   const target = num(goal.target_amount);
 
   if (type === "savings_balance") {
-    const current = data.wallets.reduce((s, w) => s + num(w.current_balance), 0);
+    // Solde de trésorerie disponible: tous les portefeuilles sauf crédit
+    const current = data.wallets
+      .filter(w => (w.type ?? "") !== "credit")
+      .reduce((s, w) => s + num(w.current_balance), 0);
     return {
       current, target,
       pct: target > 0 ? Math.min(100, (current / target) * 100) : 0,
-      label: "Trésorerie totale",
+      label: "Trésorerie disponible (hors crédit)",
       inverse: false,
     };
   }
@@ -119,12 +125,15 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   if (type === "savings_rate") {
     const inPeriod = data.txs.filter(inRange);
     const income = inPeriod.filter(t => t.type === "income").reduce((s, t) => s + num(t.base_amount), 0);
-    const expense = inPeriod.filter(t => t.type === "expense").reduce((s, t) => s + num(t.base_amount), 0);
-    const rate = income > 0 ? ((income - expense) / income) * 100 : 0;
+    // Épargne = solde des wallets de type "savings" ou "hidden_cash"
+    const saved = data.wallets
+      .filter(w => SAVINGS_WALLET_TYPES.has(w.type ?? ""))
+      .reduce((s, w) => s + num(w.current_balance), 0);
+    const rate = income > 0 ? (saved / income) * 100 : 0;
     return {
       current: rate, target,
       pct: target > 0 ? Math.min(100, Math.max(0, (rate / target) * 100)) : 0,
-      label: `Taux d'épargne · ${pLabel}`,
+      label: `Solde épargne / revenus · ${pLabel}`,
       inverse: false,
     };
   }

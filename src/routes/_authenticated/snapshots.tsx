@@ -1,16 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel, StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtMoney, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
-import { Camera, TrendingUp, Activity, PiggyBank } from "lucide-react";
+import { Camera, TrendingUp, Activity, PiggyBank, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Area, AreaChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { buildAllocation, growthRate } from "@/lib/analytics";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
+import { logAudit } from "@/lib/audit";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
   head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
@@ -39,18 +42,23 @@ function SnapshotsPage() {
     queryFn: async () => (await supabase.from("wallets").select("current_balance")).data ?? [],
   });
 
+  const [captureFor, setCaptureFor] = useState<string | null>(null);
   const capture = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (targetMonth: string) => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user!.id;
-      const month = toISODate(monthStart());
+      const monthDate = new Date(targetMonth + "-01");
+      const month = toISODate(monthStart(monthDate));
+      // Period = target month
+      const from = month;
+      const to = toISODate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
 
       const [wRes, dRes, rRes, aRes, txRes] = await Promise.all([
         supabase.from("wallets").select("current_balance"),
         supabase.from("debts").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
         supabase.from("receivables").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
         supabase.from("assets").select("current_value").eq("status", "owned"),
-        supabase.from("transactions").select("type, base_amount").gte("occurred_on", month),
+        supabase.from("transactions").select("type, base_amount").gte("occurred_on", from).lte("occurred_on", to),
       ]);
 
       const cash = (wRes.data ?? []).reduce((s, w) => s + Number(w.current_balance), 0);
@@ -68,11 +76,22 @@ function SnapshotsPage() {
         monthly_income: income, monthly_expense: expense,
       }, { onConflict: "user_id,snapshot_month" });
       if (error) throw error;
+      await logAudit("transaction" as any, null, "create", { snapshot_month: month });
     },
     onSuccess: () => {
-      toast.success("Clôture du mois enregistrée — patrimoine, dettes et créances figés.");
+      toast.success("Clôture enregistrée");
       qc.invalidateQueries({ queryKey: ["snapshots"] });
+      setCaptureFor(null);
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("monthly_snapshots").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshots"] }); toast.success("Clôture supprimée"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -119,9 +138,25 @@ function SnapshotsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PeriodPicker preset={period.preset} onPresetChange={period.setPreset} custom={period.custom} onCustomChange={period.setCustom} />
-          <Button onClick={() => capture.mutate()} disabled={capture.isPending}><Camera className="mr-2 h-4 w-4" />{capture.isPending ? "Clôture..." : "Clôturer ce mois"}</Button>
+          <Button onClick={() => setCaptureFor(toISODate(monthStart()).slice(0, 7))} disabled={capture.isPending}>
+            <Camera className="mr-2 h-4 w-4" />Clôturer une période
+          </Button>
         </div>
       </header>
+
+      {captureFor != null && (
+        <Dialog open onOpenChange={(v) => !v && setCaptureFor(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Choisir le mois à clôturer</DialogTitle></DialogHeader>
+            <p className="text-xs text-muted-foreground">La photographie sera figée pour le mois choisi. Utile pour une saisie en retard.</p>
+            <Input type="month" value={captureFor} onChange={(e) => setCaptureFor(e.target.value)} />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setCaptureFor(null)}>Annuler</Button>
+              <Button disabled={capture.isPending || !captureFor} onClick={() => capture.mutate(captureFor!)}>Clôturer {captureFor}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Valeur nette" value={last ? fmtMoney(Number(last.net_worth)) : "—"} tone={last && Number(last.net_worth) >= 0 ? "positive" : "neutral"} icon={<Activity className="h-4 w-4" />} />
@@ -189,6 +224,7 @@ function SnapshotsPage() {
                 <th className="px-4 py-2 text-right">Créances</th>
                 <th className="px-4 py-2 text-right">Valeur nette</th>
                 <th className="px-4 py-2 text-right">Δ Mois</th>
+                <th className="px-4 py-2 w-24"></th>
               </tr>
             </thead>
             <tbody>
@@ -206,10 +242,20 @@ function SnapshotsPage() {
                     <td className={`num px-4 py-2 text-right ${delta == null ? "text-muted-foreground" : delta >= 0 ? "text-positive" : "text-negative"}`}>
                       {delta == null ? "—" : fmtPct(delta)}
                     </td>
+                    <td className="px-2 py-2 text-right">
+                      <div className="flex justify-end gap-0.5 text-muted-foreground">
+                        <button title="Recalculer cette clôture" onClick={() => capture.mutate(s.snapshot_month.slice(0,7))} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                          <Camera className="h-3.5 w-3.5" />
+                        </button>
+                        <button title="Supprimer" onClick={() => confirm("Supprimer cette clôture ?") && del.mutate(s.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
-              {list.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune clôture. Cliquez sur "Clôturer ce mois" pour démarrer l'historique patrimonial.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune clôture sur cette période.</td></tr>}
             </tbody>
           </table>
         </div>

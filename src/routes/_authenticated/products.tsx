@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 
@@ -57,6 +57,16 @@ function ProductsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Mis à jour"); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("product_prices").delete().eq("product_id", id);
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
+      await logAudit("product", id, "delete");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Produit supprimé"); if (selected) setSelected(null); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -81,6 +91,9 @@ function ProductsPage() {
                 <button title="Modifier" onClick={() => setEditing(p)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                 <button title={p.archived ? "Restaurer" : "Archiver"} onClick={() => arch.mutate({ id: p.id, on: !p.archived })} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
                   {p.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                </button>
+                <button title="Supprimer" onClick={() => confirm(`Supprimer "${p.name}" et son historique de prix ?`) && del.mutate(p.id)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </li>
             ))}

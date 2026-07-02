@@ -33,7 +33,7 @@ function ProjectsPage() {
   });
   const visible = (projects.data ?? []).filter((p: any) => showArchived || !p.archived);
   const [editing, setEditing] = useState<any | null>(null);
-  const [action, setAction] = useState<{ kind: "fund" | "borrow" | "finalize"; project: any } | null>(null);
+  const [action, setAction] = useState<{ kind: "fund" | "borrow" | "spend" | "finalize"; project: any } | null>(null);
   const [history, setHistory] = useState<any | null>(null);
 
   return (
@@ -54,7 +54,10 @@ function ProjectsPage() {
         {visible.map((p: any) => {
           const envelope = Number(p.envelope_balance ?? 0);
           const spent = Number(p.total_spent ?? 0);
-          const pct = Number(p.target_amount) > 0 ? (spent / Number(p.target_amount)) * 100 : 0;
+          const target = Number(p.target_amount) || 0;
+          // Progression = ce qui est provisionné dans l'enveloppe vs cible
+          const pct = target > 0 ? (envelope / target) * 100 : 0;
+          const spentPct = target > 0 ? (spent / target) * 100 : 0;
           const closed = p.status === "completed" || !!p.closed_at;
           return (
             <div key={p.id} className={`rounded-md border border-border bg-card p-4 ${p.archived ? "opacity-60" : ""}`}>
@@ -76,7 +79,7 @@ function ProjectsPage() {
                   <div className="num text-lg font-semibold">{fmtMoney(spent, p.currency)}</div>
                 </div>
               </div>
-              <div className="num mt-3 text-xs text-muted-foreground">Cible · {fmtMoney(Number(p.target_amount), p.currency)} · {fmtPct(pct)}</div>
+              <div className="num mt-3 text-xs text-muted-foreground">Cible · {fmtMoney(target, p.currency)} · Provisionné {fmtPct(pct)} · Dépensé {fmtPct(spentPct)}</div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
               </div>
@@ -92,6 +95,10 @@ function ProjectsPage() {
                   <button onClick={() => setAction({ kind: "borrow", project: p })}
                     className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
                     <ArrowUpFromLine className="h-3 w-3 text-warning" /> Emprunter
+                  </button>
+                  <button onClick={() => setAction({ kind: "spend", project: p })}
+                    className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
+                    <ArrowUpFromLine className="h-3 w-3 text-negative" /> Dépenser
                   </button>
                   <button onClick={() => setAction({ kind: "finalize", project: p })}
                     className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted/30 px-2 py-1 text-[11px] hover:bg-muted">
@@ -194,7 +201,7 @@ function ProjectDialog({ editing, onDone, onClose }: { editing?: any; onDone: ()
 }
 
 function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }: {
-  kind: "fund" | "borrow" | "finalize"; project: any; wallets: any[]; nodes: any[];
+  kind: "fund" | "borrow" | "spend" | "finalize"; project: any; wallets: any[]; nodes: any[];
   onClose: () => void; onDone: () => void;
 }) {
   const [form, setForm] = useState({
@@ -203,6 +210,7 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
     budget_node_id: null as string | null,
     description: kind === "fund" ? `Alimentation · ${project.name}`
               : kind === "borrow" ? `Emprunt enveloppe · ${project.name}`
+              : kind === "spend" ? `Dépense projet · ${project.name}`
               : `Achat finalisé · ${project.name}`,
     // finalize extras
     create_asset: false,
@@ -212,6 +220,7 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
 
   const title = kind === "fund" ? "Alimenter l'enveloppe"
               : kind === "borrow" ? "Emprunter sur l'enveloppe"
+              : kind === "spend" ? "Dépense sur le projet (tranche)"
               : "Finaliser le projet";
 
   const envelope = Number(project.envelope_balance ?? 0);
@@ -258,6 +267,17 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
         if (dErr) throw dErr;
         await logAudit("debt", debt?.id ?? null, "create", { source: "project_borrow", project_id: project.id, amount: amt });
         await logAudit("project", project.id, "update", { action: "borrow", amount: amt, tx_id: tx?.id, debt_id: debt?.id });
+      } else if (kind === "spend") {
+        // Dépense projet: tranche d'achat / travaux, sans clôturer
+        const { data: tx, error } = await supabase.from("transactions").insert({
+          user_id: uid, type: "investment", occurred_on: today,
+          description: form.description, wallet_id: form.wallet_id,
+          amount: amt, currency: project.currency, exchange_rate: 1, base_amount: amt,
+          project_id: project.id, budget_node_id: form.budget_node_id,
+          source_kind: "project", source_id: project.id,
+        }).select().single();
+        if (error) throw error;
+        await logAudit("project", project.id, "update", { action: "spend", amount: amt, tx_id: tx?.id });
       } else {
         // finalize
         let assetId: string | null = null;

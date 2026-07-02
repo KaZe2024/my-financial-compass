@@ -18,11 +18,12 @@ const LABELS: Record<PeriodPreset, string> = {
   semester: "Semestre en cours",
   year: "Année en cours",
   ltm: "LTM (12 derniers mois)",
+  all_time: "Depuis toujours",
   custom: "Plage de dates",
 };
 
 export function PeriodPicker({ preset, onPresetChange, custom, onCustomChange, presets }: Props) {
-  const opts = presets ?? (["ytd", "month", "year", "ltm", "custom"] as PeriodPreset[]);
+  const opts = presets ?? (["ytd", "month", "year", "ltm", "all_time", "custom"] as PeriodPreset[]);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Select value={preset} onValueChange={(v) => onPresetChange(v as PeriodPreset)}>

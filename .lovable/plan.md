@@ -1,110 +1,130 @@
-# Chantier Personal CFO — 6 corrections structurelles
 
-Respect strict des principes non négociables : transactions = source unique, réutilisation de l'existant, feuille budgétaire obligatoire, projets = enveloppes, objectifs = cibles calculées, migrations additives uniquement.
+# Sprint : Corrections structurelles + nouveaux modules
 
-## Reconnaissance préalable (obligatoire avant tout code)
+Gros chantier — je propose de le découper en **deux vagues** pour garder la qualité. Confirme si tu veux tout d'un coup ou en deux passes.
 
-Lecture ciblée de :
-- `budget_nodes`, `NodePicker`, `buildTree` (déjà en place → réutiliser `allowBranches={false}` + exclusion des nœuds à enfants)
-- Formulaire transaction (`transactions.tsx`) + tous les endroits qui insèrent une transaction (assets, debts, receivables, projects, shopping)
-- `dashboard.tsx`, `snapshots.tsx` (lecture des objectifs / projets)
-- `goals.tsx`, `projects.tsx`, `products.tsx`
-- Tables existantes : `financial_goals` (colonnes actuelles), `projects` (envelope_balance, total_spent, linked_transaction_id), `audit_log` (déjà présent — à réutiliser, pas recréer), `subscriptions`, `income_sources` (pour "à traiter aujourd'hui")
+---
 
-## 1. Feuille budgétaire obligatoire
+## VAGUE A — Corrections structurelles (9 points)
 
-- `NodePicker` : ajouter prop `leafOnly` qui filtre `flat` sur `childCount === 0 && kind !== "subtotal"` et force `allowBranches={false}`.
-- Formulaire transaction : passer `leafOnly` pour les types `income` et `expense` (transfer/investment/enveloppe_* gardent la logique actuelle). Validation submit : bloquer si nœud non-feuille sélectionné.
-- Filtre "feuille budgétaire" dans la liste transactions : nouveau `NodePicker leafOnly` dans la barre de filtres, applique `transactions.budget_node_id === selected`.
-- Vérifier assets/debts/receivables/shopping qui créent des transactions : forcer feuille pour les auto-transactions (ou nœud dédié "Achats d'actifs" etc. si déjà présent).
+### A1. Produits (prix)
+- Ajouter `RowActions` (Archiver / Supprimer) sur chaque ligne dans `products.tsx`. Edit déjà présent.
 
-## 2. Objectifs auto-calculés
+### A2. Snapshots — CRUD + période choisie
+- Bouton "Clôturer" → ouvre un dialog `PeriodPicker` (mois/trim/sem/an) au lieu de forcer le mois courant.
+- Ajouter `RowActions` (Modifier montants figés, Supprimer) sur la liste des snapshots existants.
 
-Migration additive :
-```sql
-ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS goal_type text
-  CHECK (goal_type IN ('savings_balance','net_worth','debt_reduction','spending_cap','savings_rate','category_spend'));
-ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS watch_node_id uuid REFERENCES budget_nodes(id);
-ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_scope text
-  CHECK (period_scope IN ('ytd','ltm','mtd','qtd','all_time','custom'));
-ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_start date;
-ALTER TABLE financial_goals ADD COLUMN IF NOT EXISTS period_end date;
-```
-`current_amount` **conservée** (non exposée) et rafraîchie en arrière-plan par le client à chaque lecture (upsert silencieux) pour rester cohérente avec le calcul.
+### A3. Transactions
+- Retirer le filtre "Feuille budgétaire" dans la liste.
+- Dans le formulaire : `NodePicker` **sans** `leafOnly` (autoriser catégorie intermédiaire). Supprimer `assertLeafBudget`.
 
-Nouveau module `src/lib/goal-progress.ts` : `computeGoalProgress(goal, txs, wallets, debts, assets)` retourne `{current, target, pct}`. Un mapping par `goal_type` :
-- `savings_balance` → somme `wallets.current_balance` (wallets d'épargne = filtrés)
-- `net_worth` → assets − debts
-- `debt_reduction` → total dettes (inversé)
-- `spending_cap` / `category_spend` → somme transactions expense sur `watch_node_id` (+ descendants) dans période
-- `savings_rate` → (income − expense) / income sur période
+### A4. Actifs — Amortissements comme charges mensuelles
+- Nouveau flow "Générer amortissements" par actif :
+  - Calcul mensuel linéaire = `purchase_value / useful_life_months`.
+  - Génère une transaction `expense` par mois depuis `purchase_date` jusqu'à `min(today, purchase_date + life)`, catégorie budgétaire **"Amortissements"** (créée auto si absente, kind intermédiaire).
+  - Dialog de **validation** listant les N transactions à créer avant insertion.
+  - Idempotence : marquer `asset_events` avec `event_type='depreciation'` + `period_month`, ne pas re-générer si déjà présent.
+- Ajouter 2 boutons ligne actif :
+  - **Réévaluer +** : `asset_event` type `revaluation`, met à jour `current_value`, pas de transaction.
+  - **Vendre** : dialog (prix, portefeuille, date), crée transaction `asset_sale`, marque `status='sold'`.
+- Le bouton "Appliquer dépréciation" actuel (one-shot) est remplacé par le générateur mensuel.
 
-Formulaire `GoalDialog` : retirer champ "Déjà épargné", ajouter selects `goal_type` + `period_scope` + `NodePicker` conditionnel. Card affiche progression calculée.
+### A5. Dettes & Créances — CRUD depuis Transactions
+- Nouvelle migration : étendre l'enum `transactions.type` avec :
+  - `debt_incur` (contracter une dette : +wallet)
+  - `debt_repay` (rembourser : -wallet)
+  - `receivable_grant` (prêter : -wallet)
+  - `receivable_collect` (encaisser : +wallet)
+- Trigger `apply_tx_to_wallets` mis à jour : `debt_incur` et `receivable_collect` = crédit ; `debt_repay` et `receivable_grant` = débit. Aucun lien budget.
+- Nouveau trigger `apply_tx_to_debts` : crée/maj `debts` sur `debt_incur`, décrémente `current_balance` sur `debt_repay`. Idem `receivables`.
+- Dans `transactions.tsx` : 4 nouveaux types dans le sélecteur, champs conditionnels (créancier/débiteur, échéance).
+- `debts.tsx` et `receivables.tsx` : lecture seule + panneau "Transactions liées" au clic sur une ligne (déjà partiellement fait, retirer les boutons Create/Edit).
+- Dashboard : exclure ces 4 types du calcul dépenses/revenus.
 
-Dashboard : remplacer lecture de `current_amount` par `computeGoalProgress`. Idem partout où le champ est lu (grep `current_amount` sur financial_goals).
+### A6. Budgets — période et montant unique
+- Vérifier `period.ts` : `getPeriodRange(kind, ref)` doit retourner l'année/trimestre/semestre **contenant** `ref`, pas dériver à partir du mois seul. Corriger si besoin.
+- **Montant unique par ligne** : refonte du modèle `budget_node_amounts`.
+  - Actuellement : une ligne par (node, period) → additionne mensuel/annuel.
+  - Nouveau : stocker toujours en **mensuel canonique** (`amount_monthly`). Quand on saisit "annuel 12M", on écrit `amount_monthly = 12M/12`. Quand on affiche annuel, on lit `amount_monthly * nb_mois_periode`.
+  - Migration : convertir l'existant (garder max des lignes par node/mois), supprimer la dimension `period_kind` du unique key, ne garder que (node_id, period_month).
+  - UI budgets : un seul input par ligne, affichage adapté à la période sélectionnée mais édition toujours reflète le même stockage.
 
-## 3. Projets = enveloppes
+### A7. Projets
+- **Barre de progression** : `envelope_balance / target_amount` (déjà en DB via trigger). Vérifier que la query invalide bien après `Alimenter` — probable manque de `qc.invalidateQueries(["projects"])`.
+- **Suivi dépenses multi-tranches** : nouveau bouton **"Dépenser"** sur un projet ouvert.
+  - Crée une transaction `investment` liée au projet (trigger déjà en place : incrémente `total_spent`).
+  - Décrémente enveloppe via `enveloppe_projet` inverse ? Non : les dépenses sortent du wallet, pas de l'enveloppe. L'enveloppe reste l'engagement provisionné ; `total_spent` suit ce qui est effectivement dépensé.
+- **Finaliser** devient optionnel : projet peut rester ouvert avec multiples dépenses ; finaliser = clôturer (immo créée si applicable, sinon juste `status='completed'`).
 
-Migration additive :
-```sql
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS closed_at timestamptz;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS resulted_asset_id uuid REFERENCES assets(id);
-```
+### A8. Objectifs
+- **`spending_cap`** : accepter tableau `watch_node_ids` (multi-select catégories intermédiaires uniquement). Migration : ajouter colonne `watch_node_ids uuid[]`. `computeGoalProgress` somme les descendants.
+- **`savings_balance`** renommé UI en **"Solde trésorerie disponible"** : somme des `wallets.current_balance` où `type in ('checking','savings','cash','hidden_cash','mobile_money',...)` — tout sauf `credit`. Déjà proche, à ajuster.
+- **`savings_rate`** : au lieu de `(income-expense)/income`, montant épargné = solde des wallets `type in ('savings','hidden_cash')` ; taux = ce solde / revenus période.
 
-Formulaire projet : retirer "Déjà épargné" (`current_amount` reste en base, calculée = `envelope_balance` déjà maintenu par trigger `apply_tx_to_projects`).
+### A9. Comptes de tiers — période "Depuis toujours"
+- Ajouter option `all` dans `PeriodPicker` (label "Depuis toujours"), retourne `{start: null, end: null}`. Adapter les filtres SQL correspondants.
 
-Actions rapides sur chaque carte projet :
-- **Alimenter** → dialog qui crée une transaction `enveloppe_projet` (montant + wallet source + feuille budgétaire "Épargne projets" — la feuille peut être suggérée mais l'utilisateur confirme).
-- **Emprunter** → si `envelope_balance < montant demandé` : crée transaction `enveloppe_emprunt` (fonds dispo temporaires) **et** insère une ligne dans `debts` liée au projet (nouveau champ `debts.project_id` via migration additive) pour traçabilité.
-- **Finaliser** → dialog : montant, wallet, option "créer un actif lié" (nom, catégorie, valeur). Crée transaction `investment` (déjà supportée par trigger) et, si coché, insert `assets` + met `projects.resulted_asset_id` + `closed_at` + `status='completed'`.
+### A10. Exports (Data)
+- Dans `data.tsx`, remplacer les colonnes `*_id` par les libellés joints :
+  - `wallet_id` → nom du portefeuille
+  - `node_id` → chemin catégorie (`Alimentation › Courses`)
+  - `counterparty_id` → nom du tiers
+  - `asset_id`, `debt_id`, `project_id` → nom respectif
+- Import : accepter les libellés, résoudre en `id` via lookup (tolérant à la casse). Erreur claire si non trouvé.
 
-Migration additive complémentaire :
-```sql
-ALTER TABLE debts ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES projects(id);
-```
+---
 
-Historique projet : nouveau composant `ProjectHistoryDialog` qui lit `transactions WHERE project_id = X ORDER BY occurred_on DESC` en lecture seule.
+## VAGUE B — Nouveaux modules
 
-Dashboard / snapshots : cohérence via `envelope_balance` (déjà exposé).
+### B1. Abonnements (`/subscriptions`)
+- Page listant `subscriptions` (table déjà présente).
+- Colonnes : nom, coût, fréquence, prochaine échéance, statut actif.
+- Bouton **Confirmer** par ligne échue → génère transaction expense + `advanceDate(next_billing_date, billing_cycle)`.
+- Bouton Stop/Reprendre (`is_active`).
+- Récapitulatif : coût mensuel équivalent + coût annuel équivalent.
+- CRUD complet (créer, éditer, archiver).
 
-## 4. Prix produits
+### B2. Provisions (`/provisions`)
+- Table `provisions` déjà présente (12 colonnes).
+- Page CRUD : montant prévu, échéance, sens (dépense/revenu), catégorie budgétaire.
+- Bouton **Régler** → crée transaction correspondante + marque `settled_at`.
 
-- `products.tsx` : retirer bouton "Créer produit". Garder table avec actions Éditer (nom/unité/notes) + Archiver via `RowActions`.
-- Historique prix : déjà en lecture seule (alimenté par trigger `record_price_from_item`) — vérifier qu'aucun bouton "ajouter prix" n'existe, sinon retirer.
+### B3. Calendrier financier (`/calendar`)
+- Vue mensuelle en grille (7 colonnes).
+- Agrège **sans duplication** :
+  - `subscriptions.next_billing_date`
+  - `income_sources.next_expected_date`
+  - `debts` échéances
+  - `receivables` échéances
+  - `provisions.due_date`
+  - `projects.target_date`, `financial_goals.target_date`
+- Footer mois : total entrées prévues / sorties prévues / solde net.
+- Clic jour → détail des événements.
 
-## 5. Audit log
+### B4. Alertes & Recommandations (`/alerts`)
+- Module de **calculs dérivés** (aucune table nouvelle) :
+  - **Alertes** : budget dépassé (spent > planned sur période courante), trésorerie < seuil (solde disponible < moyenne dépenses 30j), dette élevée (ratio dette/actifs > 0.5), échéance <7j, créance en retard (>due_date), projet retard (target_date passée, status open), objectif hors trajectoire (progress < elapsed_ratio).
+  - **Recommandations** : trésorerie excédentaire (dispo > 3×dépenses moy → suggérer placement), objectif atteignable plus vite (avance > 20%), dépense anormale sur feuille (>2σ vs 6 derniers mois), abonnement inutile (0 transaction liée depuis 90j).
+- Fichier `src/lib/alerts.ts` avec `computeAlerts(data): Alert[]` et `computeRecommendations(data): Reco[]`.
+- Page dédiée + **section résumé** sur dashboard (top 5 alertes + top 3 recos).
 
-`audit_log` déjà présent en base — réutiliser. 
+### B5. Dashboard "À traiter aujourd'hui"
+- Déjà partiellement en place selon le résumé précédent, mais si absent : section listant subscriptions + income_sources échus avec bouton **Générer** en un clic.
+- Vérifier présence et compléter le cas échéant.
 
-Créer helper `src/lib/audit.ts` :
-```ts
-export async function logAudit(entity: string, entity_id: string, action: 'create'|'update'|'delete'|'archive', diff?: any)
-```
-Appeler dans les mutations existantes de : transactions, assets, debts, receivables, projects, financial_goals, budget_nodes. Wrapper léger dans `RowActions` pour archive/delete.
-
-Nouvelle page `src/routes/_authenticated/audit.tsx` : table paginée avec filtre par `entity_type`, `action`, plage de date. Lien depuis `settings.tsx` ("Journal d'audit").
-
-## 6. "À traiter aujourd'hui" sur dashboard
-
-Nouvelle section entre KPIs et graphes :
-- Lit `subscriptions WHERE next_billing_date <= today AND active`
-- Lit `income_sources WHERE next_expected_date <= today AND active` (si champ existe, sinon dériver de `frequency` + `last_received`)
-- Chaque ligne = bouton "Générer" qui insère la transaction correspondante (expense pour sub, income pour source), rattache à la feuille budgétaire mémorisée sur la source, puis met à jour `next_billing_date` / `next_expected_date` selon la fréquence (helper `addPeriod(date, frequency)`).
+---
 
 ## Ordre d'exécution
+1. Migration BDD (enum tx, budget_amounts refonte, watch_node_ids, provisions déjà OK)
+2. Vague A (A1 → A10)
+3. Vague B (B1 → B5)
+4. Vérification finale : nav complète, dashboard intact, pages accessibles, aucune régression.
 
-1. Migration additive unique (colonnes goals + projects + debts).
-2. `NodePicker` prop `leafOnly` + branchement formulaire tx + filtre.
-3. `goal-progress.ts` + refonte `goals.tsx` + patch dashboard/snapshots.
-4. Refonte `projects.tsx` (actions + historique) + patch dashboard.
-5. `products.tsx` cleanup.
-6. `audit.ts` helper + page audit + branchements mutations + lien settings.
-7. Dashboard "à traiter aujourd'hui".
-8. Revue finale : grep `current_amount`, tests navigation, mobile, cohérence visuelle.
+---
 
-## Risques / non-régression
+## Points nécessitant validation
+- **A6 refonte `budget_node_amounts`** : migration destructive-partiellement (conversion des lignes). OK ou tu préfères garder les anciennes lignes en backup ?
+- **A4 amortissements rétroactifs** : je génère silencieusement N transactions passées après validation utilisateur. Confirmes-tu que c'est ce que tu veux (ça peut créer 24+ transactions d'un coup) ?
+- **A5 enum tx** : les dettes/créances existantes seront conservées mais ne pourront plus être créées depuis leurs pages. Tu veux migrer les transactions historiques (asset_purchase liées à debt) vers `debt_incur` ? Ou laisser tel quel ?
 
-- `current_amount` et `envelope_balance` restent alimentés (triggers en place) → aucun écran ne casse.
-- Pas de rename/drop de colonne. Enum `transaction.type` déjà étendu précédemment.
-- Formulaires existants gardent la même structure visuelle (Dialog + Label + Input).
-- Chaque mutation touchée conserve son toast + invalidateQueries actuels.
+Je peux commencer par Vague A si tu confirmes ces 3 points, puis Vague B ensuite.
