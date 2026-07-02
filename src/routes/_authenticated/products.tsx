@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Pencil, Archive, ArchiveRestore } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 
