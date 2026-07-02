@@ -526,9 +526,23 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
   const mga = Number(form.amount || 0) * Number(form.exchange_rate || 1);
   const isProj = PROJECT_TYPES.has(form.type);
   const isTransfer = form.type === "transfer";
+  const isDebt = DEBT_TYPES.has(form.type);
+  const isRec = RECEIVABLE_TYPES.has(form.type);
+  const noBudget = NO_BUDGET_TYPES.has(form.type);
   const projectLabel = form.type === "enveloppe_emprunt" ? "Emprunt à l'enveloppe (projet)"
     : form.type === "enveloppe_projet" ? "Vers l'enveloppe (projet)"
     : "Projet";
+
+  // Fetch debts/receivables when needed
+  const debtsQ = useQuery({
+    queryKey: ["debts", "for-tx"], enabled: isDebt,
+    queryFn: async () => (await supabase.from("debts").select("id, creditor, outstanding, currency").neq("status","cancelled")).data ?? [],
+  });
+  const recsQ = useQuery({
+    queryKey: ["receivables", "for-tx"], enabled: isRec,
+    queryFn: async () => (await supabase.from("receivables").select("id, debtor, outstanding, currency").neq("status","cancelled")).data ?? [],
+  });
+
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -563,16 +577,35 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
               <SelectContent>{projects.filter((p: any) => !p.archived).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
+        ) : isDebt ? (
+          <Field label={form.type === "debt_incur" ? "Dette (laisser vide = créer)" : "Dette à rembourser"}>
+            <Select value={form.debt_id} onValueChange={(v) => set("debt_id", v)}>
+              <SelectTrigger><SelectValue placeholder={form.type === "debt_incur" ? "Nouvelle dette" : "—"} /></SelectTrigger>
+              <SelectContent>{(debtsQ.data ?? []).map((d: any) => <SelectItem key={d.id} value={d.id}>{d.creditor} · {fmtMoney(Number(d.outstanding), d.currency)}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
+        ) : isRec ? (
+          <Field label={form.type === "receivable_grant" ? "Créance (laisser vide = créer)" : "Créance à encaisser"}>
+            <Select value={form.receivable_id} onValueChange={(v) => set("receivable_id", v)}>
+              <SelectTrigger><SelectValue placeholder={form.type === "receivable_grant" ? "Nouvelle créance" : "—"} /></SelectTrigger>
+              <SelectContent>{(recsQ.data ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.debtor} · {fmtMoney(Number(r.outstanding), r.currency)}</SelectItem>)}</SelectContent>
+            </Select>
+          </Field>
         ) : (
-          <Field label="Feuille budgétaire">
-            <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} leafOnly placeholder="Sélectionner une feuille" />
+          <Field label="Catégorie budgétaire">
+            <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} placeholder="Sélectionner une catégorie" />
           </Field>
         )}
       </div>
       {isProj && (
-        <Field label="Feuille budgétaire (optionnel)">
-          <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} leafOnly placeholder="Aucune" />
+        <Field label="Catégorie budgétaire (optionnel)">
+          <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => set("budget_node_id", id)} placeholder="Aucune" />
         </Field>
+      )}
+      {noBudget && !isTransfer && (
+        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Les dettes et créances sont des mouvements de trésorerie, sans lien avec le budget.
+        </div>
       )}
       <div className="grid grid-cols-3 gap-3">
         <Field label="Montant"><Input type="number" step="any" value={form.amount} onChange={(e) => set("amount", e.target.value)} required /></Field>
