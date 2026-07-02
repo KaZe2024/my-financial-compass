@@ -348,7 +348,14 @@ type FormState = {
   counterparty: string;
   notes: string;
   tag_ids: string[];
+  debt_id: string;
+  receivable_id: string;
 };
+
+async function fetchDebtOrReceivable(userId: string, kind: "debts" | "receivables") {
+  const { data } = await (supabase as any).from(kind).select("id, " + (kind === "debts" ? "creditor" : "debtor") + ", outstanding, currency").neq("status","cancelled");
+  return data ?? [];
+}
 
 function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void }) {
   const [open, setOpen] = useState(false);
@@ -366,6 +373,8 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
     counterparty: "",
     notes: "",
     tag_ids: [],
+    debt_id: "",
+    receivable_id: "",
   });
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm(s => ({ ...s, [k]: v })); }
 
@@ -376,6 +385,29 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
       const xr = Number(form.exchange_rate || 1);
       const cpId = form.counterparty.trim() ? await ensureCounterparty(form.counterparty, cps) : null;
       const isProjType = PROJECT_TYPES.has(form.type);
+      const isDebtType = DEBT_TYPES.has(form.type);
+      const isRecType = RECEIVABLE_TYPES.has(form.type);
+      // Auto-create debt/receivable on _incur / _grant when none selected
+      let debtId: string | null = form.debt_id || null;
+      let recId: string | null = form.receivable_id || null;
+      if (form.type === "debt_incur" && !debtId) {
+        const { data: d, error: dErr } = await supabase.from("debts").insert({
+          user_id: u.user!.id, creditor: form.counterparty.trim() || form.description || "Créancier",
+          description: form.description || null, original_amount: amt, outstanding: 0,
+          currency: form.currency, status: "outstanding",
+        } as any).select().single();
+        if (dErr) throw dErr;
+        debtId = d?.id ?? null;
+      }
+      if (form.type === "receivable_grant" && !recId) {
+        const { data: r, error: rErr } = await supabase.from("receivables").insert({
+          user_id: u.user!.id, debtor: form.counterparty.trim() || form.description || "Débiteur",
+          description: form.description || null, original_amount: amt, outstanding: 0,
+          currency: form.currency, status: "outstanding",
+        } as any).select().single();
+        if (rErr) throw rErr;
+        recId = r?.id ?? null;
+      }
       const { data: ins, error } = await supabase.from("transactions").insert({
         user_id: u.user!.id,
         type: form.type,
@@ -387,12 +419,14 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
         currency: form.currency,
         exchange_rate: xr,
         base_amount: amt * xr,
-        budget_node_id: form.budget_node_id,
+        budget_node_id: NO_BUDGET_TYPES.has(form.type) ? null : form.budget_node_id,
         project_id: isProjType && form.project_id ? form.project_id : null,
         counterparty_id: cpId,
         counterparty_label: form.counterparty.trim() || null,
         notes: form.notes || null,
-      }).select().single();
+        debt_id: isDebtType ? debtId : null,
+        receivable_id: isRecType ? recId : null,
+      } as any).select().single();
       if (error) throw error;
       if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids, []);
       const { logAudit } = await import("@/lib/audit");
