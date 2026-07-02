@@ -57,6 +57,16 @@ function ProductsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Mis à jour"); },
     onError: (e: Error) => toast.error(e.message),
   });
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      await supabase.from("product_prices").delete().eq("product_id", id);
+      const { error } = await supabase.from("products").delete().eq("id", id);
+      if (error) throw error;
+      await logAudit("product", id, "delete");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Produit supprimé"); if (selected) setSelected(null); },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
