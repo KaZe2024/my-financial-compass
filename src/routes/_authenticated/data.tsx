@@ -44,6 +44,66 @@ async function fetchAll(table: string): Promise<any[]> {
   return data ?? [];
 }
 
+/**
+ * Build lookup maps for foreign-key labels. Returns a function that rewrites a row:
+ * every *_id column that has a known lookup gets a sibling column with the human label,
+ * and the *_id column is removed.
+ */
+async function buildLabelizer() {
+  const [walletsR, nodesR, cpsR, projectsR, assetsR, debtsR, recR, tagsR] = await Promise.all([
+    supabase.from("wallets").select("id, name"),
+    supabase.from("budget_nodes").select("id, name, parent_id"),
+    supabase.from("counterparties").select("id, name"),
+    supabase.from("projects").select("id, name"),
+    supabase.from("assets").select("id, name"),
+    supabase.from("debts").select("id, creditor"),
+    supabase.from("receivables").select("id, debtor"),
+    supabase.from("analytical_tags").select("id, name"),
+  ]);
+  const wallets = new Map((walletsR.data ?? []).map((r: any) => [r.id, r.name]));
+  const cps = new Map((cpsR.data ?? []).map((r: any) => [r.id, r.name]));
+  const projects = new Map((projectsR.data ?? []).map((r: any) => [r.id, r.name]));
+  const assets = new Map((assetsR.data ?? []).map((r: any) => [r.id, r.name]));
+  const debts = new Map((debtsR.data ?? []).map((r: any) => [r.id, r.creditor]));
+  const recs = new Map((recR.data ?? []).map((r: any) => [r.id, r.debtor]));
+  const tags = new Map((tagsR.data ?? []).map((r: any) => [r.id, r.name]));
+  // Budget node: display full path
+  const nodesById = new Map((nodesR.data ?? []).map((n: any) => [n.id, n]));
+  function nodePath(id: string): string {
+    const parts: string[] = [];
+    let cur = nodesById.get(id);
+    let guard = 0;
+    while (cur && guard++ < 20) {
+      parts.unshift(cur.name);
+      cur = cur.parent_id ? nodesById.get(cur.parent_id) : null;
+    }
+    return parts.join(" › ");
+  }
+  const nodeLabelFor = (id: string) => nodePath(id) || id;
+
+  const map: Record<string, Map<string, string> | ((id: string) => string)> = {
+    wallet_id: wallets, to_wallet_id: wallets,
+    counterparty_id: cps, project_id: projects, asset_id: assets,
+    debt_id: debts, receivable_id: recs, tag_id: tags,
+    budget_node_id: nodeLabelFor,
+  };
+  return (rows: any[]) => rows.map((row) => {
+    const out: any = { ...row };
+    for (const [col, lookup] of Object.entries(map)) {
+      if (col in out && out[col] != null) {
+        const val = typeof lookup === "function" ? lookup(out[col]) : lookup.get(out[col]) ?? out[col];
+        // Drop the technical id, keep the label under a friendly column name
+        const nice = col.replace(/_id$/, "").replace(/^([a-z])/, (m) => m.toUpperCase());
+        out[nice] = val;
+        delete out[col];
+      }
+    }
+    // Drop noisy internal ids too
+    delete out.user_id;
+    return out;
+  });
+}
+
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
