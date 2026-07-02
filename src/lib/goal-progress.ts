@@ -61,11 +61,14 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   const target = num(goal.target_amount);
 
   if (type === "savings_balance") {
-    const current = data.wallets.reduce((s, w) => s + num(w.current_balance), 0);
+    // Solde de trésorerie disponible: tous les portefeuilles sauf crédit
+    const current = data.wallets
+      .filter(w => (w.type ?? "") !== "credit")
+      .reduce((s, w) => s + num(w.current_balance), 0);
     return {
       current, target,
       pct: target > 0 ? Math.min(100, (current / target) * 100) : 0,
-      label: "Trésorerie totale",
+      label: "Trésorerie disponible (hors crédit)",
       inverse: false,
     };
   }
