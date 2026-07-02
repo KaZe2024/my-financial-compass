@@ -234,15 +234,6 @@ function TxPage() {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Projet">
-            <Select value={f.projectId} onValueChange={(v) => set("projectId", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous</SelectItem>
-                {(projects.data ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
           <div className="md:col-span-3">
             <Field label="Tags">
               <TagManager tags={tags.data ?? []} value={f.tagIds} onChange={(ids) => set("tagIds", ids)} allowManage={false} />
