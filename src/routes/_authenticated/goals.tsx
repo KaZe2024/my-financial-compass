@@ -229,8 +229,8 @@ function GoalDialog({ editing, nodes, onDone, onClose }: { editing?: any; nodes:
             </div>
           )}
           {needsNode && (
-            <F label="Feuille budgétaire à surveiller">
-              <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => setForm({ ...form, budget_node_id: id })} leafOnly placeholder="Sélectionner…" />
+            <F label={form.goal_type === "spending_cap" ? "Catégorie à surveiller (intermédiaire ou feuille)" : "Feuille budgétaire à surveiller"}>
+              <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => setForm({ ...form, budget_node_id: id })} leafOnly={form.goal_type === "category_spend"} placeholder="Sélectionner…" />
             </F>
           )}
           <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
