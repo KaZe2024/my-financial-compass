@@ -33,7 +33,7 @@ function ProjectsPage() {
   });
   const visible = (projects.data ?? []).filter((p: any) => showArchived || !p.archived);
   const [editing, setEditing] = useState<any | null>(null);
-  const [action, setAction] = useState<{ kind: "fund" | "borrow" | "finalize"; project: any } | null>(null);
+  const [action, setAction] = useState<{ kind: "fund" | "borrow" | "spend" | "finalize"; project: any } | null>(null);
   const [history, setHistory] = useState<any | null>(null);
 
   return (
