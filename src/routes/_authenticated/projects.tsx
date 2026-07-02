@@ -201,7 +201,7 @@ function ProjectDialog({ editing, onDone, onClose }: { editing?: any; onDone: ()
 }
 
 function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }: {
-  kind: "fund" | "borrow" | "finalize"; project: any; wallets: any[]; nodes: any[];
+  kind: "fund" | "borrow" | "spend" | "finalize"; project: any; wallets: any[]; nodes: any[];
   onClose: () => void; onDone: () => void;
 }) {
   const [form, setForm] = useState({
@@ -210,6 +210,7 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
     budget_node_id: null as string | null,
     description: kind === "fund" ? `Alimentation · ${project.name}`
               : kind === "borrow" ? `Emprunt enveloppe · ${project.name}`
+              : kind === "spend" ? `Dépense projet · ${project.name}`
               : `Achat finalisé · ${project.name}`,
     // finalize extras
     create_asset: false,
@@ -219,6 +220,7 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
 
   const title = kind === "fund" ? "Alimenter l'enveloppe"
               : kind === "borrow" ? "Emprunter sur l'enveloppe"
+              : kind === "spend" ? "Dépense sur le projet (tranche)"
               : "Finaliser le projet";
 
   const envelope = Number(project.envelope_balance ?? 0);
