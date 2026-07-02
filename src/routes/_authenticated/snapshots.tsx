@@ -42,18 +42,23 @@ function SnapshotsPage() {
     queryFn: async () => (await supabase.from("wallets").select("current_balance")).data ?? [],
   });
 
+  const [captureFor, setCaptureFor] = useState<string | null>(null);
   const capture = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (targetMonth: string) => {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user!.id;
-      const month = toISODate(monthStart());
+      const monthDate = new Date(targetMonth + "-01");
+      const month = toISODate(monthStart(monthDate));
+      // Period = target month
+      const from = month;
+      const to = toISODate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
 
       const [wRes, dRes, rRes, aRes, txRes] = await Promise.all([
         supabase.from("wallets").select("current_balance"),
         supabase.from("debts").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
         supabase.from("receivables").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
         supabase.from("assets").select("current_value").eq("status", "owned"),
-        supabase.from("transactions").select("type, base_amount").gte("occurred_on", month),
+        supabase.from("transactions").select("type, base_amount").gte("occurred_on", from).lte("occurred_on", to),
       ]);
 
       const cash = (wRes.data ?? []).reduce((s, w) => s + Number(w.current_balance), 0);
@@ -71,11 +76,22 @@ function SnapshotsPage() {
         monthly_income: income, monthly_expense: expense,
       }, { onConflict: "user_id,snapshot_month" });
       if (error) throw error;
+      await logAudit("transaction" as any, null, "create", { snapshot_month: month });
     },
     onSuccess: () => {
-      toast.success("Clôture du mois enregistrée — patrimoine, dettes et créances figés.");
+      toast.success("Clôture enregistrée");
       qc.invalidateQueries({ queryKey: ["snapshots"] });
+      setCaptureFor(null);
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("monthly_snapshots").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["snapshots"] }); toast.success("Clôture supprimée"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
