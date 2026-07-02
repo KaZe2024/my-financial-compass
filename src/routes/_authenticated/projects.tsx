@@ -267,6 +267,17 @@ function ProjectActionDialog({ kind, project, wallets, nodes, onClose, onDone }:
         if (dErr) throw dErr;
         await logAudit("debt", debt?.id ?? null, "create", { source: "project_borrow", project_id: project.id, amount: amt });
         await logAudit("project", project.id, "update", { action: "borrow", amount: amt, tx_id: tx?.id, debt_id: debt?.id });
+      } else if (kind === "spend") {
+        // Dépense projet: tranche d'achat / travaux, sans clôturer
+        const { data: tx, error } = await supabase.from("transactions").insert({
+          user_id: uid, type: "investment", occurred_on: today,
+          description: form.description, wallet_id: form.wallet_id,
+          amount: amt, currency: project.currency, exchange_rate: 1, base_amount: amt,
+          project_id: project.id, budget_node_id: form.budget_node_id,
+          source_kind: "project", source_id: project.id,
+        }).select().single();
+        if (error) throw error;
+        await logAudit("project", project.id, "update", { action: "spend", amount: amt, tx_id: tx?.id });
       } else {
         // finalize
         let assetId: string | null = null;
