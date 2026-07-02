@@ -31,6 +31,8 @@ export function resolvePeriod(preset: PeriodPreset, ref: Date = new Date(), cust
       return { preset, from: startOfYear(ref), to: endOfYear(ref), label: String(ref.getFullYear()) };
     case "ltm":
       return { preset, from: addMonths(today, -12), to: today, label: "12 derniers mois" };
+    case "all_time":
+      return { preset, from: new Date(1970, 0, 1), to: today, label: "Depuis toujours" };
     case "custom": {
       const from = custom?.from ? new Date(custom.from) : startOfYear(today);
       const to = custom?.to ? new Date(custom.to) : today;
