@@ -1,4 +1,4 @@
-export type PeriodPreset = "ytd" | "month" | "quarter" | "semester" | "year" | "ltm" | "custom";
+export type PeriodPreset = "ytd" | "month" | "quarter" | "semester" | "year" | "ltm" | "all_time" | "custom";
 
 export type Period = { from: Date; to: Date; label: string; preset: PeriodPreset };
 
