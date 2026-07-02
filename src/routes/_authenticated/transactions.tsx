@@ -225,8 +225,14 @@ function TxPage() {
           <Field label="Catégorie (intermédiaire)">
             <NodePicker nodes={nodesQ.data ?? []} value={f.nodeId} onChange={(id) => set("nodeId", id)} onlyDepth={1} hidePath placeholder="Toutes" />
           </Field>
-          <Field label="Feuille budgétaire">
-            <NodePicker nodes={nodesQ.data ?? []} value={f.nodeId} onChange={(id) => set("nodeId", id)} leafOnly placeholder="Toutes (feuilles)" />
+          <Field label="Projet">
+            <Select value={f.projectId} onValueChange={(v) => set("projectId", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                {(projects.data ?? []).map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Projet">
             <Select value={f.projectId} onValueChange={(v) => set("projectId", v)}>
