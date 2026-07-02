@@ -54,7 +54,10 @@ function ProjectsPage() {
         {visible.map((p: any) => {
           const envelope = Number(p.envelope_balance ?? 0);
           const spent = Number(p.total_spent ?? 0);
-          const pct = Number(p.target_amount) > 0 ? (spent / Number(p.target_amount)) * 100 : 0;
+          const target = Number(p.target_amount) || 0;
+          // Progression = ce qui est provisionné dans l'enveloppe vs cible
+          const pct = target > 0 ? (envelope / target) * 100 : 0;
+          const spentPct = target > 0 ? (spent / target) * 100 : 0;
           const closed = p.status === "completed" || !!p.closed_at;
           return (
             <div key={p.id} className={`rounded-md border border-border bg-card p-4 ${p.archived ? "opacity-60" : ""}`}>
@@ -76,7 +79,7 @@ function ProjectsPage() {
                   <div className="num text-lg font-semibold">{fmtMoney(spent, p.currency)}</div>
                 </div>
               </div>
-              <div className="num mt-3 text-xs text-muted-foreground">Cible · {fmtMoney(Number(p.target_amount), p.currency)} · {fmtPct(pct)}</div>
+              <div className="num mt-3 text-xs text-muted-foreground">Cible · {fmtMoney(target, p.currency)} · Provisionné {fmtPct(pct)} · Dépensé {fmtPct(spentPct)}</div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
               </div>
