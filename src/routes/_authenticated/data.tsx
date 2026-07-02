@@ -129,13 +129,14 @@ function DataPage() {
 
         <TabsContent value="export" className="space-y-4">
           <Panel title="Excel — Multi-feuilles (tout)">
-            <p className="mb-3 text-xs text-muted-foreground">Un seul fichier .xlsx avec une feuille par module.</p>
+            <p className="mb-3 text-xs text-muted-foreground">Un fichier .xlsx avec une feuille par module. Les identifiants techniques sont remplacés par les libellés (portefeuille, catégorie, tiers…).</p>
             <Button onClick={async () => {
               try {
                 toast.info("Préparation du fichier…");
+                const labelize = await buildLabelizer();
                 const wb = XLSX.utils.book_new();
                 for (const t of TABLES) {
-                  const rows = await fetchAll(t.id);
+                  const rows = labelize(await fetchAll(t.id));
                   const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ info: "vide" }]);
                   XLSX.utils.book_append_sheet(wb, ws, t.label.slice(0, 31));
                 }
@@ -151,7 +152,8 @@ function DataPage() {
               {TABLES.map((t) => (
                 <Button key={t.id} variant="outline" onClick={async () => {
                   try {
-                    const rows = await fetchAll(t.id);
+                    const labelize = await buildLabelizer();
+                    const rows = labelize(await fetchAll(t.id));
                     if (!rows.length) { toast.info("Aucune donnée"); return; }
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), t.label.slice(0, 31));
