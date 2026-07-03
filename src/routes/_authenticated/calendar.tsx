@@ -26,7 +26,7 @@ function CalendarPage() {
 
   const events = useMemo(() => {
     const m = new Map<string, any[]>();
-    const add = (date: string, ev: any) => { if (!date) return; if (!m.has(date)) m.set(date, []); m.get(date)!.push(ev); };
+    const add = (date: string | null | undefined, ev: any) => { if (!date) return; if (!m.has(date)) m.set(date, []); m.get(date)!.push(ev); };
     for (const d of debts.data ?? []) add(d.due_date, { color: "bg-negative", label: `Dette ${d.creditor}`, amount: -Number(d.outstanding ?? 0) });
     for (const r of recv.data ?? []) add(r.due_date, { color: "bg-positive", label: `Créance ${r.debtor}`, amount: +Number(r.outstanding ?? 0) });
     for (const s of subs.data ?? []) add(s.next_billing_date, { color: "bg-warning", label: `Abo ${s.name}`, amount: -Number(s.amount ?? 0) });
