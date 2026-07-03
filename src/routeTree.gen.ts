@@ -15,10 +15,12 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWalletsRouteImport } from './routes/_authenticated/wallets'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedSubscriptionsRouteImport } from './routes/_authenticated/subscriptions'
 import { Route as AuthenticatedSnapshotsRouteImport } from './routes/_authenticated/snapshots'
 import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticated/shopping'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReceivablesRouteImport } from './routes/_authenticated/receivables'
+import { Route as AuthenticatedProvisionsRouteImport } from './routes/_authenticated/provisions'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
@@ -30,6 +32,7 @@ import { Route as AuthenticatedCounterpartiesRouteImport } from './routes/_authe
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
+import { Route as AuthenticatedAiRouteImport } from './routes/_authenticated/ai'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -61,6 +64,12 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSubscriptionsRoute =
+  AuthenticatedSubscriptionsRouteImport.update({
+    id: '/subscriptions',
+    path: '/subscriptions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSnapshotsRoute = AuthenticatedSnapshotsRouteImport.update({
   id: '/snapshots',
   path: '/snapshots',
@@ -82,6 +91,11 @@ const AuthenticatedReceivablesRoute =
     path: '/receivables',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedProvisionsRoute = AuthenticatedProvisionsRouteImport.update({
+  id: '/provisions',
+  path: '/provisions',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -138,11 +152,17 @@ const AuthenticatedAssetsRoute = AuthenticatedAssetsRouteImport.update({
   path: '/assets',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAiRoute = AuthenticatedAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/ai': typeof AuthenticatedAiRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
@@ -154,10 +174,12 @@ export interface FileRoutesByFullPath {
   '/goals': typeof AuthenticatedGoalsRoute
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/provisions': typeof AuthenticatedProvisionsRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
+  '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
 }
@@ -165,6 +187,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/ai': typeof AuthenticatedAiRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
@@ -176,10 +199,12 @@ export interface FileRoutesByTo {
   '/goals': typeof AuthenticatedGoalsRoute
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/provisions': typeof AuthenticatedProvisionsRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
+  '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
 }
@@ -189,6 +214,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/ai': typeof AuthenticatedAiRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
@@ -200,10 +226,12 @@ export interface FileRoutesById {
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
+  '/_authenticated/provisions': typeof AuthenticatedProvisionsRoute
   '/_authenticated/receivables': typeof AuthenticatedReceivablesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping': typeof AuthenticatedShoppingRoute
   '/_authenticated/snapshots': typeof AuthenticatedSnapshotsRoute
+  '/_authenticated/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/_authenticated/wallets': typeof AuthenticatedWalletsRoute
 }
@@ -213,6 +241,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/ai'
     | '/assets'
     | '/audit'
     | '/budgets'
@@ -224,10 +253,12 @@ export interface FileRouteTypes {
     | '/goals'
     | '/products'
     | '/projects'
+    | '/provisions'
     | '/receivables'
     | '/settings'
     | '/shopping'
     | '/snapshots'
+    | '/subscriptions'
     | '/transactions'
     | '/wallets'
   fileRoutesByTo: FileRoutesByTo
@@ -235,6 +266,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/ai'
     | '/assets'
     | '/audit'
     | '/budgets'
@@ -246,10 +278,12 @@ export interface FileRouteTypes {
     | '/goals'
     | '/products'
     | '/projects'
+    | '/provisions'
     | '/receivables'
     | '/settings'
     | '/shopping'
     | '/snapshots'
+    | '/subscriptions'
     | '/transactions'
     | '/wallets'
   id:
@@ -258,6 +292,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/ai'
     | '/_authenticated/assets'
     | '/_authenticated/audit'
     | '/_authenticated/budgets'
@@ -269,10 +304,12 @@ export interface FileRouteTypes {
     | '/_authenticated/goals'
     | '/_authenticated/products'
     | '/_authenticated/projects'
+    | '/_authenticated/provisions'
     | '/_authenticated/receivables'
     | '/_authenticated/settings'
     | '/_authenticated/shopping'
     | '/_authenticated/snapshots'
+    | '/_authenticated/subscriptions'
     | '/_authenticated/transactions'
     | '/_authenticated/wallets'
   fileRoutesById: FileRoutesById
@@ -328,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/subscriptions': {
+      id: '/_authenticated/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/subscriptions'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/snapshots': {
       id: '/_authenticated/snapshots'
       path: '/snapshots'
@@ -354,6 +398,13 @@ declare module '@tanstack/react-router' {
       path: '/receivables'
       fullPath: '/receivables'
       preLoaderRoute: typeof AuthenticatedReceivablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/provisions': {
+      id: '/_authenticated/provisions'
+      path: '/provisions'
+      fullPath: '/provisions'
+      preLoaderRoute: typeof AuthenticatedProvisionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/projects': {
@@ -433,10 +484,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAssetsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai': {
+      id: '/_authenticated/ai'
+      path: '/ai'
+      fullPath: '/ai'
+      preLoaderRoute: typeof AuthenticatedAiRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAiRoute: typeof AuthenticatedAiRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
@@ -448,15 +507,18 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
+  AuthenticatedProvisionsRoute: typeof AuthenticatedProvisionsRoute
   AuthenticatedReceivablesRoute: typeof AuthenticatedReceivablesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShoppingRoute: typeof AuthenticatedShoppingRoute
   AuthenticatedSnapshotsRoute: typeof AuthenticatedSnapshotsRoute
+  AuthenticatedSubscriptionsRoute: typeof AuthenticatedSubscriptionsRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
   AuthenticatedWalletsRoute: typeof AuthenticatedWalletsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAiRoute: AuthenticatedAiRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
@@ -468,10 +530,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
+  AuthenticatedProvisionsRoute: AuthenticatedProvisionsRoute,
   AuthenticatedReceivablesRoute: AuthenticatedReceivablesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShoppingRoute: AuthenticatedShoppingRoute,
   AuthenticatedSnapshotsRoute: AuthenticatedSnapshotsRoute,
+  AuthenticatedSubscriptionsRoute: AuthenticatedSubscriptionsRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
   AuthenticatedWalletsRoute: AuthenticatedWalletsRoute,
 }

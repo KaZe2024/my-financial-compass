@@ -143,7 +143,7 @@ function ProvDialog({ editing, onDone, onClose }: { editing?: any; onDone: () =>
         direction: form.direction,
         due_date: form.due_date || null,
         notes: form.notes.trim() || null,
-        status: "pending",
+        status: "planned" as const,
       };
       if (editing) {
         const { error } = await supabase.from("provisions").update(payload).eq("id", editing.id);
