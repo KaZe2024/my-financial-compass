@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
+  Bell, CalendarDays, Repeat, Wallet2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,11 +13,16 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { group: "Vue d'ensemble", items: [
     { to: "/dashboard", label: "Dashboard", icon: Activity },
+    { to: "/ai", label: "Assistant CFO", icon: Sparkles },
+    { to: "/alerts", label: "Alertes", icon: Bell },
+    { to: "/calendar", label: "Calendrier", icon: CalendarDays },
   ]},
   { group: "Trésorerie", items: [
     { to: "/wallets", label: "Portefeuilles", icon: Wallet },
     { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
     { to: "/shopping", label: "Listes d'achat", icon: ShoppingCart },
+    { to: "/subscriptions", label: "Abonnements", icon: Repeat },
+    { to: "/provisions", label: "Provisions", icon: Wallet2 },
   ]},
   { group: "Planification", items: [
     { to: "/budgets", label: "Budgets", icon: PieChart },
