@@ -118,7 +118,7 @@ export const sendMessage = createServerFn({ method: "POST" })
 
     // Bump conversation updated_at; auto-title from first user message.
     const { data: conv } = await context.supabase.from("chat_conversations").select("title").eq("id", data.conversationId).maybeSingle();
-    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const patch: { updated_at: string; title?: string } = { updated_at: new Date().toISOString() };
     if (conv?.title === "Nouvelle conversation") {
       patch.title = data.content.slice(0, 60);
     }
