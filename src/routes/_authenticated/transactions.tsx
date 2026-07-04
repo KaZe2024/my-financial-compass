@@ -105,11 +105,9 @@ function TxPage() {
     },
   });
 
-  const txIds = (txs.data ?? []).map((t: any) => t.id);
   const txTags = useQuery({
-    queryKey: ["tx_tags", txIds.join(",")],
-    enabled: txIds.length > 0,
-    queryFn: async () => (await supabase.from("transaction_tags").select("*").in("transaction_id", txIds)).data ?? [],
+    queryKey: ["tx_tags_all"],
+    queryFn: async () => (await supabase.from("transaction_tags").select("transaction_id,tag_id")).data ?? [],
   });
   const tagIdsByTx = useMemo(() => {
     const m = new Map<string, string[]>();
