@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Plus, History as HistoryIcon } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { RowActions } from "./assets";
+import { HistoryDialog } from "@/components/history-dialog";
 
 export const Route = createFileRoute("/_authenticated/debts")({
   head: () => ({ meta: [{ title: "Dettes — Personal CFO" }] }),
