@@ -40,10 +40,14 @@ export function HistoryDialog({
     },
   });
   const rows = q.data ?? [];
+  const cashSign = (type: string, mga: number) => {
+    if (type === "transfer") return 0;
+    if (["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(type)) return mga;
+    return -mga;
+  };
   const totalMga = rows.reduce((s: number, r: any) => {
     const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
-    const inflow = ["income", "asset_sale", "enveloppe_emprunt", "debt_incur", "receivable_collect"].includes(r.type);
-    return s + (inflow ? mga : -mga);
+    return s + cashSign(r.type, mga);
   }, 0);
 
   return (
