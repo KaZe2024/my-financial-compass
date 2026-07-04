@@ -454,6 +454,19 @@ function TxPage() {
           onDone={() => { setEditingTx(null); qc.invalidateQueries(); }}
         />
       )}
+
+      {bulkEditOpen && (
+        <BulkEditDialog
+          count={selected.size}
+          wallets={wallets.data ?? []}
+          nodes={nodesQ.data ?? []}
+          tags={tags.data ?? []}
+          projects={projects.data ?? []}
+          onClose={() => setBulkEditOpen(false)}
+          onSubmit={(patch, tagIdsAdd) => bulkEdit.mutate({ ids: Array.from(selected), patch, tagIdsAdd })}
+          pending={bulkEdit.isPending}
+        />
+      )}
     </div>
   );
 }
