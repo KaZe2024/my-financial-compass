@@ -32,7 +32,10 @@ function ShoppingPage() {
   const nodes = useQuery(budgetNodesQO);
   const tags = useQuery({
     queryKey: ["analytical_tags"],
-    queryFn: async () => (await supabase.from("analytical_tags").select("*").order("name")).data ?? [],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("analytical_tags").select("*").order("name").range(from, to),
+      ),
   });
 
   const nodePath = useMemo(() => {
@@ -42,15 +45,16 @@ function ShoppingPage() {
 
   const lists = useQuery({
     queryKey: ["shopping_lists"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("shopping_lists")
-        .select("*, shopping_list_items(*)")
-        .order("occurred_on", { ascending: false }).limit(50);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("shopping_lists")
+          .select("*, shopping_list_items(*)")
+          .order("occurred_on", { ascending: false })
+          .range(from, to),
+      ),
   });
+
 
   return (
     <div className="space-y-6">
