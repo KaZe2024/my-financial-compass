@@ -179,7 +179,7 @@ function TxPage() {
       let q = supabase.from("transactions")
         .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
         .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
-        .limit(1000);
+        .limit(10000);
       if (f.type !== "all") q = q.eq("type", f.type as any);
       if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
       if (f.toDate) q = q.lte("occurred_on", f.toDate);
