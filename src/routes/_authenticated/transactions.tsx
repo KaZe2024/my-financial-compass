@@ -543,7 +543,27 @@ function TxPage() {
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
-                            <button title="Dupliquer" onClick={() => duplicate.mutate([t.id])} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                            <button title="Dupliquer" onClick={() => {
+                              const cpName = t.counterparty_id ? ((cps.data ?? []).find((c: any) => c.id === t.counterparty_id)?.name ?? "") : (t.counterparty_label ?? "");
+                              const tagIds = (txTags.data ?? []).filter((r: any) => r.transaction_id === t.id).map((r: any) => r.tag_id);
+                              setDupForm({
+                                type: t.type,
+                                occurred_on: toISODate(new Date()),
+                                description: t.description ?? "",
+                                wallet_id: t.wallet_id ?? "",
+                                to_wallet_id: t.to_wallet_id ?? "",
+                                amount: String(t.amount ?? ""),
+                                currency: t.currency,
+                                exchange_rate: String(t.exchange_rate ?? "1"),
+                                budget_node_id: t.budget_node_id ?? null,
+                                project_id: t.project_id ?? "",
+                                counterparty: cpName,
+                                notes: t.notes ?? "",
+                                tag_ids: tagIds,
+                                debt_id: t.debt_id ?? "",
+                                receivable_id: t.receivable_id ?? "",
+                              });
+                            }} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
