@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { History } from "lucide-react";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 /**
  * Historique des transactions liées à une entité (actif, dette, créance, tiers).
