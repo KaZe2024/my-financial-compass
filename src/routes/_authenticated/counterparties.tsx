@@ -15,6 +15,7 @@ import { fmtMoney, fmtDate } from "@/lib/format";
 import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
 import { HistoryDialog } from "@/components/history-dialog";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/counterparties")({
   head: () => ({ meta: [{ title: "Tiers — Personal CFO" }] }),
