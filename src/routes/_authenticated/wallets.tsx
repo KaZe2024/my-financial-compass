@@ -34,16 +34,16 @@ function WalletsPage() {
   // Last exchange_rate seen per wallet — used only to convert non-MGA wallets to MGA reference.
   const allTx = useQuery({
     queryKey: ["wallet_tx_rates"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("wallet_id, exchange_rate, currency")
-        .not("exchange_rate", "is", null)
-        .limit(10000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("wallet_id, exchange_rate, currency")
+          .not("exchange_rate", "is", null)
+          .range(from, to),
+      ),
   });
+
 
   // Per-wallet MGA balance = current_balance (maintained by DB trigger, native currency) × FX to MGA.
   const balancesMga = useMemo(() => {
