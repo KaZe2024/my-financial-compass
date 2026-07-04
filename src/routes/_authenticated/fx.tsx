@@ -72,14 +72,16 @@ function FxPage() {
   const currencies = useQuery({
     queryKey: ["fx_currencies"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("transactions").select("currency").not("currency", "is", null).limit(2000);
-      if (error) throw error;
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase.from("transactions").select("currency").not("currency", "is", null).range(from, to),
+      );
       const set = new Set<string>();
-      for (const r of data ?? []) if ((r as any).currency && (r as any).currency !== "MGA") set.add((r as any).currency);
+      for (const r of data) if ((r as any).currency && (r as any).currency !== "MGA") set.add((r as any).currency);
       for (const c of COMMON) set.add(c);
       return Array.from(set).sort();
     },
   });
+
 
   return (
     <div className="space-y-6">
