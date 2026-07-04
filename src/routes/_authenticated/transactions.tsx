@@ -625,9 +625,12 @@ async function fetchDebtOrReceivable(userId: string, kind: "debts" | "receivable
   return data ?? [];
 }
 
-function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>({
+function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
+  const [openInner, setOpenInner] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? !!openProp : openInner;
+  const setOpen = (v: boolean) => { if (isControlled) onOpenChange?.(v); else setOpenInner(v); };
+  const defaultForm: FormState = {
     type: "expense",
     occurred_on: toISODate(new Date()),
     description: "",
@@ -643,7 +646,13 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
     tag_ids: [],
     debt_id: "",
     receivable_id: "",
-  });
+  };
+  const [form, setForm] = useState<FormState>(initialForm ?? defaultForm);
+  // Re-seed the form whenever the dialog opens with a fresh initialForm (duplicate).
+  useEffect(() => {
+    if (open) setForm(initialForm ?? defaultForm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialForm]);
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm(s => ({ ...s, [k]: v })); }
 
   const m = useMutation({
