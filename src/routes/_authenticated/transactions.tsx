@@ -163,11 +163,20 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const chunk = <T,>(arr: T[], size = 200): T[][] => {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
   const bulkDel = useMutation({
     mutationFn: async (ids: string[]) => {
-      await supabase.from("transaction_tags").delete().in("transaction_id", ids);
-      const { error } = await supabase.from("transactions").delete().in("id", ids);
-      if (error) throw error;
+      for (const c of chunk(ids)) {
+        const { error: e1 } = await supabase.from("transaction_tags").delete().in("transaction_id", c);
+        if (e1) throw e1;
+        const { error } = await supabase.from("transactions").delete().in("id", c);
+        if (error) throw error;
+      }
     },
     onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
@@ -175,8 +184,10 @@ function TxPage() {
 
   const bulkArchive = useMutation({
     mutationFn: async ({ ids, archived }: { ids: string[]; archived: boolean }) => {
-      const { error } = await supabase.from("transactions").update({ archived } as any).in("id", ids);
-      if (error) throw error;
+      for (const c of chunk(ids)) {
+        const { error } = await supabase.from("transactions").update({ archived } as any).in("id", c);
+        if (error) throw error;
+      }
     },
     onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
@@ -185,14 +196,22 @@ function TxPage() {
   const bulkEdit = useMutation({
     mutationFn: async ({ ids, patch, tagIdsAdd }: { ids: string[]; patch: Record<string, any>; tagIdsAdd: string[] }) => {
       if (Object.keys(patch).length) {
-        const { error } = await supabase.from("transactions").update(patch as any).in("id", ids);
-        if (error) throw error;
+        for (const c of chunk(ids)) {
+          const { error } = await supabase.from("transactions").update(patch as any).in("id", c);
+          if (error) throw error;
+        }
       }
       if (tagIdsAdd.length) {
         const { data: u } = await supabase.auth.getUser();
-        await supabase.from("transaction_tags").delete().in("transaction_id", ids).in("tag_id", tagIdsAdd);
-        const rows = ids.flatMap((tid) => tagIdsAdd.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
-        await supabase.from("transaction_tags").insert(rows);
+        for (const c of chunk(ids)) {
+          const { error: dErr } = await supabase.from("transaction_tags").delete().in("transaction_id", c).in("tag_id", tagIdsAdd);
+          if (dErr) throw dErr;
+          const rows = c.flatMap((tid) => tagIdsAdd.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
+          for (const rc of chunk(rows, 500)) {
+            const { error: iErr } = await supabase.from("transaction_tags").insert(rc);
+            if (iErr) throw iErr;
+          }
+        }
       }
     },
     onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} modifiée(s)`); setSelected(new Set()); setBulkEditOpen(false); },
@@ -202,27 +221,40 @@ function TxPage() {
   const duplicate = useMutation({
     mutationFn: async (ids: string[]) => {
       const { data: u } = await supabase.auth.getUser();
-      const { data: src, error } = await supabase.from("transactions").select("*").in("id", ids);
-      if (error) throw error;
+      const src: any[] = [];
+      for (const c of chunk(ids)) {
+        const { data, error } = await supabase.from("transactions").select("*").in("id", c);
+        if (error) throw error;
+        src.push(...(data ?? []));
+      }
       const today = toISODate(new Date());
-      const clones = (src ?? []).map((t: any) => {
+      const clones = src.map((t: any) => {
         const { id: _id, created_at: _c, updated_at: _up, ...rest } = t;
         return { ...rest, user_id: u.user!.id, occurred_on: today };
       });
       if (!clones.length) return { ids: [] as string[], count: 0 };
-      const { data: ins, error: iErr } = await supabase.from("transactions").insert(clones as any).select("id");
-      if (iErr) throw iErr;
-      // Copy tags
-      const { data: srcTags } = await supabase.from("transaction_tags").select("*").in("transaction_id", ids);
-      if (srcTags && srcTags.length && ins) {
+      const insIds: { id: string }[] = [];
+      for (const cc of chunk(clones, 500)) {
+        const { data: ins, error: iErr } = await supabase.from("transactions").insert(cc as any).select("id");
+        if (iErr) throw iErr;
+        insIds.push(...(ins ?? []));
+      }
+      const srcTags: any[] = [];
+      for (const c of chunk(ids)) {
+        const { data } = await supabase.from("transaction_tags").select("*").in("transaction_id", c);
+        srcTags.push(...(data ?? []));
+      }
+      if (srcTags.length) {
         const map = new Map<string, string>();
-        (src ?? []).forEach((s: any, i: number) => map.set(s.id, ins[i]?.id));
+        src.forEach((s: any, i: number) => map.set(s.id, insIds[i]?.id));
         const tagRows = srcTags
           .map((tt: any) => ({ transaction_id: map.get(tt.transaction_id)!, tag_id: tt.tag_id, user_id: u.user!.id }))
           .filter((r) => r.transaction_id);
-        if (tagRows.length) await supabase.from("transaction_tags").insert(tagRows);
+        for (const rc of chunk(tagRows, 500)) {
+          if (rc.length) await supabase.from("transaction_tags").insert(rc);
+        }
       }
-      return { ids: (ins ?? []).map((r: any) => r.id), count: clones.length };
+      return { ids: insIds.map((r) => r.id), count: clones.length };
     },
     onSuccess: (r) => { qc.invalidateQueries(); toast.success(`${r.count} dupliquée(s)`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
