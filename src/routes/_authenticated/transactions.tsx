@@ -608,6 +608,22 @@ function TxPage() {
           pending={bulkEdit.isPending}
         />
       )}
+
+      {dupForm && (
+        <AddTxDialog
+          wallets={wallets.data ?? []}
+          nodes={nodesQ.data ?? []}
+          tags={tags.data ?? []}
+          cps={cps.data ?? []}
+          projects={projects.data ?? []}
+          onDone={() => { setDupForm(null); qc.invalidateQueries(); }}
+          initialForm={dupForm}
+          open={!!dupForm}
+          onOpenChange={(v) => !v && setDupForm(null)}
+          hideTrigger
+          title="Dupliquer la transaction"
+        />
+      )}
     </div>
   );
 }
