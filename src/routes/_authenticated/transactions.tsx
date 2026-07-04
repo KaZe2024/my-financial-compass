@@ -465,10 +465,10 @@ function TxPage() {
             </thead>
             <tbody>
               {grouped.map((g) => (
-                <Fragment key={g.date}>
-                  <tr key={`h-${g.date}`} className="border-t border-border bg-muted/40">
+                <Fragment key={g.month}>
+                  <tr key={`h-${g.month}`} className="border-t border-border bg-muted/40">
                     <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {fmtDate(g.date)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
+                      {fmtMonth(`${g.month}-01`)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
                     </td>
                     <td className={`num px-4 py-1.5 text-right whitespace-nowrap font-semibold ${g.net >= 0 ? "text-positive" : "text-negative"}`}>
                       {fmtMoney(g.net, "MGA", { sign: true })}
@@ -483,7 +483,16 @@ function TxPage() {
                     const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
                     const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
                     const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-                    const signedRow = isTransfer ? 0 : (inCashRow ? mga : -mga);
+                    const walletFilter = f.walletId !== "all" ? f.walletId : null;
+                    let signedRow = 0;
+                    if (isTransfer) {
+                      if (walletFilter) {
+                        if (t.to_wallet_id === walletFilter) signedRow = mga;
+                        else if (t.wallet_id === walletFilter) signedRow = -mga;
+                      }
+                    } else {
+                      signedRow = inCashRow ? mga : -mga;
+                    }
                     const sign = signedRow > 0 ? 1 : signedRow < 0 ? -1 : 0;
                     const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
                     const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
