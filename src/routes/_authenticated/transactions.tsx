@@ -252,12 +252,14 @@ function TxPage() {
       if (tagIdsSet !== null) {
         const { data: u, error: uErr } = await supabase.auth.getUser();
         if (uErr || !u.user) throw uErr ?? new Error("Utilisateur non authentifié");
+        const tagIds = Array.from(new Set(tagIdsSet));
+        if (!tagIds.length) return;
         for (const c of chunk(ids)) {
-          const { error: dErr } = await supabase.from("transaction_tags").delete().in("transaction_id", c);
-          if (dErr) throw dErr;
-          const rows = c.flatMap((tid) => tagIdsSet.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
+          const rows = c.flatMap((tid) => tagIds.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
           for (const rc of chunk(rows, 500)) {
-            const { error: iErr } = await supabase.from("transaction_tags").insert(rc);
+            const { error: iErr } = await supabase
+              .from("transaction_tags")
+              .upsert(rc, { onConflict: "transaction_id,tag_id", ignoreDuplicates: true });
             if (iErr) throw iErr;
           }
         }
@@ -629,14 +631,25 @@ function TxPage() {
   );
 }
 
-async function syncTags(txId: string, userId: string, newIds: string[], oldIds: string[]) {
-  const toAdd = newIds.filter((x) => !oldIds.includes(x));
-  const toRemove = oldIds.filter((x) => !newIds.includes(x));
+async function syncTags(txId: string, userId: string, newIds: string[]) {
+  const nextIds = Array.from(new Set(newIds));
+  const { data: existing, error: readError } = await supabase
+    .from("transaction_tags")
+    .select("tag_id")
+    .eq("transaction_id", txId);
+  if (readError) throw readError;
+  const oldIds = (existing ?? []).map((r) => r.tag_id);
+  const toAdd = nextIds.filter((x) => !oldIds.includes(x));
+  const toRemove = oldIds.filter((x) => !nextIds.includes(x));
   if (toRemove.length) {
-    await supabase.from("transaction_tags").delete().eq("transaction_id", txId).in("tag_id", toRemove);
+    const { error } = await supabase.from("transaction_tags").delete().eq("transaction_id", txId).in("tag_id", toRemove);
+    if (error) throw error;
   }
   if (toAdd.length) {
-    await supabase.from("transaction_tags").insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
+    const { error } = await supabase
+      .from("transaction_tags")
+      .insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
+    if (error) throw error;
   }
 }
 
@@ -743,7 +756,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         receivable_id: isRecType ? recId : null,
       } as any).select().single();
       if (error) throw error;
-      if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids, []);
+      if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
       const { logAudit } = await import("@/lib/audit");
       await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
     },
@@ -818,7 +831,7 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
         receivable_id: isRecType ? (form.receivable_id || null) : null,
       } as any).eq("id", tx.id);
       if (error) throw error;
-      await syncTags(tx.id, u.user!.id, form.tag_ids, currentTagIds);
+      await syncTags(tx.id, u.user!.id, form.tag_ids);
       const { logAudit } = await import("@/lib/audit");
       await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
     },
@@ -981,6 +994,10 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
       toast.error("Aucun champ à modifier");
       return;
     }
+    if (tagsTouched && bulkTags.length === 0) {
+      toast.error("Sélectionne au moins un tag à ajouter");
+      return;
+    }
     onSubmit(patch, tagsTouched ? bulkTags : null);
   }
 
@@ -1026,7 +1043,7 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
             <Field label="Notes (remplace)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></Field>
           </div>
           <div className="col-span-2">
-            <Field label="Tags (remplace)">
+            <Field label="Tags à ajouter">
               <TagManager
                 tags={tags}
                 value={bulkTags}
