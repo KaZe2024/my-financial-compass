@@ -135,17 +135,19 @@ export function DatePicker({
     }
   }
 
-  function handleBlur(seg: Seg) {
-    if (seg === "d" && d && d.length === 1) setD(pad(+d, 2));
-    if (seg === "m" && m && m.length === 1) setM(pad(+m, 2));
-    // Pad partial year (e.g. 24 -> 2024) on blur
-    if (seg === "y" && y && y.length > 0 && y.length < 4) {
-      const ny = y.length === 2 ? String(+y < 70 ? 2000 + +y : 1900 + +y) : pad(+y, 4);
-      setY(ny);
-      commit(d, m, ny);
-    } else {
-      commit(d, m, y);
+  function handleBlur(seg: Seg, e: React.FocusEvent<HTMLInputElement>) {
+    // Read from the DOM to avoid stale closures during auto-advance blur.
+    const cur = e.currentTarget.value.replace(/\D/g, "");
+    const cd = seg === "d" ? cur : d;
+    const cm = seg === "m" ? cur : m;
+    let cy = seg === "y" ? cur : y;
+    if (seg === "d" && cd && cd.length === 1) setD(pad(+cd, 2));
+    if (seg === "m" && cm && cm.length === 1) setM(pad(+cm, 2));
+    if (seg === "y" && cy && cy.length > 0 && cy.length < 4) {
+      cy = cy.length === 2 ? String(+cy < 70 ? 2000 + +cy : 1900 + +cy) : pad(+cy, 4);
+      setY(cy);
     }
+    commit(cd, cm, cy);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
