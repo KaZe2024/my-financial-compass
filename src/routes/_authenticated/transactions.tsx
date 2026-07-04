@@ -311,6 +311,7 @@ function TxPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [dupForm, setDupForm] = useState<FormState | null>(null);
 
   // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
   // When a wallet filter is active, transfers count with their sign for that wallet.
