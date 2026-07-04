@@ -16,6 +16,7 @@ import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check } from "lucid
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/shopping")({
   head: () => ({ meta: [{ title: "Listes d'achat — Personal CFO" }] }),
