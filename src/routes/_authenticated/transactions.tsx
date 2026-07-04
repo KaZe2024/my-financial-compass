@@ -82,6 +82,7 @@ function TxPage() {
 
   const [f, setF] = useState<Filters>(EMPTY_FILTERS);
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setF((s) => ({ ...s, [k]: v }));
+  const setDate = (k: "fromDate" | "toDate", v: string) => set(k, clampDateStr(v));
 
   const tags = useQuery({
     queryKey: ["analytical_tags"],
