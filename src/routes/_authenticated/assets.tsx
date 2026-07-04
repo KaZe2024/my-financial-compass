@@ -53,6 +53,7 @@ function AssetsPage() {
   const qc = useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
   const wallets = useQuery(walletsQO);
+  const nodesQ = useQuery(budgetNodesQO);
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await supabase.from("assets").select("*").order("purchase_date", { nullsFirst: false, ascending: false })).data ?? [],
@@ -64,6 +65,10 @@ function AssetsPage() {
   const gain = totalCur - totalPurchase;
 
   const [editing, setEditing] = useState<any | null>(null);
+  const [amortizing, setAmortizing] = useState<any | null>(null);
+  const [revaluing, setRevaluing] = useState<any | null>(null);
+  const [selling, setSelling] = useState<any | null>(null);
+  const [historyOf, setHistoryOf] = useState<any | null>(null);
 
   return (
     <div className="space-y-6">
