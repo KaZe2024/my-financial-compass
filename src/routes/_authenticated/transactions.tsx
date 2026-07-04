@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X, CheckSquare, Square } from "lucide-react";
+import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
@@ -27,13 +27,13 @@ export const Route = createFileRoute("/_authenticated/transactions")({
 const TX_TYPES = [
   "expense","income","transfer","investment","asset_purchase","asset_sale","adjustment",
   "enveloppe_projet","enveloppe_emprunt",
-  "debt_incur","debt_repay","receivable_grant","receivable_collect",
+  "dette","creance",
 ] as const;
 const CURRENCIES = ["MGA","EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
 const PROJECT_TYPES = new Set(["investment","enveloppe_projet","enveloppe_emprunt"]);
-const DEBT_TYPES = new Set(["debt_incur","debt_repay"]);
-const RECEIVABLE_TYPES = new Set(["receivable_grant","receivable_collect"]);
-const NO_BUDGET_TYPES = new Set(["transfer","debt_incur","debt_repay","receivable_grant","receivable_collect"]);
+const DEBT_TYPES = new Set(["dette"]);
+const RECEIVABLE_TYPES = new Set(["creance"]);
+const NO_BUDGET_TYPES = new Set(["transfer","dette","creance"]);
 
 type Filters = {
   fromDate: string;
@@ -201,6 +201,35 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const duplicate = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data: u } = await supabase.auth.getUser();
+      const { data: src, error } = await supabase.from("transactions").select("*").in("id", ids);
+      if (error) throw error;
+      const today = toISODate(new Date());
+      const clones = (src ?? []).map((t: any) => {
+        const { id: _id, created_at: _c, updated_at: _up, ...rest } = t;
+        return { ...rest, user_id: u.user!.id, occurred_on: today };
+      });
+      if (!clones.length) return { ids: [] as string[], count: 0 };
+      const { data: ins, error: iErr } = await supabase.from("transactions").insert(clones as any).select("id");
+      if (iErr) throw iErr;
+      // Copy tags
+      const { data: srcTags } = await supabase.from("transaction_tags").select("*").in("transaction_id", ids);
+      if (srcTags && srcTags.length && ins) {
+        const map = new Map<string, string>();
+        (src ?? []).forEach((s: any, i: number) => map.set(s.id, ins[i]?.id));
+        const tagRows = srcTags
+          .map((tt: any) => ({ transaction_id: map.get(tt.transaction_id)!, tag_id: tt.tag_id, user_id: u.user!.id }))
+          .filter((r) => r.transaction_id);
+        if (tagRows.length) await supabase.from("transaction_tags").insert(tagRows);
+      }
+      return { ids: (ins ?? []).map((r: any) => r.id), count: clones.length };
+    },
+    onSuccess: (r) => { qc.invalidateQueries(); toast.success(`${r.count} dupliquée(s)`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -219,8 +248,10 @@ function TxPage() {
       for (const t of rows) {
         if (t.type === "transfer") continue;
         const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-        const isIn = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt";
-        if (isIn) inflow += mga; else outflow += mga;
+        const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+        const signedCash = inCash ? mga : -mga;
+        const isIn = signedCash > 0;
+        if (isIn) inflow += Math.abs(signedCash); else outflow += Math.abs(signedCash);
       }
       return { date, rows, inflow, outflow, net: inflow - outflow };
     });
@@ -327,6 +358,9 @@ function TxPage() {
               <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
               </Button>
+              <Button variant="outline" size="sm" disabled={duplicate.isPending} onClick={() => duplicate.mutate(Array.from(selected))}>
+                <Copy className="mr-1 h-3.5 w-3.5" /> Dupliquer
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -390,10 +424,13 @@ function TxPage() {
                     </td>
                   </tr>
                   {g.rows.map((t: any) => {
-                    const sign = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt" ? 1 : t.type === "transfer" ? 0 : -1;
+                    const inCashRow = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+                    const isTransfer = t.type === "transfer";
                     const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
                     const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
                     const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+                    const signedRow = isTransfer ? 0 : (inCashRow ? mga : -mga);
+                    const sign = signedRow > 0 ? 1 : signedRow < 0 ? -1 : 0;
                     const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
                     const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
                     const isSel = selected.has(t.id);
@@ -417,13 +454,16 @@ function TxPage() {
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
                         <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
-                          {fmtMoney(mga * (sign || 1), "MGA", { sign: sign !== 0 })}
+                          {fmtMoney(Math.abs(signedRow) * (sign || 1), "MGA", { sign: sign !== 0 })}
                         </td>
                         <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex justify-end gap-0.5 text-muted-foreground">
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button title="Dupliquer" onClick={() => duplicate.mutate([t.id])} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                              <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
                               <Trash2 className="h-3.5 w-3.5" />
@@ -538,7 +578,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
       // Auto-create debt/receivable on _incur / _grant when none selected
       let debtId: string | null = form.debt_id || null;
       let recId: string | null = form.receivable_id || null;
-      if (form.type === "debt_incur" && !debtId) {
+      if (form.type === "dette" && !debtId) {
         const { data: d, error: dErr } = await supabase.from("debts").insert({
           user_id: u.user!.id, creditor: form.counterparty.trim() || form.description || "Créancier",
           description: form.description || null, original_amount: amt, outstanding: 0,
@@ -547,7 +587,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
         if (dErr) throw dErr;
         debtId = d?.id ?? null;
       }
-      if (form.type === "receivable_grant" && !recId) {
+      if (form.type === "creance" && !recId) {
         const { data: r, error: rErr } = await supabase.from("receivables").insert({
           user_id: u.user!.id, debtor: form.counterparty.trim() || form.description || "Débiteur",
           description: form.description || null, original_amount: amt, outstanding: 0,
@@ -726,16 +766,16 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
             </Select>
           </Field>
         ) : isDebt ? (
-          <Field label={form.type === "debt_incur" ? "Dette (laisser vide = créer)" : "Dette à rembourser"}>
+          <Field label="Dette (laisser vide = créer)">
             <Select value={form.debt_id} onValueChange={(v) => set("debt_id", v)}>
-              <SelectTrigger><SelectValue placeholder={form.type === "debt_incur" ? "Nouvelle dette" : "—"} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Nouvelle dette" /></SelectTrigger>
               <SelectContent>{(debtsQ.data ?? []).map((d: any) => <SelectItem key={d.id} value={d.id}>{d.creditor} · {fmtMoney(Number(d.outstanding), d.currency)}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
         ) : isRec ? (
-          <Field label={form.type === "receivable_grant" ? "Créance (laisser vide = créer)" : "Créance à encaisser"}>
+          <Field label="Créance (laisser vide = créer)">
             <Select value={form.receivable_id} onValueChange={(v) => set("receivable_id", v)}>
-              <SelectTrigger><SelectValue placeholder={form.type === "receivable_grant" ? "Nouvelle créance" : "—"} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Nouvelle créance" /></SelectTrigger>
               <SelectContent>{(recsQ.data ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.debtor} · {fmtMoney(Number(r.outstanding), r.currency)}</SelectItem>)}</SelectContent>
             </Select>
           </Field>

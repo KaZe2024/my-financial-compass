@@ -40,10 +40,14 @@ export function HistoryDialog({
     },
   });
   const rows = q.data ?? [];
+  const cashSign = (type: string, mga: number) => {
+    if (type === "transfer") return 0;
+    if (["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(type)) return mga;
+    return -mga;
+  };
   const totalMga = rows.reduce((s: number, r: any) => {
     const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
-    const inflow = ["income", "asset_sale", "enveloppe_emprunt", "debt_incur", "receivable_collect"].includes(r.type);
-    return s + (inflow ? mga : -mga);
+    return s + cashSign(r.type, mga);
   }, 0);
 
   return (
@@ -71,15 +75,16 @@ export function HistoryDialog({
               <tbody>
                 {rows.map((r: any) => {
                   const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
-                  const inflow = ["income", "asset_sale", "enveloppe_emprunt", "debt_incur", "receivable_collect"].includes(r.type);
+                  const signed = cashSign(r.type, mga);
+                  const isIn = signed > 0;
                   return (
                     <tr key={r.id} className="border-t border-border/60">
                       <td className="num px-2 py-1.5 text-muted-foreground whitespace-nowrap">{fmtDate(r.occurred_on)}</td>
                       <td className="px-2 py-1.5"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase">{r.type}</span></td>
                       <td className="px-2 py-1.5">{r.description}{r.notes ? <div className="text-[10px] text-muted-foreground">{r.notes}</div> : null}</td>
                       <td className="px-2 py-1.5 text-xs text-muted-foreground">{r.wallets?.name ?? "—"}</td>
-                      <td className={`num px-2 py-1.5 text-right whitespace-nowrap ${inflow ? "text-positive" : "text-negative"}`}>
-                        {fmtMoney(mga * (inflow ? 1 : -1), r.currency ?? "MGA", { sign: true })}
+                      <td className={`num px-2 py-1.5 text-right whitespace-nowrap ${signed === 0 ? "" : isIn ? "text-positive" : "text-negative"}`}>
+                        {fmtMoney(signed, r.currency ?? "MGA", { sign: true })}
                       </td>
                     </tr>
                   );
