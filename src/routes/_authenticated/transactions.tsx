@@ -357,7 +357,7 @@ function TxPage() {
   }, [grouped]);
 
   const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
-  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id));
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id: string) => selected.has(id));
   function toggleAll() {
     if (allSelected) setSelected(new Set());
     else setSelected(new Set(allVisibleIds));
