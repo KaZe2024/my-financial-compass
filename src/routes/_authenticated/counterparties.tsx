@@ -164,6 +164,7 @@ function CounterpartiesPage() {
       </Panel>
 
       {editing && <CpDialog editing={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["counterparties"] }); }} />}
+      {historyOf && <HistoryDialog open onOpenChange={(v) => !v && setHistoryOf(null)} title={`Historique · ${historyOf.name}`} column="counterparty_id" sourceKind="counterparty" entityId={historyOf.id} />}
     </div>
   );
 }
