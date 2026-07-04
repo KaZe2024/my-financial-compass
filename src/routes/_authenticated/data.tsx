@@ -40,10 +40,11 @@ const TABLES = [
 ] as const;
 
 async function fetchAll(table: string): Promise<any[]> {
-  const { data, error } = await (supabase as any).from(table).select("*").limit(50000);
-  if (error) throw error;
-  return data ?? [];
+  return await fetchAllRows<any>((from, to) =>
+    (supabase as any).from(table).select("*").range(from, to),
+  );
 }
+
 
 /**
  * Build lookup maps for foreign-key labels. Returns a function that rewrites a row:
