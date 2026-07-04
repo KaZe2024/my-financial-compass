@@ -8,6 +8,7 @@ import { resolvePeriod, isoDate } from "@/lib/period";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { fmtDate } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/fx")({
@@ -25,18 +26,20 @@ function FxPage() {
   const txs = useQuery({
     queryKey: ["fx_txs", currency, isoDate(period.from), isoDate(period.to)],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("occurred_on, currency, exchange_rate")
-        .eq("currency", currency)
-        .gte("occurred_on", isoDate(period.from))
-        .lte("occurred_on", isoDate(period.to))
-        .order("occurred_on", { ascending: true })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []).filter((r: any) => Number(r.exchange_rate) > 0);
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("occurred_on, currency, exchange_rate")
+          .eq("currency", currency)
+          .gte("occurred_on", isoDate(period.from))
+          .lte("occurred_on", isoDate(period.to))
+          .order("occurred_on", { ascending: true })
+          .range(from, to),
+      );
+      return data.filter((r: any) => Number(r.exchange_rate) > 0);
     },
   });
+
 
   // Aggregate per day (mean)
   const series = useMemo(() => {
@@ -69,14 +72,16 @@ function FxPage() {
   const currencies = useQuery({
     queryKey: ["fx_currencies"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("transactions").select("currency").not("currency", "is", null).limit(2000);
-      if (error) throw error;
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase.from("transactions").select("currency").not("currency", "is", null).range(from, to),
+      );
       const set = new Set<string>();
-      for (const r of data ?? []) if ((r as any).currency && (r as any).currency !== "MGA") set.add((r as any).currency);
+      for (const r of data) if ((r as any).currency && (r as any).currency !== "MGA") set.add((r as any).currency);
       for (const c of COMMON) set.add(c);
       return Array.from(set).sort();
     },
   });
+
 
   return (
     <div className="space-y-6">

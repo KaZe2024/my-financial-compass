@@ -20,6 +20,7 @@ import {
   type GoalType, type ProgressInput,
 } from "@/lib/goal-progress";
 import { logAudit } from "@/lib/audit";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/goals")({
   head: () => ({ meta: [{ title: "Objectifs — Personal CFO" }] }),
@@ -40,8 +41,12 @@ function useProgressData() {
   const nodesQ = useQuery(budgetNodesQO);
   const txs = useQuery({
     queryKey: ["tx", "for-goals"],
-    queryFn: async () => (await supabase.from("transactions").select("type, base_amount, occurred_on, budget_node_id").limit(10000)).data ?? [],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("transactions").select("type, base_amount, occurred_on, budget_node_id").range(from, to),
+      ),
   });
+
   const debts = useQuery({
     queryKey: ["debts", "all-for-goals"],
     queryFn: async () => (await supabase.from("debts").select("outstanding, status")).data ?? [],

@@ -15,6 +15,7 @@ import { fmtMoney, fmtDate } from "@/lib/format";
 import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
 import { HistoryDialog } from "@/components/history-dialog";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/counterparties")({
   head: () => ({ meta: [{ title: "Tiers — Personal CFO" }] }),
@@ -33,17 +34,17 @@ function CounterpartiesPage() {
 
   const txs = useQuery({
     queryKey: ["cp_txs", isoDate(period.from), isoDate(period.to)],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label")
-        .gte("occurred_on", isoDate(period.from))
-        .lte("occurred_on", isoDate(period.to))
-        .limit(5000);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label")
+          .gte("occurred_on", isoDate(period.from))
+          .lte("occurred_on", isoDate(period.to))
+          .range(from, to),
+      ),
   });
+
 
   const stats = useMemo(() => {
     const m = new Map<string, { in: number; out: number; count: number }>();

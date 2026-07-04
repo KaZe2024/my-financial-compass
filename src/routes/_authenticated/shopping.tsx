@@ -16,6 +16,7 @@ import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check } from "lucid
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/shopping")({
   head: () => ({ meta: [{ title: "Listes d'achat — Personal CFO" }] }),
@@ -31,7 +32,10 @@ function ShoppingPage() {
   const nodes = useQuery(budgetNodesQO);
   const tags = useQuery({
     queryKey: ["analytical_tags"],
-    queryFn: async () => (await supabase.from("analytical_tags").select("*").order("name")).data ?? [],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("analytical_tags").select("*").order("name").range(from, to),
+      ),
   });
 
   const nodePath = useMemo(() => {
@@ -41,15 +45,16 @@ function ShoppingPage() {
 
   const lists = useQuery({
     queryKey: ["shopping_lists"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("shopping_lists")
-        .select("*, shopping_list_items(*)")
-        .order("occurred_on", { ascending: false }).limit(50);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("shopping_lists")
+          .select("*, shopping_list_items(*)")
+          .order("occurred_on", { ascending: false })
+          .range(from, to),
+      ),
   });
+
 
   return (
     <div className="space-y-6">

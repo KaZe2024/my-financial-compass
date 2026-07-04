@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/products")({
   head: () => ({ meta: [{ title: "Prix produits — Personal CFO" }] }),
@@ -27,10 +28,11 @@ function ProductsPage() {
   const products = useQuery({
     queryKey: ["products", search, showArchived],
     queryFn: async () => {
-      let q = supabase.from("products").select("*").order("name").limit(300);
-      if (search) q = q.ilike("name", `%${search}%`);
-      const { data } = await q;
-      const rows = data ?? [];
+      const rows = await fetchAllRows<any>((from, to) => {
+        let q = supabase.from("products").select("*").order("name").range(from, to);
+        if (search) q = q.ilike("name", `%${search}%`);
+        return q;
+      });
       return rows.filter((p: any) => showArchived || !p.archived);
     },
   });
@@ -39,8 +41,12 @@ function ProductsPage() {
   const prices = useQuery({
     queryKey: ["product_prices", selected],
     enabled: !!selected,
-    queryFn: async () => (await supabase.from("product_prices").select("*").eq("product_id", selected!).order("observed_on", { ascending: false }).limit(200)).data ?? [],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("product_prices").select("*").eq("product_id", selected!).order("observed_on", { ascending: false }).range(from, to),
+      ),
   });
+
 
   const stats = (() => {
     const arr = (prices.data ?? []).map((p: any) => Number(p.unit_price));

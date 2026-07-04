@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMonth, fmtMoney, toISODate } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transactions")({
@@ -133,43 +135,37 @@ function TxPage() {
 
   const tags = useQuery({
     queryKey: ["analytical_tags"],
-    queryFn: async () => (await supabase.from("analytical_tags").select("*").order("name")).data ?? [],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("analytical_tags").select("*").order("name").range(from, to),
+      ),
   });
 
   const txs = useQuery({
     queryKey: ["transactions", f.type, f.fromDate, f.toDate, f.walletId],
     queryFn: async () => {
-      let q = supabase.from("transactions")
-        .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
-        .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
-        .limit(10000);
-      if (f.type !== "all") q = q.eq("type", f.type as any);
-      if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
-      if (f.toDate) q = q.lte("occurred_on", f.toDate);
-      if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
-      const { data, error } = await q;
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllRows<any>((from, to) => {
+        let q = supabase.from("transactions")
+          .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
+          .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
+          .range(from, to);
+        if (f.type !== "all") q = q.eq("type", f.type as any);
+        if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
+        if (f.toDate) q = q.lte("occurred_on", f.toDate);
+        if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
+        return q;
+      });
     },
   });
 
   const txTags = useQuery({
     queryKey: ["tx_tags_all"],
-    queryFn: async () => {
-      const rows: { transaction_id: string; tag_id: string }[] = [];
-      const pageSize = 1000;
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("transaction_tags")
-          .select("transaction_id,tag_id")
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        rows.push(...(data ?? []));
-        if (!data || data.length < pageSize) break;
-      }
-      return rows;
-    },
+    queryFn: async () =>
+      await fetchAllRows<{ transaction_id: string; tag_id: string }>((from, to) =>
+        supabase.from("transaction_tags").select("transaction_id,tag_id").range(from, to),
+      ),
   });
+
   const tagIdsByTx = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const r of txTags.data ?? []) {
@@ -179,7 +175,7 @@ function TxPage() {
     }
     return m;
   }, [txTags.data]);
-  const tagNameById = useMemo(() => new Map((tags.data ?? []).map((t: any) => [t.id, t.name])), [tags.data]);
+  const tagNameById = useMemo(() => new Map<string, string>((tags.data ?? []).map((t: any) => [t.id as string, t.name as string])), [tags.data]);
 
   const filtered = useMemo(() => {
     const kw = f.keyword.trim().toLowerCase();
@@ -361,7 +357,7 @@ function TxPage() {
   }, [grouped]);
 
   const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
-  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id));
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id: string) => selected.has(id));
   function toggleAll() {
     if (allSelected) setSelected(new Set());
     else setSelected(new Set(allVisibleIds));
