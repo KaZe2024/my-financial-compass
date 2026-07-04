@@ -339,7 +339,7 @@ function TxPage() {
             </thead>
             <tbody>
               {grouped.map((g) => (
-                <>
+                <Fragment key={g.date}>
                   <tr key={`h-${g.date}`} className="border-t border-border bg-muted/40">
                     <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                       {fmtDate(g.date)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
