@@ -229,6 +229,72 @@ function DataPage() {
   );
 }
 
+async function buildDelabelizer() {
+  const [walletsR, nodesR, cpsR, projectsR, assetsR, debtsR, recR, tagsR] = await Promise.all([
+    supabase.from("wallets").select("id, name"),
+    supabase.from("budget_nodes").select("id, name, parent_id"),
+    supabase.from("counterparties").select("id, name"),
+    supabase.from("projects").select("id, name"),
+    supabase.from("assets").select("id, name"),
+    supabase.from("debts").select("id, creditor"),
+    supabase.from("receivables").select("id, debtor"),
+    supabase.from("analytical_tags").select("id, name"),
+  ]);
+  const norm = (s: any) => String(s ?? "").trim().toLowerCase();
+  const idx = (rows: any[], key: string) => {
+    const m = new Map<string, string>();
+    for (const r of rows ?? []) m.set(norm(r[key]), r.id);
+    return m;
+  };
+  const wallets = idx(walletsR.data ?? [], "name");
+  const cps = idx(cpsR.data ?? [], "name");
+  const projects = idx(projectsR.data ?? [], "name");
+  const assets = idx(assetsR.data ?? [], "name");
+  const debts = idx(debtsR.data ?? [], "creditor");
+  const recs = idx(recR.data ?? [], "debtor");
+  const tags = idx(tagsR.data ?? [], "name");
+  const nodesById = new Map((nodesR.data ?? []).map((n: any) => [n.id, n]));
+  const nodePath = (id: string): string => {
+    const parts: string[] = []; let cur: any = nodesById.get(id); let g = 0;
+    while (cur && g++ < 20) { parts.unshift(cur.name); cur = cur.parent_id ? nodesById.get(cur.parent_id) : null; }
+    return parts.join(" › ");
+  };
+  const nodesByPath = new Map<string, string>();
+  const nodesByName = new Map<string, string>();
+  for (const n of (nodesR.data ?? []) as any[]) {
+    nodesByPath.set(norm(nodePath(n.id)), n.id);
+    nodesByName.set(norm(n.name), n.id);
+  }
+  const resolveNode = (v: any) => nodesByPath.get(norm(v)) ?? nodesByName.get(norm(String(v).split("›").pop())) ?? null;
+
+  const label2col: Record<string, { col: string; resolve: (v: any) => string | null }> = {
+    wallet: { col: "wallet_id", resolve: (v) => wallets.get(norm(v)) ?? null },
+    to_wallet: { col: "to_wallet_id", resolve: (v) => wallets.get(norm(v)) ?? null },
+    counterparty: { col: "counterparty_id", resolve: (v) => cps.get(norm(v)) ?? null },
+    project: { col: "project_id", resolve: (v) => projects.get(norm(v)) ?? null },
+    asset: { col: "asset_id", resolve: (v) => assets.get(norm(v)) ?? null },
+    debt: { col: "debt_id", resolve: (v) => debts.get(norm(v)) ?? null },
+    receivable: { col: "receivable_id", resolve: (v) => recs.get(norm(v)) ?? null },
+    tag: { col: "tag_id", resolve: (v) => tags.get(norm(v)) ?? null },
+    budget_node: { col: "budget_node_id", resolve: resolveNode },
+  };
+
+  return (row: any) => {
+    const out: any = { ...row };
+    for (const k of Object.keys(row)) {
+      const key = k.toLowerCase();
+      const hit = label2col[key];
+      if (!hit) continue;
+      const val = row[k];
+      if (val == null || val === "") { delete out[k]; continue; }
+      const isUuid = typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      out[hit.col] = isUuid ? val : hit.resolve(val);
+      if (k !== hit.col) delete out[k];
+    }
+    return out;
+  };
+}
+
 function ImportForm() {
   const [table, setTable] = useState<string>("transactions");
   const [busy, setBusy] = useState(false);
@@ -242,7 +308,7 @@ function ImportForm() {
           </select>
         </div>
         <div className="space-y-1">
-          <Label>Fichier .xlsx</Label>
+          <Label>Fichier .xlsx / .csv</Label>
           <Input type="file" accept=".xlsx,.xls,.csv" disabled={busy} onChange={async (e) => {
             const file = e.target.files?.[0]; if (!file) return;
             setBusy(true);
@@ -252,10 +318,10 @@ function ImportForm() {
               const ws = wb.Sheets[wb.SheetNames[0]];
               const rows = XLSX.utils.sheet_to_json<any>(ws);
               const { data: u } = await supabase.auth.getUser();
-              const stamped = rows.map((r) => ({ ...r, user_id: r.user_id ?? u.user!.id }));
-              // strip id if blank/null, plus created_at/updated_at to let DB defaults run
-              const cleaned = stamped.map((r) => {
-                const o: any = { ...r };
+              const delabel = await buildDelabelizer();
+              const cleaned = rows.map((r) => {
+                const o: any = delabel(r);
+                o.user_id = o.user_id ?? u.user!.id;
                 if (!o.id) delete o.id;
                 delete o.created_at; delete o.updated_at;
                 for (const k of Object.keys(o)) if (o[k] === "" || o[k] === null) delete o[k];
@@ -269,7 +335,7 @@ function ImportForm() {
           }} />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">Les colonnes <code>created_at</code> / <code>updated_at</code> et les <code>id</code> vides sont régénérés automatiquement. Un <code>user_id</code> manquant prend l'utilisateur courant.</p>
+      <p className="text-xs text-muted-foreground">Les colonnes libellées (Wallet, Budget_node, Counterparty, …) sont converties automatiquement en identifiants. Les colonnes <code>created_at</code>/<code>updated_at</code> et les <code>id</code> vides sont régénérés. Un <code>user_id</code> manquant prend l'utilisateur courant.</p>
     </div>
   );
 }
