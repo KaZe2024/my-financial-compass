@@ -31,15 +31,17 @@ export function HistoryDialog({
     queryFn: async () => {
       const filters: string[] = [`${column}.eq.${entityId}`];
       if (sourceKind) filters.push(`and(source_kind.eq.${sourceKind},source_id.eq.${entityId})`);
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("id, occurred_on, type, description, amount, base_amount, currency, exchange_rate, wallet_id, wallets:wallet_id(name), notes")
-        .or(filters.join(","))
-        .order("occurred_on", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
+      return await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, occurred_on, type, description, amount, base_amount, currency, exchange_rate, wallet_id, wallets:wallet_id(name), notes")
+          .or(filters.join(","))
+          .order("occurred_on", { ascending: false })
+          .range(from, to),
+      );
     },
   });
+
   const rows = q.data ?? [];
   const cashSign = (type: string, mga: number) => {
     if (type === "transfer") return 0;
