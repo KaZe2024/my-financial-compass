@@ -80,7 +80,12 @@ export function ObligationsPage(props: {
                     <td className="num px-4 py-2 text-right">{fmtMoney(Number(r.original_amount), r.currency)}</td>
                     <td className={`num px-4 py-2 text-right font-semibold ${Number(r.outstanding) > 0 ? (props.tone === "negative" ? "text-warning" : "text-positive") : "text-muted-foreground"}`}>{fmtMoney(Number(r.outstanding), r.currency)}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{r.archived ? "archivé" : r.status}</span></td>
-                    <td className="px-2 py-2 text-right"><RowActions table={props.table} id={r.id} archived={r.archived} onEdit={() => setEditing(r)} linkedTxId={r.linked_transaction_id} /></td>
+                    <td className="px-2 py-2 text-right">
+                      <div className="flex justify-end items-center gap-0.5">
+                        <button title="Historique" onClick={() => setHistoryOf(r)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><HistoryIcon className="h-3.5 w-3.5" /></button>
+                        <RowActions table={props.table} id={r.id} archived={r.archived} onEdit={() => setEditing(r)} linkedTxId={r.linked_transaction_id} />
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -92,6 +97,9 @@ export function ObligationsPage(props: {
 
       {editing && (
         <ObligationDialog editing={editing} table={props.table} partyField={props.partyField} partyLabel={props.partyLabel} tone={props.tone} wallets={wallets.data ?? []} onClose={() => setEditing(null)} onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: [props.table] }); }} />
+      )}
+      {historyOf && (
+        <HistoryDialog open onOpenChange={(v) => !v && setHistoryOf(null)} title={`Historique · ${historyOf[props.partyField]}`} column={props.table === "debts" ? "debt_id" : "receivable_id"} sourceKind={props.table === "debts" ? "debt" : "receivable"} entityId={historyOf.id} />
       )}
     </div>
   );
