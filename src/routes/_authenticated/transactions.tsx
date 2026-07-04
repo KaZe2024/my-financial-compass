@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMonth, fmtMoney, toISODate } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
+
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transactions")({
