@@ -34,6 +34,7 @@ const PROJECT_TYPES = new Set(["investment","enveloppe_projet","enveloppe_emprun
 const DEBT_TYPES = new Set(["dette"]);
 const RECEIVABLE_TYPES = new Set(["creance"]);
 const NO_BUDGET_TYPES = new Set(["transfer","dette","creance"]);
+const CASH_IN_TYPES = new Set(["income","asset_sale","adjustment","enveloppe_emprunt","dette"]);
 
 type Filters = {
   fromDate: string;
