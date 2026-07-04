@@ -786,7 +786,8 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
     debt_id: tx.debt_id ?? "",
     receivable_id: tx.receivable_id ?? "",
   });
-  useEffect(() => { setForm((s) => ({ ...s, tag_ids: currentTagIds })); /* eslint-disable-next-line */ }, [currentTagIds.join(",")]);
+  // tag_ids initialisé une seule fois au montage — ne pas réinitialiser depuis les props
+  // pour éviter d'écraser une sélection en cours si le parent refetch (window focus, etc.)
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm(s => ({ ...s, [k]: v })); }
 
   const m = useMutation({
