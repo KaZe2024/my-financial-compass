@@ -8,6 +8,7 @@ import { resolvePeriod, isoDate } from "@/lib/period";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { fmtDate } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/fx")({
