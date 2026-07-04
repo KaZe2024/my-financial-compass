@@ -2,126 +2,270 @@ import * as React from "react";
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Professional date picker. Stores/returns ISO `YYYY-MM-DD` (empty string when cleared).
- * Displays as `DD/MM/YYYY`. Includes month/year selectors that auto-clamp the day
- * to the last valid day of the selected month (e.g. Feb → 28/29, Apr → 30).
+ * Segmented date picker (DD / MM / YYYY). Auto-advances between segments as the
+ * user types, no separator required. Stores/returns ISO `YYYY-MM-DD` (empty
+ * string when cleared). Includes a Popover calendar with month/year dropdowns.
  */
-function parseISO(v: string): Date | undefined {
+
+function daysInMonth(y: number, m: number) {
+  if (!y || !m) return 31;
+  return new Date(y, m, 0).getDate();
+}
+function pad(n: number, len: number) { return String(n).padStart(len, "0"); }
+function parseISO(v: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v ?? "");
-  if (!m) return undefined;
-  const y = +m[1], mo = +m[2], d = +m[3];
-  const last = new Date(y, mo, 0).getDate();
-  const day = Math.min(d, last);
-  const dt = new Date(y, mo - 1, day);
-  return isNaN(dt.getTime()) ? undefined : dt;
-}
-function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${da}`;
-}
-function toDMY(v: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v ?? "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
-}
-function parseDMY(s: string): string | null {
-  const m = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/.exec(s.trim());
   if (!m) return null;
-  let d = +m[1], mo = +m[2], y = +m[3];
-  if (y < 100) y += 2000;
-  if (mo < 1 || mo > 12 || d < 1) return null;
-  const last = new Date(y, mo, 0).getDate();
-  d = Math.min(d, last);
-  return `${String(y).padStart(4, "0")}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return { y: +m[1], mo: +m[2], d: +m[3] };
+}
+function toISO(y: number, mo: number, d: number) {
+  return `${pad(y, 4)}-${pad(mo, 2)}-${pad(d, 2)}`;
+}
+function isoFromDate(d: Date) {
+  return toISO(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
 export interface DatePickerProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
-  placeholder?: string;
   id?: string;
   required?: boolean;
   disabled?: boolean;
   inputClassName?: string;
+  placeholder?: string; // unused – kept for API compat
 }
 
+type Seg = "d" | "m" | "y";
+
 export function DatePicker({
-  value,
-  onChange,
-  className,
-  placeholder = "jj/mm/aaaa",
-  id,
-  required,
-  disabled,
-  inputClassName,
+  value, onChange, className, id, required, disabled, inputClassName,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
-  const [draft, setDraft] = React.useState(() => toDMY(value));
-  React.useEffect(() => setDraft(toDMY(value)), [value]);
+  const dRef = React.useRef<HTMLInputElement>(null);
+  const mRef = React.useRef<HTMLInputElement>(null);
+  const yRef = React.useRef<HTMLInputElement>(null);
 
-  const selected = parseISO(value);
+  const parsed = parseISO(value);
+  const [d, setD] = React.useState(parsed ? pad(parsed.d, 2) : "");
+  const [m, setM] = React.useState(parsed ? pad(parsed.mo, 2) : "");
+  const [y, setY] = React.useState(parsed ? pad(parsed.y, 4) : "");
 
-  function commitText(s: string) {
-    if (!s.trim()) { onChange(""); return; }
-    const iso = parseDMY(s);
-    if (iso) { onChange(iso); setDraft(toDMY(iso)); }
-    else setDraft(toDMY(value));
+  // Sync from external value
+  React.useEffect(() => {
+    const p = parseISO(value);
+    if (p) {
+      setD(pad(p.d, 2)); setM(pad(p.mo, 2)); setY(pad(p.y, 4));
+    } else if (!value) {
+      setD(""); setM(""); setY("");
+    }
+  }, [value]);
+
+  function commit(nd: string, nm: string, ny: string) {
+    if (nd && nm && ny.length === 4) {
+      const yi = +ny, mi = +nm;
+      let di = +nd;
+      if (yi < 1 || mi < 1 || mi > 12 || di < 1) return;
+      const last = daysInMonth(yi, mi);
+      if (di > last) { di = last; setD(pad(di, 2)); }
+      const iso = toISO(yi, mi, di);
+      if (iso !== value) onChange(iso);
+    } else if (!nd && !nm && !ny && value) {
+      onChange("");
+    }
   }
 
+  function focusSeg(seg: Seg) {
+    const el = seg === "d" ? dRef.current : seg === "m" ? mRef.current : yRef.current;
+    el?.focus(); el?.select();
+  }
+
+  function handleChange(seg: Seg, raw: string) {
+    const digits = raw.replace(/\D/g, "");
+    if (seg === "d") {
+      const trimmed = digits.slice(0, 2);
+      setD(trimmed);
+      // Auto-advance when unambiguous (>=4 forces 2-digit, or when 2 chars typed)
+      if (trimmed.length === 2 || (trimmed.length === 1 && +trimmed > 3)) {
+        commit(trimmed.padStart(2, "0"), m, y);
+        focusSeg("m");
+      } else {
+        commit(trimmed, m, y);
+      }
+    } else if (seg === "m") {
+      const trimmed = digits.slice(0, 2);
+      setM(trimmed);
+      if (trimmed.length === 2 || (trimmed.length === 1 && +trimmed > 1)) {
+        commit(d, trimmed.padStart(2, "0"), y);
+        focusSeg("y");
+      } else {
+        commit(d, trimmed, y);
+      }
+    } else {
+      const trimmed = digits.slice(0, 4);
+      setY(trimmed);
+      commit(d, m, trimmed);
+    }
+  }
+
+  function handleKeyDown(seg: Seg, e: React.KeyboardEvent<HTMLInputElement>) {
+    const target = e.currentTarget;
+    const val = target.value;
+    if (e.key === "ArrowRight" && target.selectionStart === val.length) {
+      e.preventDefault();
+      if (seg === "d") focusSeg("m");
+      else if (seg === "m") focusSeg("y");
+    } else if (e.key === "ArrowLeft" && target.selectionStart === 0) {
+      e.preventDefault();
+      if (seg === "y") focusSeg("m");
+      else if (seg === "m") focusSeg("d");
+    } else if (e.key === "Backspace" && val === "") {
+      e.preventDefault();
+      if (seg === "y") focusSeg("m");
+      else if (seg === "m") focusSeg("d");
+    } else if (e.key === "/" || e.key === "-" || e.key === "." || e.key === " ") {
+      e.preventDefault();
+      if (seg === "d" && d) { setD(pad(+d || 0, 2)); focusSeg("m"); }
+      else if (seg === "m" && m) { setM(pad(+m || 0, 2)); focusSeg("y"); }
+    } else if (e.key === "Enter") {
+      commit(d, m, y);
+    }
+  }
+
+  function handleBlur(seg: Seg) {
+    if (seg === "d" && d && d.length === 1) setD(pad(+d, 2));
+    if (seg === "m" && m && m.length === 1) setM(pad(+m, 2));
+    // Pad partial year (e.g. 24 -> 2024) on blur
+    if (seg === "y" && y && y.length > 0 && y.length < 4) {
+      const ny = y.length === 2 ? String(+y < 70 ? 2000 + +y : 1900 + +y) : pad(+y, 4);
+      setY(ny);
+      commit(d, m, ny);
+    } else {
+      commit(d, m, y);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text");
+    const m1 = /^(\d{1,2})[/\-.\s](\d{1,2})[/\-.\s](\d{2,4})$/.exec(text.trim())
+      || /^(\d{4})-(\d{2})-(\d{2})$/.exec(text.trim());
+    if (!m1) return;
+    e.preventDefault();
+    let dd: string, mm: string, yy: string;
+    if (m1[0].startsWith(m1[1]) && m1[1].length === 4) {
+      // ISO
+      yy = m1[1]; mm = m1[2]; dd = m1[3];
+    } else {
+      dd = m1[1]; mm = m1[2]; yy = m1[3];
+      if (yy.length === 2) yy = String(+yy < 70 ? 2000 + +yy : 1900 + +yy);
+    }
+    dd = pad(+dd, 2); mm = pad(+mm, 2); yy = pad(+yy, 4);
+    setD(dd); setM(mm); setY(yy);
+    commit(dd, mm, yy);
+    focusSeg("y");
+  }
+
+  const selectedDate = parsed ? new Date(parsed.y, parsed.mo - 1, Math.min(parsed.d, daysInMonth(parsed.y, parsed.mo))) : undefined;
+
+  const segInputBase = "bg-transparent p-0 text-center tabular-nums outline-none focus:bg-accent focus:text-accent-foreground rounded-sm caret-transparent selection:bg-primary/30";
+  const empty = !d && !m && !y;
+
   return (
-    <div className={cn("relative flex items-center", className)}>
-      <Input
+    <div
+      className={cn(
+        "relative flex h-9 w-full items-center gap-0.5 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring md:text-sm",
+        disabled && "cursor-not-allowed opacity-50",
+        className,
+        inputClassName,
+      )}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) focusSeg(d ? (m ? "y" : "m") : "d");
+      }}
+    >
+      <input
+        ref={dRef}
         id={id}
-        type="text"
+        aria-label="Jour"
         inputMode="numeric"
-        placeholder={placeholder}
-        value={draft}
-        required={required}
+        placeholder="jj"
+        className={cn(segInputBase, "w-5 placeholder:text-muted-foreground")}
+        value={d}
         disabled={disabled}
-        onChange={(e) => {
-          const next = e.target.value;
-          setDraft(next);
-          const iso = parseDMY(next);
-          if (iso) onChange(iso);
-          else if (!next.trim()) onChange("");
-        }}
-        onBlur={() => commitText(draft)}
-        className={cn("pr-9", inputClassName)}
+        required={required}
+        onChange={(e) => handleChange("d", e.target.value)}
+        onKeyDown={(e) => handleKeyDown("d", e)}
+        onBlur={() => handleBlur("d")}
+        onFocus={(e) => e.currentTarget.select()}
+        onPaste={handlePaste}
       />
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled={disabled}
-            className="absolute right-0.5 top-1/2 h-7 w-7 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label="Ouvrir le calendrier"
-          >
-            <CalendarIcon className="h-4 w-4" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="single"
-            captionLayout="dropdown"
-            selected={selected}
-            defaultMonth={selected ?? new Date()}
-            onSelect={(d) => {
-              if (d) { onChange(toISO(d)); setDraft(toDMY(toISO(d))); setOpen(false); }
-            }}
-            initialFocus
-            className={cn("p-3 pointer-events-auto")}
-          />
-        </PopoverContent>
-      </Popover>
+      <span className={cn("select-none", empty ? "text-muted-foreground" : "text-foreground/60")}>/</span>
+      <input
+        ref={mRef}
+        aria-label="Mois"
+        inputMode="numeric"
+        placeholder="mm"
+        className={cn(segInputBase, "w-5 placeholder:text-muted-foreground")}
+        value={m}
+        disabled={disabled}
+        onChange={(e) => handleChange("m", e.target.value)}
+        onKeyDown={(e) => handleKeyDown("m", e)}
+        onBlur={() => handleBlur("m")}
+        onFocus={(e) => e.currentTarget.select()}
+        onPaste={handlePaste}
+      />
+      <span className={cn("select-none", empty ? "text-muted-foreground" : "text-foreground/60")}>/</span>
+      <input
+        ref={yRef}
+        aria-label="Année"
+        inputMode="numeric"
+        placeholder="aaaa"
+        className={cn(segInputBase, "w-10 placeholder:text-muted-foreground")}
+        value={y}
+        disabled={disabled}
+        onChange={(e) => handleChange("y", e.target.value)}
+        onKeyDown={(e) => handleKeyDown("y", e)}
+        onBlur={() => handleBlur("y")}
+        onFocus={(e) => e.currentTarget.select()}
+        onPaste={handlePaste}
+      />
+      <div className="ml-auto flex items-center">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              disabled={disabled}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label="Ouvrir le calendrier"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              captionLayout="dropdown"
+              selected={selectedDate}
+              defaultMonth={selectedDate ?? new Date()}
+              onSelect={(dt) => {
+                if (dt) {
+                  const iso = isoFromDate(dt);
+                  const p = parseISO(iso)!;
+                  setD(pad(p.d, 2)); setM(pad(p.mo, 2)); setY(pad(p.y, 4));
+                  onChange(iso);
+                  setOpen(false);
+                }
+              }}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }
