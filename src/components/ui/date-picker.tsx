@@ -199,7 +199,7 @@ export function DatePicker({
         required={required}
         onChange={(e) => handleChange("d", e.target.value)}
         onKeyDown={(e) => handleKeyDown("d", e)}
-        onBlur={() => handleBlur("d")}
+        onBlur={(e) => handleBlur("d", e)}
         onFocus={(e) => e.currentTarget.select()}
         onPaste={handlePaste}
       />
@@ -214,7 +214,7 @@ export function DatePicker({
         disabled={disabled}
         onChange={(e) => handleChange("m", e.target.value)}
         onKeyDown={(e) => handleKeyDown("m", e)}
-        onBlur={() => handleBlur("m")}
+        onBlur={(e) => handleBlur("m", e)}
         onFocus={(e) => e.currentTarget.select()}
         onPaste={handlePaste}
       />
@@ -229,7 +229,7 @@ export function DatePicker({
         disabled={disabled}
         onChange={(e) => handleChange("y", e.target.value)}
         onKeyDown={(e) => handleKeyDown("y", e)}
-        onBlur={() => handleBlur("y")}
+        onBlur={(e) => handleBlur("y", e)}
         onFocus={(e) => e.currentTarget.select()}
         onPaste={handlePaste}
       />
