@@ -2270,8 +2270,8 @@ export type Database = {
         | "enveloppe_projet"
         | "enveloppe_emprunt"
         | "debt_incur"
-        | "debt_repay"
-        | "receivable_grant"
+        | "dette"
+        | "creance"
         | "receivable_collect"
       utility_type: "water" | "electricity" | "gas" | "other"
       wallet_status: "active" | "archived" | "closed"
@@ -2448,8 +2448,8 @@ export const Constants = {
         "enveloppe_projet",
         "enveloppe_emprunt",
         "debt_incur",
-        "debt_repay",
-        "receivable_grant",
+        "dette",
+        "creance",
         "receivable_collect",
       ],
       utility_type: ["water", "electricity", "gas", "other"],
