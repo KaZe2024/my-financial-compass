@@ -29,6 +29,7 @@ function CounterpartiesPage() {
 
   const [filters, setFilters] = useState({ name: "", notes: "", group: "all", service: "all", showArchived: false });
   const [editing, setEditing] = useState<any | null>(null);
+  const [historyOf, setHistoryOf] = useState<any | null>(null);
 
   const txs = useQuery({
     queryKey: ["cp_txs", isoDate(period.from), isoDate(period.to)],
