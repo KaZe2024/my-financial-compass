@@ -334,8 +334,8 @@ function TxPage() {
         }
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Field label="Date du"><Input type="date" value={f.fromDate} onChange={(e) => set("fromDate", e.target.value)} /></Field>
-          <Field label="Date au"><Input type="date" value={f.toDate} onChange={(e) => set("toDate", e.target.value)} /></Field>
+          <Field label="Date du"><Input type="date" value={f.fromDate} onChange={(e) => setDate("fromDate", e.target.value)} /></Field>
+          <Field label="Date au"><Input type="date" value={f.toDate} onChange={(e) => setDate("toDate", e.target.value)} /></Field>
           <Field label="Montant MGA min"><Input type="number" step="any" value={f.amountMin} onChange={(e) => set("amountMin", e.target.value)} /></Field>
           <Field label="Montant MGA max"><Input type="number" step="any" value={f.amountMax} onChange={(e) => set("amountMax", e.target.value)} /></Field>
           <Field label="Tiers"><Input value={f.counterparty} onChange={(e) => set("counterparty", e.target.value)} placeholder="Nom contient…" /></Field>
