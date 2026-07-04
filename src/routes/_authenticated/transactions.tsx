@@ -311,6 +311,7 @@ function TxPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [dupForm, setDupForm] = useState<FormState | null>(null);
 
   // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
   // When a wallet filter is active, transfers count with their sign for that wallet.
@@ -542,7 +543,27 @@ function TxPage() {
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
-                            <button title="Dupliquer" onClick={() => duplicate.mutate([t.id])} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                            <button title="Dupliquer" onClick={() => {
+                              const cpName = t.counterparty_id ? ((cps.data ?? []).find((c: any) => c.id === t.counterparty_id)?.name ?? "") : (t.counterparty_label ?? "");
+                              const tagIds = (txTags.data ?? []).filter((r: any) => r.transaction_id === t.id).map((r: any) => r.tag_id);
+                              setDupForm({
+                                type: t.type,
+                                occurred_on: toISODate(new Date()),
+                                description: t.description ?? "",
+                                wallet_id: t.wallet_id ?? "",
+                                to_wallet_id: t.to_wallet_id ?? "",
+                                amount: String(t.amount ?? ""),
+                                currency: t.currency,
+                                exchange_rate: String(t.exchange_rate ?? "1"),
+                                budget_node_id: t.budget_node_id ?? null,
+                                project_id: t.project_id ?? "",
+                                counterparty: cpName,
+                                notes: t.notes ?? "",
+                                tag_ids: tagIds,
+                                debt_id: t.debt_id ?? "",
+                                receivable_id: t.receivable_id ?? "",
+                              });
+                            }} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Copy className="h-3.5 w-3.5" />
                             </button>
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
@@ -587,6 +608,22 @@ function TxPage() {
           pending={bulkEdit.isPending}
         />
       )}
+
+      {dupForm && (
+        <AddTxDialog
+          wallets={wallets.data ?? []}
+          nodes={nodesQ.data ?? []}
+          tags={tags.data ?? []}
+          cps={cps.data ?? []}
+          projects={projects.data ?? []}
+          onDone={() => { setDupForm(null); qc.invalidateQueries(); }}
+          initialForm={dupForm}
+          open={!!dupForm}
+          onOpenChange={(v) => !v && setDupForm(null)}
+          hideTrigger
+          title="Dupliquer la transaction"
+        />
+      )}
     </div>
   );
 }
@@ -625,9 +662,12 @@ async function fetchDebtOrReceivable(userId: string, kind: "debts" | "receivable
   return data ?? [];
 }
 
-function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<FormState>({
+function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
+  const [openInner, setOpenInner] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? !!openProp : openInner;
+  const setOpen = (v: boolean) => { if (isControlled) onOpenChange?.(v); else setOpenInner(v); };
+  const defaultForm: FormState = {
     type: "expense",
     occurred_on: toISODate(new Date()),
     description: "",
@@ -643,7 +683,13 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
     tag_ids: [],
     debt_id: "",
     receivable_id: "",
-  });
+  };
+  const [form, setForm] = useState<FormState>(initialForm ?? defaultForm);
+  // Re-seed the form whenever the dialog opens with a fresh initialForm (duplicate).
+  useEffect(() => {
+    if (open) setForm(initialForm ?? defaultForm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialForm]);
   function set<K extends keyof FormState>(k: K, v: FormState[K]) { setForm(s => ({ ...s, [k]: v })); }
 
   const m = useMutation({
@@ -706,9 +752,11 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Nouvelle transaction</Button></DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Nouvelle transaction</Button></DialogTrigger>
+      )}
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Nouvelle transaction</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{title ?? "Nouvelle transaction"}</DialogTitle></DialogHeader>
         <TxForm form={form} set={set} wallets={wallets} nodes={nodes} tags={tags} cps={cps} projects={projects} onSubmit={() => m.mutate()} pending={m.isPending} />
       </DialogContent>
     </Dialog>
