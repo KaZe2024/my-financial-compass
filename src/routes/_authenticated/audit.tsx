@@ -32,15 +32,17 @@ function AuditPage() {
   const logs = useQuery({
     queryKey: ["audit_log", entity, action, from, to],
     queryFn: async () => {
-      let q = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(500);
-      if (entity !== "all") q = q.eq("entity_type", entity);
-      if (action !== "all") q = q.eq("action", action);
-      if (from) q = q.gte("created_at", from);
-      if (to) q = q.lte("created_at", to + "T23:59:59");
-      const { data } = await q;
-      return data ?? [];
+      return await fetchAllRows<any>((f, t) => {
+        let q = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).range(f, t);
+        if (entity !== "all") q = q.eq("entity_type", entity);
+        if (action !== "all") q = q.eq("action", action);
+        if (from) q = q.gte("created_at", from);
+        if (to) q = q.lte("created_at", to + "T23:59:59");
+        return q;
+      });
     },
   });
+
 
   return (
     <div className="space-y-6">
