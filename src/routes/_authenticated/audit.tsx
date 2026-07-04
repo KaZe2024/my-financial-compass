@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { fmtDate } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
 import { X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/audit")({
