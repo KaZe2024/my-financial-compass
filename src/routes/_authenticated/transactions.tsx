@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
+import { fmtDate, fmtMonth, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transactions")({
@@ -58,6 +58,17 @@ const EMPTY_FILTERS: Filters = {
   keyword: "", notesKw: "", lineId: null, nodeId: null, projectId: "all", tagIds: [],
 };
 
+function clampDateStr(s: string): string {
+  if (!s) return s;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return s;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12) return s;
+  const last = new Date(y, mo, 0).getDate();
+  const cd = Math.min(Math.max(d, 1), last);
+  return `${m[1]}-${m[2]}-${String(cd).padStart(2, "0")}`;
+}
+
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
@@ -82,6 +93,7 @@ function TxPage() {
 
   const [f, setF] = useState<Filters>(EMPTY_FILTERS);
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setF((s) => ({ ...s, [k]: v }));
+  const setDate = (k: "fromDate" | "toDate", v: string) => set(k, clampDateStr(v));
 
   const tags = useQuery({
     queryKey: ["analytical_tags"],
@@ -264,28 +276,40 @@ function TxPage() {
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
-  // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
+  // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
+  // When a wallet filter is active, transfers count with their sign for that wallet.
   const grouped = useMemo(() => {
+    const walletFilter = f.walletId !== "all" ? f.walletId : null;
     const groups = new Map<string, any[]>();
     for (const t of filtered) {
-      const k = String(t.occurred_on).slice(0, 10);
+      const k = String(t.occurred_on).slice(0, 7);
       const arr = groups.get(k) ?? [];
       arr.push(t);
       groups.set(k, arr);
     }
-    return Array.from(groups.entries()).map(([date, rows]) => {
-      let inflow = 0, outflow = 0;
-      for (const t of rows) {
-        if (t.type === "transfer") continue;
-        const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-        const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
-        const signedCash = inCash ? mga : -mga;
-        const isIn = signedCash > 0;
-        if (isIn) inflow += Math.abs(signedCash); else outflow += Math.abs(signedCash);
-      }
-      return { date, rows, inflow, outflow, net: inflow - outflow };
-    });
-  }, [filtered]);
+    return Array.from(groups.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([month, rows]) => {
+        let inflow = 0, outflow = 0;
+        for (const t of rows) {
+          const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+          let signedCash = 0;
+          if (t.type === "transfer") {
+            if (walletFilter) {
+              if (t.to_wallet_id === walletFilter) signedCash = mga;
+              else if (t.wallet_id === walletFilter) signedCash = -mga;
+            }
+          } else {
+            const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+            signedCash = inCash ? mga : -mga;
+          }
+          if (signedCash > 0) inflow += signedCash;
+          else if (signedCash < 0) outflow += Math.abs(signedCash);
+        }
+        return { month, rows, inflow, outflow, net: inflow - outflow };
+      });
+  }, [filtered, f.walletId]);
+
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
@@ -322,8 +346,8 @@ function TxPage() {
         }
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Field label="Date du"><Input type="date" value={f.fromDate} onChange={(e) => set("fromDate", e.target.value)} /></Field>
-          <Field label="Date au"><Input type="date" value={f.toDate} onChange={(e) => set("toDate", e.target.value)} /></Field>
+          <Field label="Date du"><Input type="date" value={f.fromDate} onChange={(e) => setDate("fromDate", e.target.value)} /></Field>
+          <Field label="Date au"><Input type="date" value={f.toDate} onChange={(e) => setDate("toDate", e.target.value)} /></Field>
           <Field label="Montant MGA min"><Input type="number" step="any" value={f.amountMin} onChange={(e) => set("amountMin", e.target.value)} /></Field>
           <Field label="Montant MGA max"><Input type="number" step="any" value={f.amountMax} onChange={(e) => set("amountMax", e.target.value)} /></Field>
           <Field label="Tiers"><Input value={f.counterparty} onChange={(e) => set("counterparty", e.target.value)} placeholder="Nom contient…" /></Field>
@@ -441,10 +465,10 @@ function TxPage() {
             </thead>
             <tbody>
               {grouped.map((g) => (
-                <Fragment key={g.date}>
-                  <tr key={`h-${g.date}`} className="border-t border-border bg-muted/40">
+                <Fragment key={g.month}>
+                  <tr key={`h-${g.month}`} className="border-t border-border bg-muted/40">
                     <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {fmtDate(g.date)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
+                      {fmtMonth(`${g.month}-01`)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
                     </td>
                     <td className={`num px-4 py-1.5 text-right whitespace-nowrap font-semibold ${g.net >= 0 ? "text-positive" : "text-negative"}`}>
                       {fmtMoney(g.net, "MGA", { sign: true })}
@@ -459,7 +483,16 @@ function TxPage() {
                     const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
                     const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
                     const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-                    const signedRow = isTransfer ? 0 : (inCashRow ? mga : -mga);
+                    const walletFilter = f.walletId !== "all" ? f.walletId : null;
+                    let signedRow = 0;
+                    if (isTransfer) {
+                      if (walletFilter) {
+                        if (t.to_wallet_id === walletFilter) signedRow = mga;
+                        else if (t.wallet_id === walletFilter) signedRow = -mga;
+                      }
+                    } else {
+                      signedRow = inCashRow ? mga : -mga;
+                    }
                     const sign = signedRow > 0 ? 1 : signedRow < 0 ? -1 : 0;
                     const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
                     const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
