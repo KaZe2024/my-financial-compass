@@ -58,6 +58,17 @@ const EMPTY_FILTERS: Filters = {
   keyword: "", notesKw: "", lineId: null, nodeId: null, projectId: "all", tagIds: [],
 };
 
+function clampDateStr(s: string): string {
+  if (!s) return s;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return s;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (mo < 1 || mo > 12) return s;
+  const last = new Date(y, mo, 0).getDate();
+  const cd = Math.min(Math.max(d, 1), last);
+  return `${m[1]}-${m[2]}-${String(cd).padStart(2, "0")}`;
+}
+
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
