@@ -95,10 +95,8 @@ export const sendMessage = createServerFn({ method: "POST" })
     try {
       const result = await generateText({
         model: gateway("google/gemini-3-flash-preview"),
-        messages: [
-          { role: "system", content: `${AI_SYSTEM_PROMPT}\n\n${snapshot}` },
-          ...((history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))),
-        ],
+        system: `${AI_SYSTEM_PROMPT}\n\n${snapshot}`,
+        messages: (history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       });
       assistantText = result.text;
     } catch (e: any) {
