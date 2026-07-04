@@ -365,17 +365,7 @@ function TxPage() {
       .map(([month, rows]) => {
         let inflow = 0, outflow = 0;
         for (const t of rows) {
-          const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-          let signedCash = 0;
-          if (t.type === "transfer") {
-            if (walletFilter) {
-              if (t.to_wallet_id === walletFilter) signedCash = mga;
-              else if (t.wallet_id === walletFilter) signedCash = -mga;
-            }
-          } else {
-            const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
-            signedCash = inCash ? mga : -mga;
-          }
+          const signedCash = signedCashImpact(t, walletFilter);
           if (signedCash > 0) inflow += signedCash;
           else if (signedCash < 0) outflow += Math.abs(signedCash);
         }
@@ -419,8 +409,8 @@ function TxPage() {
         }
       >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Field label="Date du"><Input type="date" value={f.fromDate} onChange={(e) => setDate("fromDate", e.target.value)} /></Field>
-          <Field label="Date au"><Input type="date" value={f.toDate} onChange={(e) => setDate("toDate", e.target.value)} /></Field>
+          <Field label="Date du"><DateInput value={f.fromDate} onChange={(v) => setDate("fromDate", v)} /></Field>
+          <Field label="Date au"><DateInput value={f.toDate} onChange={(v) => setDate("toDate", v)} /></Field>
           <Field label="Montant MGA min"><Input type="number" step="any" value={f.amountMin} onChange={(e) => set("amountMin", e.target.value)} /></Field>
           <Field label="Montant MGA max"><Input type="number" step="any" value={f.amountMax} onChange={(e) => set("amountMax", e.target.value)} /></Field>
           <Field label="Tiers"><Input value={f.counterparty} onChange={(e) => set("counterparty", e.target.value)} placeholder="Nom contient…" /></Field>
@@ -551,21 +541,12 @@ function TxPage() {
                     </td>
                   </tr>
                   {g.rows.map((t: any) => {
-                    const inCashRow = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
                     const isTransfer = t.type === "transfer";
                     const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
                     const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
-                    const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+                    const mga = baseAmount(t);
                     const walletFilter = f.walletId !== "all" ? f.walletId : null;
-                    let signedRow = 0;
-                    if (isTransfer) {
-                      if (walletFilter) {
-                        if (t.to_wallet_id === walletFilter) signedRow = mga;
-                        else if (t.wallet_id === walletFilter) signedRow = -mga;
-                      }
-                    } else {
-                      signedRow = inCashRow ? mga : -mga;
-                    }
+                    const signedRow = signedCashImpact(t, walletFilter);
                     const sign = signedRow > 0 ? 1 : signedRow < 0 ? -1 : 0;
                     const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
                     const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
@@ -590,7 +571,7 @@ function TxPage() {
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
                         <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : "text-muted-foreground"}`}>
-                          {isTransfer ? fmtMoney(mga, "MGA") : fmtMoney(Math.abs(signedRow) * (sign || 1), "MGA", { sign: sign !== 0 })}
+                          {isTransfer && !walletFilter ? fmtMoney(0, "MGA") : fmtMoney(signedRow, "MGA", { sign: sign !== 0 })}
                         </td>
                         <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
                         <td className="px-2 py-2 text-right">
@@ -876,7 +857,7 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
             <SelectContent>{TX_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
-        <Field label="Date"><Input type="date" value={form.occurred_on} onChange={(e) => set("occurred_on", e.target.value)} /></Field>
+        <Field label="Date"><DateInput value={form.occurred_on} onChange={(v) => set("occurred_on", v)} /></Field>
       </div>
       <Field label="Description"><Input value={form.description} onChange={(e) => set("description", e.target.value)} required /></Field>
       <Field label="Tiers"><CounterpartyPicker list={cps} value={form.counterparty} onChange={(v) => set("counterparty", v)} /></Field>
@@ -995,7 +976,7 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
         <DialogHeader><DialogTitle>Modifier {count} transaction(s)</DialogTitle></DialogHeader>
         <p className="text-xs text-muted-foreground">Seuls les champs remplis seront appliqués à toutes les lignes sélectionnées.</p>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Date"><Input type="date" value={occurred_on} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Date"><DateInput value={occurred_on} onChange={setDate} /></Field>
           <Field label="Type">
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
