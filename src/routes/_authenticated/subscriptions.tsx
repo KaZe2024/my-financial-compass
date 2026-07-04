@@ -274,7 +274,7 @@ function SubDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing?
             </F>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Prochaine échéance"><Input type="date" value={form.next_billing_date} onChange={(e) => setForm({ ...form, next_billing_date: e.target.value })} /></F>
+            <F label="Prochaine échéance"><DatePicker value={form.next_billing_date} onChange={(__v) => setForm({ ...form, next_billing_date: __v })} /></F>
             <F label="Portefeuille de paiement">
               <Select value={form.wallet_id || "none"} onValueChange={(v) => setForm({ ...form, wallet_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

@@ -35,9 +35,9 @@ export function PeriodPicker({ preset, onPresetChange, custom, onCustomChange, p
       </Select>
       {preset === "custom" && (
         <>
-          <Input type="date" value={custom.from} onChange={(e) => onCustomChange({ ...custom, from: e.target.value })} className="h-8 w-36 text-xs" />
+          <DatePicker value={custom.from} onChange={(__v) => onCustomChange({ ...custom, from: __v })} className="h-8 w-36 text-xs" />
           <span className="text-xs text-muted-foreground">→</span>
-          <Input type="date" value={custom.to} onChange={(e) => onCustomChange({ ...custom, to: e.target.value })} className="h-8 w-36 text-xs" />
+          <DatePicker value={custom.to} onChange={(__v) => onCustomChange({ ...custom, to: __v })} className="h-8 w-36 text-xs" />
         </>
       )}
     </div>

@@ -177,7 +177,7 @@ function ObligationDialog({ editing, table, partyField, partyLabel, tone, wallet
             </Lf>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Lf label="Échéance"><Input type="date" value={form.due} onChange={(e) => setForm({ ...form, due: e.target.value })} /></Lf>
+            <Lf label="Échéance"><DatePicker value={form.due} onChange={(__v) => setForm({ ...form, due: __v })} /></Lf>
             <Lf label="Statut">
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
