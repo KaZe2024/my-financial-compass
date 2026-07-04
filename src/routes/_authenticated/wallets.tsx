@@ -30,45 +30,37 @@ function WalletsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
-  // All transactions in base_amount (MGA) — drives the reference balance.
+  // Last exchange_rate seen per wallet — used only to convert non-MGA wallets to MGA reference.
   const allTx = useQuery({
-    queryKey: ["wallet_tx_mga"],
+    queryKey: ["wallet_tx_rates"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("transactions")
-        .select("type, wallet_id, to_wallet_id, base_amount, amount, exchange_rate, currency")
+        .select("wallet_id, exchange_rate, currency")
+        .not("exchange_rate", "is", null)
         .limit(10000);
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  // Per-wallet MGA balance = opening (converted if not MGA via latest rate seen) + Σ signed base_amount
+  // Per-wallet MGA balance = current_balance (maintained by DB trigger, native currency) × FX to MGA.
   const balancesMga = useMemo(() => {
-    const sums = new Map<string, number>();
     const lastRate = new Map<string, number>();
     for (const t of allTx.data ?? []) {
-      const ba = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-      if (t.type === "transfer") {
-        if (t.wallet_id) sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) - ba);
-        if (t.to_wallet_id) sums.set(t.to_wallet_id, (sums.get(t.to_wallet_id) ?? 0) + ba);
-      } else if (t.wallet_id) {
-        const sign = CASH_IN_TYPES.has(t.type) ? 1 : -1;
-        sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) + sign * ba);
-      }
       if (t.wallet_id && t.exchange_rate) lastRate.set(t.wallet_id, Number(t.exchange_rate));
     }
     const out = new Map<string, number>();
     for (const w of wallets.data ?? []) {
       const rate = w.currency === "MGA" ? 1 : (lastRate.get(w.id) ?? 1);
-      const opening = Number(w.opening_balance) * rate;
-      out.set(w.id, opening + (sums.get(w.id) ?? 0));
+      out.set(w.id, Number(w.current_balance) * rate);
     }
     return out;
   }, [allTx.data, wallets.data]);
 
   const visible = (wallets.data ?? []).filter((w: any) => showArchived || w.status !== "archived");
   const totalMga = visible.filter((w: any) => w.status === "active").reduce((s: number, w: any) => s + (balancesMga.get(w.id) ?? 0), 0);
+
 
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
