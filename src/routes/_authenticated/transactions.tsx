@@ -201,6 +201,35 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const duplicate = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data: u } = await supabase.auth.getUser();
+      const { data: src, error } = await supabase.from("transactions").select("*").in("id", ids);
+      if (error) throw error;
+      const today = toISODate(new Date());
+      const clones = (src ?? []).map((t: any) => {
+        const { id: _id, created_at: _c, updated_at: _up, ...rest } = t;
+        return { ...rest, user_id: u.user!.id, occurred_on: today };
+      });
+      if (!clones.length) return { ids: [] as string[], count: 0 };
+      const { data: ins, error: iErr } = await supabase.from("transactions").insert(clones as any).select("id");
+      if (iErr) throw iErr;
+      // Copy tags
+      const { data: srcTags } = await supabase.from("transaction_tags").select("*").in("transaction_id", ids);
+      if (srcTags && srcTags.length && ins) {
+        const map = new Map<string, string>();
+        (src ?? []).forEach((s: any, i: number) => map.set(s.id, ins[i]?.id));
+        const tagRows = srcTags
+          .map((tt: any) => ({ transaction_id: map.get(tt.transaction_id)!, tag_id: tt.tag_id, user_id: u.user!.id }))
+          .filter((r) => r.transaction_id);
+        if (tagRows.length) await supabase.from("transaction_tags").insert(tagRows);
+      }
+      return { ids: (ins ?? []).map((r: any) => r.id), count: clones.length };
+    },
+    onSuccess: (r) => { qc.invalidateQueries(); toast.success(`${r.count} dupliquée(s)`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
