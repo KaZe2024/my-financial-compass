@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
 import { fmtMoney, fmtDate } from "@/lib/format";
-import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users } from "lucide-react";
+import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
+import { HistoryDialog } from "@/components/history-dialog";
 
 export const Route = createFileRoute("/_authenticated/counterparties")({
   head: () => ({ meta: [{ title: "Tiers — Personal CFO" }] }),
