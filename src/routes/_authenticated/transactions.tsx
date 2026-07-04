@@ -10,6 +10,7 @@ import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -83,45 +84,8 @@ function normalizeCompleteDate(s: string): string | null {
   return clampDateStr(s);
 }
 
-function formatDateInputValue(value: string) {
-  const normalized = normalizeCompleteDate(value);
-  if (!normalized) return value;
-  const [, y, mo, d] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized) ?? [];
-  return y ? `${d}/${mo}/${y}` : value;
-}
-
 function DateInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [draft, setDraft] = useState(() => formatDateInputValue(value));
-  useEffect(() => setDraft(formatDateInputValue(value)), [value]);
-
-  function commit(next: string) {
-    const normalized = normalizeCompleteDate(next);
-    if (normalized) {
-      onChange(normalized);
-      setDraft(formatDateInputValue(normalized));
-    } else if (!next.trim()) {
-      onChange("");
-    }
-  }
-
-  return (
-    <Input
-      type="text"
-      inputMode="numeric"
-      placeholder="jj/mm/aaaa"
-      value={draft}
-      onChange={(e) => { const next = e.target.value; setDraft(next); commit(next); }}
-      onBlur={() => {
-        const normalized = normalizeCompleteDate(draft);
-        if (normalized) {
-          onChange(normalized);
-          setDraft(formatDateInputValue(normalized));
-        } else {
-          setDraft(formatDateInputValue(value));
-        }
-      }}
-    />
-  );
+  return <DatePicker value={value} onChange={onChange} />;
 }
 
 function baseAmount(t: any) {

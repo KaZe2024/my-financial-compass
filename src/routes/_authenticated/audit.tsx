@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/stat-card";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -72,8 +73,8 @@ function AuditPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label>Du</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Au</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Du</Label><DatePicker value={from} onChange={(__v) => setFrom(__v)} /></div>
+          <div className="space-y-1"><Label>Au</Label><DatePicker value={to} onChange={(__v) => setTo(__v)} /></div>
         </div>
       </Panel>
 

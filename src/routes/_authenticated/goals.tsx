@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -212,7 +213,7 @@ function GoalDialog({ editing, nodes, onDone, onClose }: { editing?: any; nodes:
             <F label={form.goal_type === "savings_rate" ? "Cible (%)" : "Cible"}>
               <Input type="number" step="any" value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} required />
             </F>
-            <F label="Échéance"><Input type="date" value={form.target_date} onChange={(e) => setForm({ ...form, target_date: e.target.value })} /></F>
+            <F label="Échéance"><DatePicker value={form.target_date} onChange={(__v) => setForm({ ...form, target_date: __v })} /></F>
           </div>
           {needsPeriod && (
             <F label="Période à surveiller">
@@ -224,8 +225,8 @@ function GoalDialog({ editing, nodes, onDone, onClose }: { editing?: any; nodes:
           )}
           {needsPeriod && form.period_scope === "custom" && (
             <div className="grid grid-cols-2 gap-3">
-              <F label="Du"><Input type="date" value={form.period_start} onChange={(e) => setForm({ ...form, period_start: e.target.value })} /></F>
-              <F label="Au"><Input type="date" value={form.period_end} onChange={(e) => setForm({ ...form, period_end: e.target.value })} /></F>
+              <F label="Du"><DatePicker value={form.period_start} onChange={(__v) => setForm({ ...form, period_start: __v })} /></F>
+              <F label="Au"><DatePicker value={form.period_end} onChange={(__v) => setForm({ ...form, period_end: __v })} /></F>
             </div>
           )}
           {needsNode && (

@@ -6,6 +6,7 @@ import { walletsQO, budgetNodesQO } from "@/lib/queries";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -270,7 +271,7 @@ function AssetDialog({ editingAsset, wallets, onDone, onClose }: { editingAsset?
                 <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </F>
-            <F label="Date d'achat"><Input type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} /></F>
+            <F label="Date d'achat"><DatePicker value={form.purchase_date} onChange={(__v) => setForm({ ...form, purchase_date: __v })} /></F>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <F label="Coût"><Input type="number" step="any" value={form.purchase_value} onChange={(e) => setForm({ ...form, purchase_value: e.target.value })} required /></F>
@@ -449,7 +450,7 @@ function RevalueDialog({ asset, onClose, onDone }: { asset: any; onClose: () => 
         <DialogHeader><DialogTitle>Réévaluer · {asset.name}</DialogTitle></DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
           <F label="Nouvelle valeur"><Input type="number" step="any" value={value} onChange={(e) => setValue(e.target.value)} required /></F>
-          <F label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+          <F label="Date"><DatePicker value={date} onChange={(__v) => setDate(__v)} /></F>
           <F label="Notes"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Commentaire (optionnel)" /></F>
           <DialogFooter><Button type="submit" disabled={m.isPending}>Enregistrer</Button></DialogFooter>
         </form>
@@ -496,7 +497,7 @@ function SellDialog({ asset, wallets, onClose, onDone }: { asset: any; wallets: 
               <SelectContent>{wallets.map((w: any) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
             </Select>
           </F>
-          <F label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+          <F label="Date"><DatePicker value={date} onChange={(__v) => setDate(__v)} /></F>
           <DialogFooter><Button type="submit" disabled={m.isPending}>Enregistrer la vente</Button></DialogFooter>
         </form>
       </DialogContent>

@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Panel, StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -257,7 +258,7 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
           <div className="grid grid-cols-3 gap-3">
             <F label="Montant"><Input type="number" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></F>
             <F label="Devise"><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></F>
-            <F label="Échéance"><Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></F>
+            <F label="Échéance"><DatePicker value={form.due_date} onChange={(__v) => setForm({ ...form, due_date: __v })} /></F>
           </div>
           <F label="Portefeuille cible (paiement futur)">
             <Select value={form.wallet_id || "none"} onValueChange={(v) => setForm({ ...form, wallet_id: v === "none" ? "" : v })}>
@@ -356,7 +357,7 @@ function PayDialog({ prov, wallets, onDone, onClose }: { prov: any; wallets: any
             </Select>
           </F>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Date de paiement"><Input type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} required /></F>
+            <F label="Date de paiement"><DatePicker value={paidOn} onChange={(__v) => setPaidOn(__v)} required /></F>
             <F label="Montant réel"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} required /></F>
           </div>
           <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

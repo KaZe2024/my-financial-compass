@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -188,7 +189,7 @@ function ProjectDialog({ editing, onDone, onClose }: { editing?: any; onDone: ()
                 <SelectContent>{["MGA","EUR","USD","GBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </F>
-            <F label="Date objectif"><Input type="date" value={form.target_date} onChange={(e) => setForm({ ...form, target_date: e.target.value })} /></F>
+            <F label="Date objectif"><DatePicker value={form.target_date} onChange={(__v) => setForm({ ...form, target_date: __v })} /></F>
           </div>
           <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             L'enveloppe et le dépensé se calculent automatiquement à partir des mouvements. Utilisez "Alimenter", "Emprunter" ou "Finaliser" pour créer les transactions.
