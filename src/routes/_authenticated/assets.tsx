@@ -307,3 +307,199 @@ function AssetDialog({ editingAsset, wallets, onDone, onClose }: { editingAsset?
 }
 
 function F({ label, children }: any) { return <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</Label>{children}</div>; }
+
+/**
+ * Génère un événement d'amortissement + une transaction (charge sans portefeuille)
+ * pour chaque mois écoulé depuis l'achat jusqu'à aujourd'hui, dans la limite de la
+ * durée de vie utile. Utilise l'index unique (asset_id, event_type, event_month)
+ * pour éviter les doublons.
+ */
+function AmortDialog({ asset, nodes, onClose, onDone }: { asset: any; nodes: any[]; onClose: () => void; onDone: () => void }) {
+  const [nodeId, setNodeId] = useState<string | null>(null);
+
+  const months = useMemo(() => {
+    const life = Number(asset.useful_life_months ?? 0);
+    const cost = Number(asset.purchase_value ?? 0);
+    if (!life || !asset.purchase_date || cost <= 0) return [] as { month: string; amount: number }[];
+    const monthly = cost / life;
+    const start = new Date(asset.purchase_date);
+    const today = new Date();
+    const out: { month: string; amount: number }[] = [];
+    const first = new Date(start.getFullYear(), start.getMonth(), 1);
+    for (let i = 0; i < life; i++) {
+      const d = new Date(first.getFullYear(), first.getMonth() + i, 1);
+      if (d > today) break;
+      out.push({ month: toISODate(d), amount: monthly });
+    }
+    return out;
+  }, [asset]);
+
+  const existing = useQuery({
+    queryKey: ["ae-existing", asset.id],
+    queryFn: async () => (await supabase.from("asset_events").select("event_month").eq("asset_id", asset.id).eq("event_type", "depreciation")).data ?? [],
+  });
+  const done = new Set((existing.data ?? []).map((r: any) => r.event_month));
+  const pending = months.filter((m) => !done.has(m.month));
+  const totalPending = pending.reduce((s, m) => s + m.amount, 0);
+
+  const run = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user!.id;
+      for (const m of pending) {
+        const { data: tx, error: txErr } = await supabase.from("transactions").insert({
+          user_id: uid,
+          type: "expense",
+          occurred_on: m.month,
+          description: `Amortissement · ${asset.name}`,
+          wallet_id: null,
+          amount: m.amount,
+          currency: asset.currency ?? "MGA",
+          exchange_rate: 1,
+          base_amount: m.amount,
+          budget_node_id: nodeId,
+          asset_id: asset.id,
+          source_kind: "asset",
+          source_id: asset.id,
+          notes: `Dotation aux amortissements (linéaire)`,
+        } as any).select().single();
+        if (txErr) throw txErr;
+        const { error } = await supabase.from("asset_events").insert({
+          user_id: uid,
+          asset_id: asset.id,
+          event_type: "depreciation",
+          event_date: m.month,
+          event_month: m.month,
+          amount: m.amount,
+          transaction_id: tx.id,
+          notes: `Amortissement mensuel ${m.month.slice(0, 7)}`,
+        } as any);
+        if (error) throw error;
+      }
+      // Baisse la valeur courante
+      const currentVal = Math.max(0, Number(asset.current_value) - totalPending);
+      await supabase.from("assets").update({ current_value: currentVal }).eq("id", asset.id);
+    },
+    onSuccess: () => { toast.success(`${pending.length} amortissement(s) générés`); onDone(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Amortissements rétroactifs · {asset.name}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <F label="Catégorie budgétaire · Amortissement">
+            <NodePicker nodes={nodes} value={nodeId} onChange={setNodeId} placeholder="Sélectionner…" />
+          </F>
+          <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+            <p><strong>{pending.length}</strong> mois à générer (sur {months.length}), pour un total de <strong>{fmtMoney(totalPending, asset.currency)}</strong>.</p>
+            {done.size > 0 && <p className="mt-1 text-muted-foreground">{done.size} mois déjà passés — ignorés (contrainte d'unicité).</p>}
+          </div>
+          <div className="scroll-thin max-h-48 overflow-y-auto rounded-md border border-border/60">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 text-left font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                <tr><th className="px-2 py-1">Mois</th><th className="px-2 py-1 text-right">Dotation</th><th className="px-2 py-1">Statut</th></tr>
+              </thead>
+              <tbody>
+                {months.map((m) => (
+                  <tr key={m.month} className="border-t border-border/60">
+                    <td className="px-2 py-1 font-mono">{m.month.slice(0, 7)}</td>
+                    <td className="num px-2 py-1 text-right">{fmtMoney(m.amount, asset.currency)}</td>
+                    <td className="px-2 py-1 text-muted-foreground">{done.has(m.month) ? "déjà passé" : "à générer"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={onClose}>Annuler</Button>
+            <Button disabled={run.isPending || pending.length === 0 || !nodeId} onClick={() => run.mutate()}>
+              Générer {pending.length} écriture{pending.length > 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RevalueDialog({ asset, onClose, onDone }: { asset: any; onClose: () => void; onDone: () => void }) {
+  const [value, setValue] = useState<string>(String(asset.current_value ?? ""));
+  const [date, setDate] = useState<string>(toISODate(new Date()));
+  const [notes, setNotes] = useState<string>("");
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const newVal = Number(value);
+      const delta = newVal - Number(asset.current_value);
+      await supabase.from("assets").update({ current_value: newVal }).eq("id", asset.id);
+      await supabase.from("asset_events").insert({
+        user_id: u.user!.id, asset_id: asset.id,
+        event_type: delta >= 0 ? "revaluation" : "impairment",
+        event_date: date, amount: delta, notes: notes || (delta >= 0 ? "Réévaluation" : "Dépréciation exceptionnelle"),
+      } as any);
+    },
+    onSuccess: () => { toast.success("Réévaluation enregistrée"); onDone(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Réévaluer · {asset.name}</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
+          <F label="Nouvelle valeur"><Input type="number" step="any" value={value} onChange={(e) => setValue(e.target.value)} required /></F>
+          <F label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+          <F label="Notes"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Commentaire (optionnel)" /></F>
+          <DialogFooter><Button type="submit" disabled={m.isPending}>Enregistrer</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SellDialog({ asset, wallets, onClose, onDone }: { asset: any; wallets: any[]; onClose: () => void; onDone: () => void }) {
+  const [price, setPrice] = useState<string>(String(asset.current_value ?? ""));
+  const [walletId, setWalletId] = useState<string>("");
+  const [date, setDate] = useState<string>(toISODate(new Date()));
+  const m = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user!.id;
+      const amt = Number(price);
+      const { data: tx, error: txErr } = await supabase.from("transactions").insert({
+        user_id: uid, type: "asset_sale", occurred_on: date,
+        description: `Vente actif · ${asset.name}`,
+        wallet_id: walletId || null,
+        amount: amt, currency: asset.currency ?? "MGA", exchange_rate: 1, base_amount: amt,
+        asset_id: asset.id, source_kind: "asset", source_id: asset.id,
+      } as any).select().single();
+      if (txErr) throw txErr;
+      await supabase.from("asset_events").insert({
+        user_id: uid, asset_id: asset.id, event_type: "sale",
+        event_date: date, amount: amt, transaction_id: tx.id,
+      } as any);
+      await supabase.from("assets").update({ status: "sold", current_value: 0 }).eq("id", asset.id);
+    },
+    onSuccess: () => { toast.success("Actif vendu"); onDone(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Vendre · {asset.name}</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); if (!walletId) { toast.error("Choisissez un portefeuille"); return; } m.mutate(); }} className="space-y-3">
+          <F label="Prix de vente"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} required /></F>
+          <F label="Portefeuille encaisseur">
+            <Select value={walletId} onValueChange={setWalletId}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>{wallets.map((w: any) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </F>
+          <F label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+          <DialogFooter><Button type="submit" disabled={m.isPending}>Enregistrer la vente</Button></DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
