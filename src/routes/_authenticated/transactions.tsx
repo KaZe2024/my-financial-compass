@@ -155,7 +155,20 @@ function TxPage() {
 
   const txTags = useQuery({
     queryKey: ["tx_tags_all"],
-    queryFn: async () => (await supabase.from("transaction_tags").select("transaction_id,tag_id")).data ?? [],
+    queryFn: async () => {
+      const rows: { transaction_id: string; tag_id: string }[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("transaction_tags")
+          .select("transaction_id,tag_id")
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      return rows;
+    },
   });
   const tagIdsByTx = useMemo(() => {
     const m = new Map<string, string[]>();
