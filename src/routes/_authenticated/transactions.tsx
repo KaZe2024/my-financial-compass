@@ -849,14 +849,14 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
           <Field label="Dette (laisser vide = créer)">
             <Select value={form.debt_id} onValueChange={(v) => set("debt_id", v)}>
               <SelectTrigger><SelectValue placeholder="Nouvelle dette" /></SelectTrigger>
-              <SelectContent>{(debtsQ.data ?? []).map((d: any) => <SelectItem key={d.id} value={d.id}>{d.creditor} · {fmtMoney(Number(d.outstanding), d.currency)}</SelectItem>)}</SelectContent>
+              <SelectContent>{(debtsQ.data ?? []).map((d: any) => <SelectItem key={d.id} value={d.id}>{d.creditor}{d.description ? ` — ${d.description}` : ""}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
         ) : isRec ? (
           <Field label="Créance (laisser vide = créer)">
             <Select value={form.receivable_id} onValueChange={(v) => set("receivable_id", v)}>
               <SelectTrigger><SelectValue placeholder="Nouvelle créance" /></SelectTrigger>
-              <SelectContent>{(recsQ.data ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.debtor} · {fmtMoney(Number(r.outstanding), r.currency)}</SelectItem>)}</SelectContent>
+              <SelectContent>{(recsQ.data ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.debtor}{r.description ? ` — ${r.description}` : ""}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
         ) : (
