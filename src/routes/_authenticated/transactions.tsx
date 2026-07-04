@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X, CheckSquare, Square } from "lucide-react";
+import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
@@ -27,13 +27,13 @@ export const Route = createFileRoute("/_authenticated/transactions")({
 const TX_TYPES = [
   "expense","income","transfer","investment","asset_purchase","asset_sale","adjustment",
   "enveloppe_projet","enveloppe_emprunt",
-  "debt_incur","debt_repay","receivable_grant","receivable_collect",
+  "dette","creance",
 ] as const;
 const CURRENCIES = ["MGA","EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
 const PROJECT_TYPES = new Set(["investment","enveloppe_projet","enveloppe_emprunt"]);
-const DEBT_TYPES = new Set(["debt_incur","debt_repay"]);
-const RECEIVABLE_TYPES = new Set(["receivable_grant","receivable_collect"]);
-const NO_BUDGET_TYPES = new Set(["transfer","debt_incur","debt_repay","receivable_grant","receivable_collect"]);
+const DEBT_TYPES = new Set(["dette"]);
+const RECEIVABLE_TYPES = new Set(["creance"]);
+const NO_BUDGET_TYPES = new Set(["transfer","dette","creance"]);
 
 type Filters = {
   fromDate: string;
