@@ -40,6 +40,7 @@ export function ObligationsPage(props: {
   const total = visible.filter((r: any) => r.status !== "settled" && r.status !== "cancelled").reduce((s: number, r: any) => s + Number(r.outstanding), 0);
 
   const [editing, setEditing] = useState<any | null>(null);
+  const [historyOf, setHistoryOf] = useState<any | null>(null);
 
   return (
     <div className="space-y-6">
