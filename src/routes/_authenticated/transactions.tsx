@@ -457,6 +457,9 @@ function TxPage() {
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
+                            <button title="Dupliquer" onClick={() => duplicate.mutate([t.id])} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
