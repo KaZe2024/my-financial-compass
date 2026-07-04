@@ -248,8 +248,10 @@ function TxPage() {
       for (const t of rows) {
         if (t.type === "transfer") continue;
         const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-        const isIn = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt";
-        if (isIn) inflow += mga; else outflow += mga;
+        const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+        const signedCash = inCash ? mga : -mga;
+        const isIn = signedCash > 0;
+        if (isIn) inflow += Math.abs(signedCash); else outflow += Math.abs(signedCash);
       }
       return { date, rows, inflow, outflow, net: inflow - outflow };
     });
