@@ -35,6 +35,7 @@ import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
 import { Route as AuthenticatedAiRouteImport } from './routes/_authenticated/ai'
+import { Route as ApiPublicSignupOpenRouteImport } from './routes/api/public/signup-open'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -169,6 +170,11 @@ const AuthenticatedAiRoute = AuthenticatedAiRouteImport.update({
   path: '/ai',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicSignupOpenRoute = ApiPublicSignupOpenRouteImport.update({
+  id: '/api/public/signup-open',
+  path: '/api/public/signup-open',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -196,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
+  '/api/public/signup-open': typeof ApiPublicSignupOpenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
+  '/api/public/signup-open': typeof ApiPublicSignupOpenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -252,6 +260,7 @@ export interface FileRoutesById {
   '/_authenticated/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/_authenticated/wallets': typeof AuthenticatedWalletsRoute
+  '/api/public/signup-open': typeof ApiPublicSignupOpenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -281,6 +290,7 @@ export interface FileRouteTypes {
     | '/subscriptions'
     | '/transactions'
     | '/wallets'
+    | '/api/public/signup-open'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/subscriptions'
     | '/transactions'
     | '/wallets'
+    | '/api/public/signup-open'
   id:
     | '__root__'
     | '/'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/_authenticated/subscriptions'
     | '/_authenticated/transactions'
     | '/_authenticated/wallets'
+    | '/api/public/signup-open'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -343,6 +355,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicSignupOpenRoute: typeof ApiPublicSignupOpenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -529,6 +542,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/signup-open': {
+      id: '/api/public/signup-open'
+      path: '/api/public/signup-open'
+      fullPath: '/api/public/signup-open'
+      preLoaderRoute: typeof ApiPublicSignupOpenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -590,6 +610,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicSignupOpenRoute: ApiPublicSignupOpenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
