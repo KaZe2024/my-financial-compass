@@ -165,7 +165,55 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkDel = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await supabase.from("transaction_tags").delete().in("transaction_id", ids);
+      const { error } = await supabase.from("transactions").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
+
+  // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
+  const grouped = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const t of filtered) {
+      const k = String(t.occurred_on).slice(0, 10);
+      const arr = groups.get(k) ?? [];
+      arr.push(t);
+      groups.set(k, arr);
+    }
+    return Array.from(groups.entries()).map(([date, rows]) => {
+      let inflow = 0, outflow = 0;
+      for (const t of rows) {
+        if (t.type === "transfer") continue;
+        const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+        const isIn = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt";
+        if (isIn) inflow += mga; else outflow += mga;
+      }
+      return { date, rows, inflow, outflow, net: inflow - outflow };
+    });
+  }, [filtered]);
+
+  const totals = useMemo(() => {
+    let inflow = 0, outflow = 0;
+    for (const g of grouped) { inflow += g.inflow; outflow += g.outflow; }
+    return { inflow, outflow, net: inflow - outflow };
+  }, [grouped]);
+
+  const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id));
+  function toggleAll() {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(allVisibleIds));
+  }
+  function toggleOne(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
 
   return (
     <div className="space-y-6">
