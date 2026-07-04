@@ -242,19 +242,20 @@ function TxPage() {
   });
 
   const bulkEdit = useMutation({
-    mutationFn: async ({ ids, patch, tagIdsAdd }: { ids: string[]; patch: Record<string, any>; tagIdsAdd: string[] }) => {
+    mutationFn: async ({ ids, patch, tagIdsSet }: { ids: string[]; patch: Record<string, any>; tagIdsSet: string[] | null }) => {
       if (Object.keys(patch).length) {
         for (const c of chunk(ids)) {
           const { error } = await supabase.from("transactions").update(patch as any).in("id", c);
           if (error) throw error;
         }
       }
-      if (tagIdsAdd.length) {
-        const { data: u } = await supabase.auth.getUser();
+      if (tagIdsSet !== null) {
+        const { data: u, error: uErr } = await supabase.auth.getUser();
+        if (uErr || !u.user) throw uErr ?? new Error("Utilisateur non authentifié");
         for (const c of chunk(ids)) {
-          const { error: dErr } = await supabase.from("transaction_tags").delete().in("transaction_id", c).in("tag_id", tagIdsAdd);
+          const { error: dErr } = await supabase.from("transaction_tags").delete().in("transaction_id", c);
           if (dErr) throw dErr;
-          const rows = c.flatMap((tid) => tagIdsAdd.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
+          const rows = c.flatMap((tid) => tagIdsSet.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
           for (const rc of chunk(rows, 500)) {
             const { error: iErr } = await supabase.from("transaction_tags").insert(rc);
             if (iErr) throw iErr;
@@ -604,7 +605,7 @@ function TxPage() {
           tags={tags.data ?? []}
           projects={projects.data ?? []}
           onClose={() => setBulkEditOpen(false)}
-          onSubmit={(patch, tagIdsAdd) => bulkEdit.mutate({ ids: Array.from(selected), patch, tagIdsAdd })}
+          onSubmit={(patch, tagIdsSet) => bulkEdit.mutate({ ids: Array.from(selected), patch, tagIdsSet })}
           pending={bulkEdit.isPending}
         />
       )}
@@ -955,7 +956,7 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
   tags: any[];
   projects: any[];
   onClose: () => void;
-  onSubmit: (patch: Record<string, any>, tagIdsAdd: string[]) => void;
+  onSubmit: (patch: Record<string, any>, tagIdsSet: string[] | null) => void;
   pending: boolean;
 }) {
   const [occurred_on, setDate] = useState("");
@@ -964,7 +965,8 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
   const [budget_node_id, setNode] = useState<string | null>(null);
   const [project_id, setProject] = useState("");
   const [notes, setNotes] = useState("");
-  const [addTags, setAddTags] = useState<string[]>([]);
+  const [bulkTags, setBulkTags] = useState<string[]>([]);
+  const [tagsTouched, setTagsTouched] = useState(false);
 
   function submit() {
     const patch: Record<string, any> = {};
@@ -974,11 +976,11 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
     if (budget_node_id !== null) patch.budget_node_id = budget_node_id;
     if (project_id) patch.project_id = project_id === "__null__" ? null : project_id;
     if (notes) patch.notes = notes;
-    if (Object.keys(patch).length === 0 && addTags.length === 0) {
+    if (Object.keys(patch).length === 0 && !tagsTouched) {
       toast.error("Aucun champ à modifier");
       return;
     }
-    onSubmit(patch, addTags);
+    onSubmit(patch, tagsTouched ? bulkTags : null);
   }
 
   return (
@@ -1023,8 +1025,13 @@ function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubm
             <Field label="Notes (remplace)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></Field>
           </div>
           <div className="col-span-2">
-            <Field label="Ajouter des tags">
-              <TagManager tags={tags} value={addTags} onChange={setAddTags} allowManage={false} />
+            <Field label="Tags (remplace)">
+              <TagManager
+                tags={tags}
+                value={bulkTags}
+                onChange={(ids) => { setTagsTouched(true); setBulkTags(ids); }}
+                allowManage={false}
+              />
             </Field>
           </div>
         </div>
