@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PeriodPreset } from "@/lib/period";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type Props = {
   preset: PeriodPreset;
