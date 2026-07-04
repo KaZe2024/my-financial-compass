@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Wallet as WalletIcon, ArrowLeftRight, Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 import { fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/wallets")({
   head: () => ({ meta: [{ title: "Portefeuilles — Personal CFO" }] }),
