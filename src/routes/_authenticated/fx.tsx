@@ -26,18 +26,20 @@ function FxPage() {
   const txs = useQuery({
     queryKey: ["fx_txs", currency, isoDate(period.from), isoDate(period.to)],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("occurred_on, currency, exchange_rate")
-        .eq("currency", currency)
-        .gte("occurred_on", isoDate(period.from))
-        .lte("occurred_on", isoDate(period.to))
-        .order("occurred_on", { ascending: true })
-        .limit(5000);
-      if (error) throw error;
-      return (data ?? []).filter((r: any) => Number(r.exchange_rate) > 0);
+      const data = await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("occurred_on, currency, exchange_rate")
+          .eq("currency", currency)
+          .gte("occurred_on", isoDate(period.from))
+          .lte("occurred_on", isoDate(period.to))
+          .order("occurred_on", { ascending: true })
+          .range(from, to),
+      );
+      return data.filter((r: any) => Number(r.exchange_rate) > 0);
     },
   });
+
 
   // Aggregate per day (mean)
   const series = useMemo(() => {
