@@ -20,6 +20,7 @@ export const Route = createFileRoute("/_authenticated/wallets")({
 
 const TYPES = ["cash","hidden_cash","bank","mobile_money","savings","investment","project_fund","other"] as const;
 const CURRENCIES = ["MGA","EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
+const CASH_IN_TYPES = new Set(["income","asset_sale","adjustment","enveloppe_emprunt","dette"]);
 
 function WalletsPage() {
   const qc = useQueryClient();
@@ -36,7 +37,7 @@ function WalletsPage() {
       const { data, error } = await supabase
         .from("transactions")
         .select("type, wallet_id, to_wallet_id, base_amount, amount, exchange_rate, currency")
-        .limit(5000);
+        .limit(10000);
       if (error) throw error;
       return data ?? [];
     },
@@ -52,7 +53,7 @@ function WalletsPage() {
         if (t.wallet_id) sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) - ba);
         if (t.to_wallet_id) sums.set(t.to_wallet_id, (sums.get(t.to_wallet_id) ?? 0) + ba);
       } else if (t.wallet_id) {
-        const sign = t.type === "income" || t.type === "asset_sale" || t.type === "adjustment" ? 1 : -1;
+        const sign = CASH_IN_TYPES.has(t.type) ? 1 : -1;
         sums.set(t.wallet_id, (sums.get(t.wallet_id) ?? 0) + sign * ba);
       }
       if (t.wallet_id && t.exchange_rate) lastRate.set(t.wallet_id, Number(t.exchange_rate));
