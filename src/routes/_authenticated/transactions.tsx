@@ -175,7 +175,7 @@ function TxPage() {
     }
     return m;
   }, [txTags.data]);
-  const tagNameById = useMemo(() => new Map((tags.data ?? []).map((t: any) => [t.id, t.name])), [tags.data]);
+  const tagNameById = useMemo(() => new Map<string, string>((tags.data ?? []).map((t: any) => [t.id as string, t.name as string])), [tags.data]);
 
   const filtered = useMemo(() => {
     const kw = f.keyword.trim().toLowerCase();
