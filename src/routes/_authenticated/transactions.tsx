@@ -804,11 +804,11 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
   // Fetch debts/receivables when needed
   const debtsQ = useQuery({
     queryKey: ["debts", "for-tx"], enabled: isDebt,
-    queryFn: async () => (await supabase.from("debts").select("id, creditor, outstanding, currency").neq("status","cancelled")).data ?? [],
+    queryFn: async () => (await supabase.from("debts").select("id, creditor, description, outstanding, currency").neq("status","cancelled")).data ?? [],
   });
   const recsQ = useQuery({
     queryKey: ["receivables", "for-tx"], enabled: isRec,
-    queryFn: async () => (await supabase.from("receivables").select("id, debtor, outstanding, currency").neq("status","cancelled")).data ?? [],
+    queryFn: async () => (await supabase.from("receivables").select("id, debtor, description, outstanding, currency").neq("status","cancelled")).data ?? [],
   });
 
   return (
