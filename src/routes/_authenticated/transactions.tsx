@@ -715,9 +715,11 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Nouvelle transaction</Button></DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" /> Nouvelle transaction</Button></DialogTrigger>
+      )}
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Nouvelle transaction</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{title ?? "Nouvelle transaction"}</DialogTitle></DialogHeader>
         <TxForm form={form} set={set} wallets={wallets} nodes={nodes} tags={tags} cps={cps} projects={projects} onSubmit={() => m.mutate()} pending={m.isPending} />
       </DialogContent>
     </Dialog>
