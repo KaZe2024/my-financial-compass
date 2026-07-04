@@ -424,10 +424,13 @@ function TxPage() {
                     </td>
                   </tr>
                   {g.rows.map((t: any) => {
-                    const sign = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt" ? 1 : t.type === "transfer" ? 0 : -1;
+                    const inCashRow = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+                    const isTransfer = t.type === "transfer";
                     const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
                     const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
                     const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+                    const signedRow = isTransfer ? 0 : (inCashRow ? mga : -mga);
+                    const sign = signedRow > 0 ? 1 : signedRow < 0 ? -1 : 0;
                     const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
                     const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
                     const isSel = selected.has(t.id);
