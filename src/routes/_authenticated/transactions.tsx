@@ -356,6 +356,9 @@ function TxPage() {
               <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
                 <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
               </Button>
+              <Button variant="outline" size="sm" disabled={duplicate.isPending} onClick={() => duplicate.mutate(Array.from(selected))}>
+                <Copy className="mr-1 h-3.5 w-3.5" /> Dupliquer
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
