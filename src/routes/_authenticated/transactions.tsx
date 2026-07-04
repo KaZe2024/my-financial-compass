@@ -453,8 +453,8 @@ function TxPage() {
                           </div>
                         </td>
                         <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
-                        <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
-                          {fmtMoney(Math.abs(signedRow) * (sign || 1), "MGA", { sign: sign !== 0 })}
+                        <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : "text-muted-foreground"}`}>
+                          {isTransfer ? fmtMoney(mga, "MGA") : fmtMoney(Math.abs(signedRow) * (sign || 1), "MGA", { sign: sign !== 0 })}
                         </td>
                         <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
                         <td className="px-2 py-2 text-right">
