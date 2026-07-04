@@ -166,6 +166,25 @@ function DataPage() {
             </div>
           </Panel>
 
+          <Panel title="CSV — Par module (libellés lisibles)">
+            <p className="mb-3 text-xs text-muted-foreground">Un fichier .csv par module, avec libellés à la place des identifiants techniques. Idéal pour éditer puis réimporter.</p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {TABLES.map((t) => (
+                <Button key={t.id} variant="outline" onClick={async () => {
+                  try {
+                    const labelize = await buildLabelizer();
+                    const rows = labelize(await fetchAll(t.id));
+                    if (!rows.length) { toast.info("Aucune donnée"); return; }
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    const csv = XLSX.utils.sheet_to_csv(ws);
+                    downloadBlob(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }), `${t.id}-${new Date().toISOString().slice(0, 10)}.csv`);
+                    toast.success(`${t.label} CSV exporté`);
+                  } catch (e: any) { toast.error(e.message); }
+                }}>{t.label}</Button>
+              ))}
+            </div>
+          </Panel>
+
           <Panel title="PDF — Récap rapide">
             <p className="mb-3 text-xs text-muted-foreground">Génère un PDF listant le compte de chaque module.</p>
             <Button variant="outline" onClick={async () => {

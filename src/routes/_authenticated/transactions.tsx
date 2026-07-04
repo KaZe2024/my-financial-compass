@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Fragment } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { walletsQO, budgetNodesQO, counterpartiesQO, projectsQO } from "@/lib/queries";
 import { NodePicker } from "@/components/node-picker";
@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, CheckSquare, Square } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -164,7 +165,55 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkDel = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await supabase.from("transaction_tags").delete().in("transaction_id", ids);
+      const { error } = await supabase.from("transactions").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
+
+  // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
+  const grouped = useMemo(() => {
+    const groups = new Map<string, any[]>();
+    for (const t of filtered) {
+      const k = String(t.occurred_on).slice(0, 10);
+      const arr = groups.get(k) ?? [];
+      arr.push(t);
+      groups.set(k, arr);
+    }
+    return Array.from(groups.entries()).map(([date, rows]) => {
+      let inflow = 0, outflow = 0;
+      for (const t of rows) {
+        if (t.type === "transfer") continue;
+        const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+        const isIn = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt";
+        if (isIn) inflow += mga; else outflow += mga;
+      }
+      return { date, rows, inflow, outflow, net: inflow - outflow };
+    });
+  }, [filtered]);
+
+  const totals = useMemo(() => {
+    let inflow = 0, outflow = 0;
+    for (const g of grouped) { inflow += g.inflow; outflow += g.outflow; }
+    return { inflow, outflow, net: inflow - outflow };
+  }, [grouped]);
+
+  const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
+  const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id) => selected.has(id));
+  function toggleAll() {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(allVisibleIds));
+  }
+  function toggleOne(id: string) {
+    setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
 
   return (
     <div className="space-y-6">
@@ -242,11 +291,40 @@ function TxPage() {
         </div>
       </Panel>
 
-      <Panel title={`${filtered.length} mouvements`}>
+      <Panel
+        title={`${filtered.length} mouvements`}
+        action={
+          selected.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={bulkDel.isPending}
+                onClick={() => { if (confirm(`Supprimer ${selected.size} transaction(s) ?`)) bulkDel.mutate(Array.from(selected)); }}
+              >
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Supprimer
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Annuler</Button>
+            </div>
+          ) : (
+            <div className="flex gap-4 font-mono text-[10px] uppercase tracking-widest">
+              <span className="text-positive">+ {fmtMoney(totals.inflow, "MGA")}</span>
+              <span className="text-negative">− {fmtMoney(totals.outflow, "MGA")}</span>
+              <span className={totals.net >= 0 ? "text-positive" : "text-negative"}>Net {fmtMoney(totals.net, "MGA", { sign: true })}</span>
+            </div>
+          )
+        }
+      >
         <div className="scroll-thin -mx-4 overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-sm">
+          <table className="w-full min-w-[1240px] text-sm">
             <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               <tr>
+                <th className="px-3 py-2 w-8">
+                  <button onClick={toggleAll} title={allSelected ? "Tout désélectionner" : "Tout sélectionner"} className="text-muted-foreground hover:text-foreground">
+                    {allSelected ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                  </button>
+                </th>
                 <th className="px-4 py-2">Date</th>
                 <th className="px-4 py-2">Type</th>
                 <th className="px-4 py-2">Description</th>
@@ -260,47 +338,66 @@ function TxPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t: any) => {
-                const sign = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt" ? 1 : t.type === "transfer" ? 0 : -1;
-                const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
-                const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
-                const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-                const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
-                const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
-                return (
-                  <tr key={t.id} className="border-t border-border/60 hover:bg-muted/40 align-top">
-                    <td className="num px-4 py-2 text-muted-foreground whitespace-nowrap">{fmtDate(t.occurred_on)}</td>
-                    <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">{t.type}</span></td>
-                    <td className="px-4 py-2">
-                      {t.description}
-                      {proj && <div className="text-[10px] text-muted-foreground">↳ {proj}</div>}
+              {grouped.map((g) => (
+                <Fragment key={g.date}>
+                  <tr key={`h-${g.date}`} className="border-t border-border bg-muted/40">
+                    <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {fmtDate(g.date)} · {g.rows.length} mvt{g.rows.length > 1 ? "s" : ""}
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{cpName ?? "—"}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{info?.name ?? "—"}</td>
-                    <td className="px-4 py-2">
-                      <div className="flex flex-wrap gap-1">
-                        {tList.map((n) => <span key={n} className="rounded-sm bg-accent/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent">{n}</span>)}
-                      </div>
+                    <td className={`num px-4 py-1.5 text-right whitespace-nowrap font-semibold ${g.net >= 0 ? "text-positive" : "text-negative"}`}>
+                      {fmtMoney(g.net, "MGA", { sign: true })}
                     </td>
-                    <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
-                    <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
-                      {fmtMoney(mga * (sign || 1), "MGA", { sign: sign !== 0 })}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
-                    <td className="px-2 py-2 text-right">
-                      <div className="flex justify-end gap-0.5 text-muted-foreground">
-                        <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                    <td colSpan={2} className="px-4 py-1.5 text-right font-mono text-[10px] text-muted-foreground">
+                      <span className="text-positive">+{fmtMoney(g.inflow, "MGA")}</span> · <span className="text-negative">−{fmtMoney(g.outflow, "MGA")}</span>
                     </td>
                   </tr>
-                );
-              })}
-              {filtered.length === 0 && <tr><td colSpan={10} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
+                  {g.rows.map((t: any) => {
+                    const sign = t.type === "income" || t.type === "asset_sale" || t.type === "enveloppe_emprunt" ? 1 : t.type === "transfer" ? 0 : -1;
+                    const tList = (tagIdsByTx.get(t.id) ?? []).map((id) => tagNameById.get(id) ?? "?");
+                    const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
+                    const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+                    const cpName = t.counterparty_id ? (cpById.get(t.counterparty_id) as any)?.name : t.counterparty_label;
+                    const proj = t.project_id ? (projectById.get(t.project_id) as any)?.name : null;
+                    const isSel = selected.has(t.id);
+                    return (
+                      <tr key={t.id} className={`border-t border-border/60 hover:bg-muted/40 align-top ${isSel ? "bg-primary/5" : ""}`}>
+                        <td className="px-3 py-2">
+                          <Checkbox checked={isSel} onCheckedChange={() => toggleOne(t.id)} />
+                        </td>
+                        <td className="num px-4 py-2 text-muted-foreground whitespace-nowrap">{fmtDate(t.occurred_on)}</td>
+                        <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">{t.type}</span></td>
+                        <td className="px-4 py-2">
+                          {t.description}
+                          {proj && <div className="text-[10px] text-muted-foreground">↳ {proj}</div>}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">{cpName ?? "—"}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{info?.name ?? "—"}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {tList.map((n) => <span key={n} className="rounded-sm bg-accent/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-accent">{n}</span>)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">{t.type === "transfer" ? `${t.wallets?.name ?? "?"} → ${t.to?.name ?? "?"}` : t.wallets?.name ?? "—"}</td>
+                        <td className={`num px-4 py-2 text-right whitespace-nowrap ${sign > 0 ? "text-positive" : sign < 0 ? "text-negative" : ""}`}>
+                          {fmtMoney(mga * (sign || 1), "MGA", { sign: sign !== 0 })}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
+                        <td className="px-2 py-2 text-right">
+                          <div className="flex justify-end gap-0.5 text-muted-foreground">
+                            <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </Fragment>
+              ))}
+              {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
             </tbody>
           </table>
         </div>
