@@ -276,28 +276,40 @@ function TxPage() {
   const [editingTx, setEditingTx] = useState<any | null>(null);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
-  // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
+  // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
+  // When a wallet filter is active, transfers count with their sign for that wallet.
   const grouped = useMemo(() => {
+    const walletFilter = f.walletId !== "all" ? f.walletId : null;
     const groups = new Map<string, any[]>();
     for (const t of filtered) {
-      const k = String(t.occurred_on).slice(0, 10);
+      const k = String(t.occurred_on).slice(0, 7);
       const arr = groups.get(k) ?? [];
       arr.push(t);
       groups.set(k, arr);
     }
-    return Array.from(groups.entries()).map(([date, rows]) => {
-      let inflow = 0, outflow = 0;
-      for (const t of rows) {
-        if (t.type === "transfer") continue;
-        const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
-        const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
-        const signedCash = inCash ? mga : -mga;
-        const isIn = signedCash > 0;
-        if (isIn) inflow += Math.abs(signedCash); else outflow += Math.abs(signedCash);
-      }
-      return { date, rows, inflow, outflow, net: inflow - outflow };
-    });
-  }, [filtered]);
+    return Array.from(groups.entries())
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([month, rows]) => {
+        let inflow = 0, outflow = 0;
+        for (const t of rows) {
+          const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+          let signedCash = 0;
+          if (t.type === "transfer") {
+            if (walletFilter) {
+              if (t.to_wallet_id === walletFilter) signedCash = mga;
+              else if (t.wallet_id === walletFilter) signedCash = -mga;
+            }
+          } else {
+            const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(t.type);
+            signedCash = inCash ? mga : -mga;
+          }
+          if (signedCash > 0) inflow += signedCash;
+          else if (signedCash < 0) outflow += Math.abs(signedCash);
+        }
+        return { month, rows, inflow, outflow, net: inflow - outflow };
+      });
+  }, [filtered, f.walletId]);
+
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
