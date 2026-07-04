@@ -62,11 +62,10 @@ const EMPTY_FILTERS: Filters = {
 function parseDateParts(s: string): { y: number; mo: number; d: number } | null {
   const value = s.trim();
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
-  const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(value);
+  const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(value);
   if (iso) return { y: +iso[1], mo: +iso[2], d: +iso[3] };
   if (!dmy) return null;
-  const y = +dmy[3] < 100 ? +dmy[3] + 2000 : +dmy[3];
-  return { y, mo: +dmy[2], d: +dmy[1] };
+  return { y: +dmy[3], mo: +dmy[2], d: +dmy[1] };
 }
 
 function clampDateStr(s: string): string {
