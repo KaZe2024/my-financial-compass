@@ -26,7 +26,10 @@ function AuthPage() {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: "/dashboard" });
     });
-    supabase.rpc("is_signup_open").then(({ data }) => setSignupOpen(Boolean(data)));
+    fetch("/api/public/signup-open")
+      .then((r) => r.json())
+      .then((d) => setSignupOpen(Boolean(d?.open)))
+      .catch(() => setSignupOpen(false));
   }, [navigate]);
 
   async function submit(e: React.FormEvent) {
