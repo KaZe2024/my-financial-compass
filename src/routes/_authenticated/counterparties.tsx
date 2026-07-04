@@ -52,8 +52,11 @@ function CounterpartiesPage() {
       if (!key) continue;
       const cur = m.get(key) ?? { in: 0, out: 0, count: 0 };
       const mga = Number((t as any).base_amount ?? Number((t as any).amount) * Number((t as any).exchange_rate ?? 1));
-      if (["income", "asset_sale", "enveloppe_emprunt"].includes((t as any).type)) cur.in += mga;
-      else if ((t as any).type !== "transfer") cur.out += mga;
+      const type = (t as any).type;
+      if (type === "transfer") { cur.count++; m.set(key, cur); continue; }
+      const inCash = ["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(type);
+      const signed = inCash ? mga : -mga;
+      if (signed > 0) cur.in += signed; else cur.out += -signed;
       cur.count++;
       m.set(key, cur);
     }
