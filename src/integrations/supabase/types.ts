@@ -1891,6 +1891,7 @@ export type Database = {
       transactions: {
         Row: {
           amount: number
+          archived: boolean
           asset_id: string | null
           attachment_url: string | null
           base_amount: number
@@ -1918,6 +1919,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          archived?: boolean
           asset_id?: string | null
           attachment_url?: string | null
           base_amount: number
@@ -1945,6 +1947,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          archived?: boolean
           asset_id?: string | null
           attachment_url?: string | null
           base_amount?: number

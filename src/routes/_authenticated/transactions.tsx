@@ -175,8 +175,35 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkArchive = useMutation({
+    mutationFn: async ({ ids, archived }: { ids: string[]; archived: boolean }) => {
+      const { error } = await supabase.from("transactions").update({ archived } as any).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkEdit = useMutation({
+    mutationFn: async ({ ids, patch, tagIdsAdd }: { ids: string[]; patch: Record<string, any>; tagIdsAdd: string[] }) => {
+      if (Object.keys(patch).length) {
+        const { error } = await supabase.from("transactions").update(patch as any).in("id", ids);
+        if (error) throw error;
+      }
+      if (tagIdsAdd.length) {
+        const { data: u } = await supabase.auth.getUser();
+        await supabase.from("transaction_tags").delete().in("transaction_id", ids).in("tag_id", tagIdsAdd);
+        const rows = ids.flatMap((tid) => tagIdsAdd.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
+        await supabase.from("transaction_tags").insert(rows);
+      }
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} modifiée(s)`); setSelected(new Set()); setBulkEditOpen(false); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
   // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
   const grouped = useMemo(() => {
@@ -297,6 +324,17 @@ function TxPage() {
           selected.size > 0 ? (
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+              <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
+                <Pencil className="mr-1 h-3.5 w-3.5" /> Modifier
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={bulkArchive.isPending}
+                onClick={() => bulkArchive.mutate({ ids: Array.from(selected), archived: true })}
+              >
+                Archiver
+              </Button>
               <Button
                 variant="destructive"
                 size="sm"
@@ -414,6 +452,19 @@ function TxPage() {
           currentTagIds={(txTags.data ?? []).filter((r: any) => r.transaction_id === editingTx.id).map((r: any) => r.tag_id)}
           onClose={() => setEditingTx(null)}
           onDone={() => { setEditingTx(null); qc.invalidateQueries(); }}
+        />
+      )}
+
+      {bulkEditOpen && (
+        <BulkEditDialog
+          count={selected.size}
+          wallets={wallets.data ?? []}
+          nodes={nodesQ.data ?? []}
+          tags={tags.data ?? []}
+          projects={projects.data ?? []}
+          onClose={() => setBulkEditOpen(false)}
+          onSubmit={(patch, tagIdsAdd) => bulkEdit.mutate({ ids: Array.from(selected), patch, tagIdsAdd })}
+          pending={bulkEdit.isPending}
         />
       )}
     </div>
@@ -727,4 +778,93 @@ function TxForm({ form, set, wallets, nodes, tags, cps, projects, onSubmit, pend
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1.5"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</Label>{children}</div>;
+}
+
+function BulkEditDialog({ count, wallets, nodes, tags, projects, onClose, onSubmit, pending }: {
+  count: number;
+  wallets: any[];
+  nodes: any[];
+  tags: any[];
+  projects: any[];
+  onClose: () => void;
+  onSubmit: (patch: Record<string, any>, tagIdsAdd: string[]) => void;
+  pending: boolean;
+}) {
+  const [occurred_on, setDate] = useState("");
+  const [type, setType] = useState("");
+  const [wallet_id, setWallet] = useState("");
+  const [budget_node_id, setNode] = useState<string | null>(null);
+  const [project_id, setProject] = useState("");
+  const [notes, setNotes] = useState("");
+  const [addTags, setAddTags] = useState<string[]>([]);
+
+  function submit() {
+    const patch: Record<string, any> = {};
+    if (occurred_on) patch.occurred_on = occurred_on;
+    if (type) patch.type = type;
+    if (wallet_id) patch.wallet_id = wallet_id === "__null__" ? null : wallet_id;
+    if (budget_node_id !== null) patch.budget_node_id = budget_node_id;
+    if (project_id) patch.project_id = project_id === "__null__" ? null : project_id;
+    if (notes) patch.notes = notes;
+    if (Object.keys(patch).length === 0 && addTags.length === 0) {
+      toast.error("Aucun champ à modifier");
+      return;
+    }
+    onSubmit(patch, addTags);
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Modifier {count} transaction(s)</DialogTitle></DialogHeader>
+        <p className="text-xs text-muted-foreground">Seuls les champs remplis seront appliqués à toutes les lignes sélectionnées.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date"><Input type="date" value={occurred_on} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Type">
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {TX_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Portefeuille">
+            <Select value={wallet_id} onValueChange={setWallet}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__null__">Aucun</SelectItem>
+                {wallets.map((w: any) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Projet">
+            <Select value={project_id} onValueChange={setProject}>
+              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__null__">Aucun</SelectItem>
+                {projects.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <div className="col-span-2">
+            <Field label="Catégorie budgétaire">
+              <NodePicker nodes={nodes} value={budget_node_id} onChange={setNode} placeholder="—" />
+            </Field>
+          </div>
+          <div className="col-span-2">
+            <Field label="Notes (remplace)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></Field>
+          </div>
+          <div className="col-span-2">
+            <Field label="Ajouter des tags">
+              <TagManager tags={tags} value={addTags} onChange={setAddTags} allowManage={false} />
+            </Field>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Annuler</Button>
+          <Button onClick={submit} disabled={pending}>Appliquer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
