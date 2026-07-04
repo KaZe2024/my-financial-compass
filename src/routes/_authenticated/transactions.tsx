@@ -538,7 +538,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
       // Auto-create debt/receivable on _incur / _grant when none selected
       let debtId: string | null = form.debt_id || null;
       let recId: string | null = form.receivable_id || null;
-      if (form.type === "debt_incur" && !debtId) {
+      if (form.type === "dette" && !debtId) {
         const { data: d, error: dErr } = await supabase.from("debts").insert({
           user_id: u.user!.id, creditor: form.counterparty.trim() || form.description || "Créancier",
           description: form.description || null, original_amount: amt, outstanding: 0,
@@ -547,7 +547,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone }: { wallets:
         if (dErr) throw dErr;
         debtId = d?.id ?? null;
       }
-      if (form.type === "receivable_grant" && !recId) {
+      if (form.type === "creance" && !recId) {
         const { data: r, error: rErr } = await supabase.from("receivables").insert({
           user_id: u.user!.id, debtor: form.counterparty.trim() || form.description || "Débiteur",
           description: form.description || null, original_amount: amt, outstanding: 0,
