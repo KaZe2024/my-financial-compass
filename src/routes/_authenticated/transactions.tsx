@@ -59,20 +59,87 @@ const EMPTY_FILTERS: Filters = {
   keyword: "", notesKw: "", lineId: null, nodeId: null, projectId: "all", tagIds: [],
 };
 
+function parseDateParts(s: string): { y: number; mo: number; d: number } | null {
+  const value = s.trim();
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
+  const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(value);
+  if (iso) return { y: +iso[1], mo: +iso[2], d: +iso[3] };
+  if (!dmy) return null;
+  const y = +dmy[3] < 100 ? +dmy[3] + 2000 : +dmy[3];
+  return { y, mo: +dmy[2], d: +dmy[1] };
+}
+
 function clampDateStr(s: string): string {
   if (!s) return s;
-  let y: number, mo: number, d: number;
-  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
-  const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(s);
-  if (iso) { y = +iso[1]; mo = +iso[2]; d = +iso[3]; }
-  else if (dmy) {
-    d = +dmy[1]; mo = +dmy[2]; y = +dmy[3];
-    if (y < 100) y += 2000;
-  } else return s;
-  if (mo < 1 || mo > 12 || d < 1) return s;
-  const last = new Date(y, mo, 0).getDate();
-  const cd = Math.min(d, last);
-  return `${String(y).padStart(4, "0")}-${String(mo).padStart(2, "0")}-${String(cd).padStart(2, "0")}`;
+  const parts = parseDateParts(s);
+  if (!parts || parts.mo < 1 || parts.mo > 12 || parts.d < 1) return s;
+  const last = new Date(parts.y, parts.mo, 0).getDate();
+  const d = Math.min(parts.d, last);
+  return `${String(parts.y).padStart(4, "0")}-${String(parts.mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function normalizeCompleteDate(s: string): string | null {
+  const parts = parseDateParts(s);
+  if (!parts || parts.mo < 1 || parts.mo > 12 || parts.d < 1) return null;
+  return clampDateStr(s);
+}
+
+function formatDateInputValue(value: string) {
+  const normalized = normalizeCompleteDate(value);
+  if (!normalized) return value;
+  const [, y, mo, d] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized) ?? [];
+  return y ? `${d}/${mo}/${y}` : value;
+}
+
+function DateInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [draft, setDraft] = useState(() => formatDateInputValue(value));
+  useEffect(() => setDraft(formatDateInputValue(value)), [value]);
+
+  function commit(next: string) {
+    const normalized = normalizeCompleteDate(next);
+    if (normalized) {
+      onChange(normalized);
+      setDraft(formatDateInputValue(normalized));
+    } else if (!next.trim()) {
+      onChange("");
+    }
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      placeholder="jj/mm/aaaa"
+      value={draft}
+      onChange={(e) => { const next = e.target.value; setDraft(next); commit(next); }}
+      onBlur={() => {
+        const normalized = normalizeCompleteDate(draft);
+        if (normalized) {
+          onChange(normalized);
+          setDraft(formatDateInputValue(normalized));
+        } else {
+          setDraft(formatDateInputValue(value));
+        }
+      }}
+    />
+  );
+}
+
+function baseAmount(t: any) {
+  return Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+}
+
+function signedCashImpact(t: any, walletId: string | null) {
+  const mga = baseAmount(t);
+  if (t.type === "transfer") {
+    if (!walletId) return 0;
+    let impact = 0;
+    if (t.wallet_id === walletId) impact -= mga;
+    if (t.to_wallet_id === walletId) impact += mga;
+    return impact;
+  }
+  if (walletId && t.wallet_id !== walletId) return 0;
+  return CASH_IN_TYPES.has(t.type) ? mga : -mga;
 }
 
 function TxPage() {
