@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
 import { fmtMoney, fmtDate } from "@/lib/format";
-import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users } from "lucide-react";
+import { Plus, Pencil, Archive, ArchiveRestore, Trash2, Users, History as HistoryIcon } from "lucide-react";
 import { toast } from "sonner";
+import { HistoryDialog } from "@/components/history-dialog";
 
 export const Route = createFileRoute("/_authenticated/counterparties")({
   head: () => ({ meta: [{ title: "Tiers — Personal CFO" }] }),
@@ -28,6 +29,7 @@ function CounterpartiesPage() {
 
   const [filters, setFilters] = useState({ name: "", notes: "", group: "all", service: "all", showArchived: false });
   const [editing, setEditing] = useState<any | null>(null);
+  const [historyOf, setHistoryOf] = useState<any | null>(null);
 
   const txs = useQuery({
     queryKey: ["cp_txs", isoDate(period.from), isoDate(period.to)],
@@ -146,6 +148,7 @@ function CounterpartiesPage() {
                     <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={c.notes ?? ""}>{c.notes ?? "—"}</td>
                     <td className="px-2 py-2 text-right">
                       <div className="flex justify-end gap-0.5 text-muted-foreground">
+                        <button title="Historique" onClick={() => setHistoryOf(c)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><HistoryIcon className="h-3.5 w-3.5" /></button>
                         <button title="Modifier" onClick={() => setEditing(c)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
                         <button title={c.archived ? "Restaurer" : "Archiver"} onClick={() => arch.mutate({ id: c.id, on: !c.archived })} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">{c.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}</button>
                         <button title="Supprimer" onClick={() => confirm(`Supprimer « ${c.name} » ?`) && del.mutate(c.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -161,6 +164,7 @@ function CounterpartiesPage() {
       </Panel>
 
       {editing && <CpDialog editing={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["counterparties"] }); }} />}
+      {historyOf && <HistoryDialog open onOpenChange={(v) => !v && setHistoryOf(null)} title={`Historique · ${historyOf.name}`} column="counterparty_id" sourceKind="counterparty" entityId={historyOf.id} />}
     </div>
   );
 }

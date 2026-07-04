@@ -1358,52 +1358,83 @@ export type Database = {
         Row: {
           actual_amount: number | null
           amount: number
+          booking_tx_id: string | null
           budget_node_id: string | null
           category: string | null
+          counterparty_id: string | null
           created_at: string
           currency: string
+          description: string | null
           direction: string
           due_date: string | null
           id: string
           name: string
           notes: string | null
+          payment_tx_id: string | null
+          period_month: string | null
+          reversal_tx_id: string | null
           settled_at: string | null
           status: Database["public"]["Enums"]["provision_status"]
+          subscription_id: string | null
           user_id: string
+          wallet_id: string | null
         }
         Insert: {
           actual_amount?: number | null
           amount: number
+          booking_tx_id?: string | null
           budget_node_id?: string | null
           category?: string | null
+          counterparty_id?: string | null
           created_at?: string
           currency?: string
+          description?: string | null
           direction?: string
           due_date?: string | null
           id?: string
           name: string
           notes?: string | null
+          payment_tx_id?: string | null
+          period_month?: string | null
+          reversal_tx_id?: string | null
           settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
+          subscription_id?: string | null
           user_id: string
+          wallet_id?: string | null
         }
         Update: {
           actual_amount?: number | null
           amount?: number
+          booking_tx_id?: string | null
           budget_node_id?: string | null
           category?: string | null
+          counterparty_id?: string | null
           created_at?: string
           currency?: string
+          description?: string | null
           direction?: string
           due_date?: string | null
           id?: string
           name?: string
           notes?: string | null
+          payment_tx_id?: string | null
+          period_month?: string | null
+          reversal_tx_id?: string | null
           settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
+          subscription_id?: string | null
           user_id?: string
+          wallet_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "provisions_booking_tx_id_fkey"
+            columns: ["booking_tx_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "provisions_budget_node_id_fkey"
             columns: ["budget_node_id"]
@@ -1412,11 +1443,46 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "provisions_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "provisions_currency_fkey"
             columns: ["currency"]
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "provisions_payment_tx_id_fkey"
+            columns: ["payment_tx_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisions_reversal_tx_id_fkey"
+            columns: ["reversal_tx_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provisions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1705,48 +1771,87 @@ export type Database = {
           active: boolean
           amount: number
           billing_cycle: string
+          budget_node_id: string | null
           category: string | null
+          counterparty_id: string | null
           created_at: string
           currency: string
+          description: string | null
+          direction: string
           id: string
+          last_provisioned_month: string | null
           name: string
           next_billing_date: string | null
           notes: string | null
           user_id: string
+          wallet_id: string | null
         }
         Insert: {
           active?: boolean
           amount: number
           billing_cycle?: string
+          budget_node_id?: string | null
           category?: string | null
+          counterparty_id?: string | null
           created_at?: string
           currency?: string
+          description?: string | null
+          direction?: string
           id?: string
+          last_provisioned_month?: string | null
           name: string
           next_billing_date?: string | null
           notes?: string | null
           user_id: string
+          wallet_id?: string | null
         }
         Update: {
           active?: boolean
           amount?: number
           billing_cycle?: string
+          budget_node_id?: string | null
           category?: string | null
+          counterparty_id?: string | null
           created_at?: string
           currency?: string
+          description?: string | null
+          direction?: string
           id?: string
+          last_provisioned_month?: string | null
           name?: string
           next_billing_date?: string | null
           notes?: string | null
           user_id?: string
+          wallet_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "subscriptions_budget_node_id_fkey"
+            columns: ["budget_node_id"]
+            isOneToOne: false
+            referencedRelation: "budget_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "subscriptions_currency_fkey"
             columns: ["currency"]
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "subscriptions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
           },
         ]
       }

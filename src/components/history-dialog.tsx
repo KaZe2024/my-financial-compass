@@ -1,0 +1,100 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fmtDate, fmtMoney } from "@/lib/format";
+import { History } from "lucide-react";
+
+/**
+ * Historique des transactions liées à une entité (actif, dette, créance, tiers).
+ * Filtre par colonne dédiée (asset_id / debt_id / receivable_id / counterparty_id)
+ * ET par (source_kind, source_id) pour attraper les mouvements liés côté source.
+ */
+export function HistoryDialog({
+  open,
+  onOpenChange,
+  title,
+  column,
+  sourceKind,
+  entityId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  title: string;
+  column: "asset_id" | "debt_id" | "receivable_id" | "counterparty_id";
+  sourceKind?: "asset" | "debt" | "receivable" | "counterparty" | "provision" | "subscription";
+  entityId: string;
+}) {
+  const q = useQuery({
+    queryKey: ["history", column, entityId, sourceKind ?? ""],
+    enabled: open && !!entityId,
+    queryFn: async () => {
+      const filters: string[] = [`${column}.eq.${entityId}`];
+      if (sourceKind) filters.push(`and(source_kind.eq.${sourceKind},source_id.eq.${entityId})`);
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("id, occurred_on, type, description, amount, base_amount, currency, exchange_rate, wallet_id, wallets:wallet_id(name), notes")
+        .or(filters.join(","))
+        .order("occurred_on", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const rows = q.data ?? [];
+  const totalMga = rows.reduce((s: number, r: any) => {
+    const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
+    const inflow = ["income", "asset_sale", "enveloppe_emprunt", "debt_incur", "receivable_collect"].includes(r.type);
+    return s + (inflow ? mga : -mga);
+  }, 0);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><History className="h-4 w-4" /> {title}</DialogTitle>
+        </DialogHeader>
+        <div className="scroll-thin max-h-[60vh] overflow-y-auto">
+          {q.isLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Chargement…</p>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Aucun mouvement lié.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2">Date</th>
+                  <th className="px-2 py-2">Type</th>
+                  <th className="px-2 py-2">Description</th>
+                  <th className="px-2 py-2">Portefeuille</th>
+                  <th className="px-2 py-2 text-right">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any) => {
+                  const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
+                  const inflow = ["income", "asset_sale", "enveloppe_emprunt", "debt_incur", "receivable_collect"].includes(r.type);
+                  return (
+                    <tr key={r.id} className="border-t border-border/60">
+                      <td className="num px-2 py-1.5 text-muted-foreground whitespace-nowrap">{fmtDate(r.occurred_on)}</td>
+                      <td className="px-2 py-1.5"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase">{r.type}</span></td>
+                      <td className="px-2 py-1.5">{r.description}{r.notes ? <div className="text-[10px] text-muted-foreground">{r.notes}</div> : null}</td>
+                      <td className="px-2 py-1.5 text-xs text-muted-foreground">{r.wallets?.name ?? "—"}</td>
+                      <td className={`num px-2 py-1.5 text-right whitespace-nowrap ${inflow ? "text-positive" : "text-negative"}`}>
+                        {fmtMoney(mga * (inflow ? 1 : -1), r.currency ?? "MGA", { sign: true })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-border">
+                  <td colSpan={4} className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Net</td>
+                  <td className={`num px-2 py-2 text-right font-semibold ${totalMga >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(totalMga, "MGA", { sign: true })}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
