@@ -118,27 +118,17 @@ function AssetsPage() {
                     <td className={`num px-4 py-2 text-right ${delta >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(delta, a.currency, { sign: true })}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
                     <td className="px-2 py-2 text-right">
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end gap-0.5 text-muted-foreground">
                         {amo && (
-                          <button
-                            title={`Appliquer dépréciation → VNC ${fmtMoney(amo.vnc, a.currency)}`}
-                            onClick={async () => {
-                              const { data: u } = await supabase.auth.getUser();
-                              const today = toISODate(new Date());
-                              const amount = Number(a.current_value) - amo.vnc;
-                              await supabase.from("assets").update({ current_value: amo.vnc }).eq("id", a.id);
-                              if (amount !== 0) {
-                                await supabase.from("asset_events").insert({
-                                  user_id: u.user!.id, asset_id: a.id, event_type: "depreciation",
-                                  event_date: today, amount, notes: `Amortissement linéaire (${amo.months}/${amo.life} mois)`,
-                                });
-                              }
-                              toast.success("Dépréciation appliquée");
-                              qc.invalidateQueries();
-                            }}
-                            className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          ><TrendingDown className="h-3.5 w-3.5" /></button>
+                          <button title="Générer amortissements rétroactifs" onClick={() => setAmortizing(a)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
+                            <TrendingDown className="h-3.5 w-3.5" />
+                          </button>
                         )}
+                        <button title="Réévaluer" onClick={() => setRevaluing(a)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><RefreshCcw className="h-3.5 w-3.5" /></button>
+                        {a.status === "owned" && (
+                          <button title="Vendre" onClick={() => setSelling(a)} className="rounded-sm p-1 hover:bg-muted hover:text-positive"><HandCoins className="h-3.5 w-3.5" /></button>
+                        )}
+                        <button title="Historique" onClick={() => setHistoryOf(a)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><HistoryIcon className="h-3.5 w-3.5" /></button>
                         <RowActions table="assets" id={a.id} archived={a.archived} onEdit={() => setEditing(a)} linkedTxId={a.linked_transaction_id} />
                       </div>
                     </td>
@@ -153,6 +143,18 @@ function AssetsPage() {
 
       {editing && (
         <AssetDialog editingAsset={editing} wallets={wallets.data ?? []} onDone={() => { setEditing(null); qc.invalidateQueries(); }} onClose={() => setEditing(null)} />
+      )}
+      {amortizing && (
+        <AmortDialog asset={amortizing} nodes={nodesQ.data ?? []} onClose={() => setAmortizing(null)} onDone={() => { setAmortizing(null); qc.invalidateQueries(); }} />
+      )}
+      {revaluing && (
+        <RevalueDialog asset={revaluing} onClose={() => setRevaluing(null)} onDone={() => { setRevaluing(null); qc.invalidateQueries(); }} />
+      )}
+      {selling && (
+        <SellDialog asset={selling} wallets={wallets.data ?? []} onClose={() => setSelling(null)} onDone={() => { setSelling(null); qc.invalidateQueries(); }} />
+      )}
+      {historyOf && (
+        <HistoryDialog open onOpenChange={(v) => !v && setHistoryOf(null)} title={`Historique · ${historyOf.name}`} column="asset_id" sourceKind="asset" entityId={historyOf.id} />
       )}
     </div>
   );
