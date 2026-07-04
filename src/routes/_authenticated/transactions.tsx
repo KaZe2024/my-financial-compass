@@ -175,8 +175,35 @@ function TxPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const bulkArchive = useMutation({
+    mutationFn: async ({ ids, archived }: { ids: string[]; archived: boolean }) => {
+      const { error } = await supabase.from("transactions").update({ archived } as any).in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkEdit = useMutation({
+    mutationFn: async ({ ids, patch, tagIdsAdd }: { ids: string[]; patch: Record<string, any>; tagIdsAdd: string[] }) => {
+      if (Object.keys(patch).length) {
+        const { error } = await supabase.from("transactions").update(patch as any).in("id", ids);
+        if (error) throw error;
+      }
+      if (tagIdsAdd.length) {
+        const { data: u } = await supabase.auth.getUser();
+        await supabase.from("transaction_tags").delete().in("transaction_id", ids).in("tag_id", tagIdsAdd);
+        const rows = ids.flatMap((tid) => tagIdsAdd.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
+        await supabase.from("transaction_tags").insert(rows);
+      }
+    },
+    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} modifiée(s)`); setSelected(new Set()); setBulkEditOpen(false); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
 
   // Group rows by day with per-day and grand totals (MGA base_amount, signed by tx type).
   const grouped = useMemo(() => {
