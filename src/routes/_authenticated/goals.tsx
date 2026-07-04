@@ -20,6 +20,7 @@ import {
   type GoalType, type ProgressInput,
 } from "@/lib/goal-progress";
 import { logAudit } from "@/lib/audit";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/goals")({
   head: () => ({ meta: [{ title: "Objectifs — Personal CFO" }] }),
