@@ -93,16 +93,19 @@ export const sendMessage = createServerFn({ method: "POST" })
 
     let assistantText = "";
     try {
+      const hist = (history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+      // Prepend system context to the first user message (some Gemini variants via gateway reject role:"system").
+      if (hist.length && hist[0].role === "user") {
+        hist[0] = { role: "user", content: `[Contexte système]\n${AI_SYSTEM_PROMPT}\n\n${snapshot}\n\n[Question utilisateur]\n${hist[0].content}` };
+      }
       const result = await generateText({
         model: gateway("google/gemini-3-flash-preview"),
-        messages: [
-          { role: "system", content: `${AI_SYSTEM_PROMPT}\n\n${snapshot}` },
-          ...((history ?? []).map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))),
-        ],
+        messages: hist,
       });
       assistantText = result.text;
     } catch (e: any) {
       const msg = String(e?.message ?? e);
+      console.error("[ai.sendMessage] gateway error:", msg);
       if (msg.includes("429")) throw new Error("Limite d'appels atteinte, réessaie dans une minute.");
       if (msg.includes("402")) throw new Error("Crédits IA épuisés — ajoute des crédits pour continuer.");
       throw new Error(msg);
