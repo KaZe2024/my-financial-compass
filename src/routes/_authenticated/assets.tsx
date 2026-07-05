@@ -150,7 +150,7 @@ function AssetsPage() {
       </Panel>
 
       {editing && (
-        <AssetDialog editingAsset={editing} wallets={wallets.data ?? []} onDone={() => { setEditing(null); qc.invalidateQueries(); }} onClose={() => setEditing(null)} />
+        <AssetDialog editingAsset={editing} types={assetTypes.data ?? []} wallets={wallets.data ?? []} onDone={() => { setEditing(null); qc.invalidateQueries(); }} onClose={() => setEditing(null)} />
       )}
       {amortizing && (
         <AmortDialog asset={amortizing} nodes={nodesQ.data ?? []} onClose={() => setAmortizing(null)} onDone={() => { setAmortizing(null); qc.invalidateQueries(); }} />
