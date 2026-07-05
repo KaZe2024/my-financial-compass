@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NodePicker } from "@/components/node-picker";
 import { HistoryDialog } from "@/components/history-dialog";
-import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown, RefreshCcw, HandCoins, History as HistoryIcon } from "lucide-react";
+import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown, RefreshCcw, HandCoins, History as HistoryIcon, Tags, Check, X } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
