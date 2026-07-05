@@ -31,30 +31,46 @@ function WalletsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
-  // Last exchange_rate seen per wallet — used only to convert non-MGA wallets to MGA reference.
+  // Toutes les transactions — nécessaire pour recalculer les soldes de manière cohérente
+  // avec la vue Transactions (opening + net signé en MGA base_amount).
   const allTx = useQuery({
-    queryKey: ["wallet_tx_rates"],
+    queryKey: ["wallet_tx_full"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("wallet_id, exchange_rate, currency")
-          .not("exchange_rate", "is", null)
+          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, currency")
           .range(from, to),
       ),
   });
 
-
-  // Per-wallet MGA balance = current_balance (maintained by DB trigger, native currency) × FX to MGA.
+  // Solde par portefeuille (MGA) = opening_balance converti + somme des impacts signés
+  // (mêmes règles que la page Transactions : CASH_IN_TYPES = entrée, transfer = ±montant).
   const balancesMga = useMemo(() => {
+    // Dernier taux vu par portefeuille pour convertir l'opening_balance non-MGA
     const lastRate = new Map<string, number>();
     for (const t of allTx.data ?? []) {
       if (t.wallet_id && t.exchange_rate) lastRate.set(t.wallet_id, Number(t.exchange_rate));
+      if (t.to_wallet_id && t.exchange_rate) {
+        if (!lastRate.has(t.to_wallet_id)) lastRate.set(t.to_wallet_id, Number(t.exchange_rate));
+      }
+    }
+    const nets = new Map<string, number>();
+    for (const t of allTx.data ?? []) {
+      const mga = Number(t.base_amount ?? Number(t.amount) * Number(t.exchange_rate ?? 1));
+      if (t.type === "transfer") {
+        if (t.wallet_id) nets.set(t.wallet_id, (nets.get(t.wallet_id) ?? 0) - mga);
+        if (t.to_wallet_id) nets.set(t.to_wallet_id, (nets.get(t.to_wallet_id) ?? 0) + mga);
+      } else if (t.wallet_id) {
+        const impact = CASH_IN_TYPES.has(t.type) ? mga : -mga;
+        nets.set(t.wallet_id, (nets.get(t.wallet_id) ?? 0) + impact);
+      }
     }
     const out = new Map<string, number>();
     for (const w of wallets.data ?? []) {
       const rate = w.currency === "MGA" ? 1 : (lastRate.get(w.id) ?? 1);
-      out.set(w.id, Number(w.current_balance) * rate);
+      const openingMga = Number(w.opening_balance) * rate;
+      out.set(w.id, openingMga + (nets.get(w.id) ?? 0));
     }
     return out;
   }, [allTx.data, wallets.data]);
