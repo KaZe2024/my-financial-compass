@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/assets")({
   component: AssetsPage,
 });
 
-const TYPES = ["real_estate","land","vehicle","computer","electronics","investment","other"];
+const DEFAULT_TYPE = "other";
 
 type FormShape = {
   name: string; type: string; purchase_date: string;
