@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { NodePicker } from "@/components/node-picker";
 import { HistoryDialog } from "@/components/history-dialog";
-import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown, RefreshCcw, HandCoins, History as HistoryIcon } from "lucide-react";
+import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown, RefreshCcw, HandCoins, History as HistoryIcon, Tags, Check, X } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/_authenticated/assets")({
   component: AssetsPage,
 });
 
-const TYPES = ["real_estate","land","vehicle","computer","electronics","investment","other"];
+const DEFAULT_TYPE = "other";
 
 type FormShape = {
   name: string; type: string; purchase_date: string;
@@ -44,7 +44,7 @@ type FormShape = {
 };
 
 const EMPTY: FormShape = {
-  name: "", type: "vehicle", purchase_date: toISODate(new Date()),
+  name: "", type: DEFAULT_TYPE, purchase_date: toISODate(new Date()),
   purchase_value: "0", current_value: "0", currency: "MGA",
   useful_life_months: "", notes: "",
   link_tx: true, wallet_id: "",
@@ -53,8 +53,13 @@ const EMPTY: FormShape = {
 function AssetsPage() {
   const qc = useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
+  const [manageTypes, setManageTypes] = useState(false);
   const wallets = useQuery(walletsQO);
   const nodesQ = useQuery(budgetNodesQO);
+  const assetTypes = useQuery({
+    queryKey: ["asset_types"],
+    queryFn: async () => (await supabase.from("asset_types").select("*").order("sort_order", { ascending: true }).order("name", { ascending: true })).data ?? [],
+  });
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await supabase.from("assets").select("*").order("purchase_date", { nullsFirst: false, ascending: false })).data ?? [],
@@ -84,9 +89,11 @@ function AssetsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
-          <AssetDialog wallets={wallets.data ?? []} onDone={() => qc.invalidateQueries()} />
+          <Button variant="secondary" size="sm" onClick={() => setManageTypes(true)}><Tags className="mr-2 h-4 w-4" /> Types</Button>
+          <AssetDialog types={assetTypes.data ?? []} wallets={wallets.data ?? []} onDone={() => qc.invalidateQueries()} />
         </div>
       </header>
+      {manageTypes && <AssetTypesDialog onClose={() => setManageTypes(false)} />}
 
       <Panel title={`${visible.length} actifs`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
@@ -143,7 +150,7 @@ function AssetsPage() {
       </Panel>
 
       {editing && (
-        <AssetDialog editingAsset={editing} wallets={wallets.data ?? []} onDone={() => { setEditing(null); qc.invalidateQueries(); }} onClose={() => setEditing(null)} />
+        <AssetDialog editingAsset={editing} types={assetTypes.data ?? []} wallets={wallets.data ?? []} onDone={() => { setEditing(null); qc.invalidateQueries(); }} onClose={() => setEditing(null)} />
       )}
       {amortizing && (
         <AmortDialog asset={amortizing} nodes={nodesQ.data ?? []} onClose={() => setAmortizing(null)} onDone={() => { setAmortizing(null); qc.invalidateQueries(); }} />
@@ -215,7 +222,7 @@ export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo 
   );
 }
 
-function AssetDialog({ editingAsset, wallets, onDone, onClose }: { editingAsset?: any; wallets: any[]; onDone: () => void; onClose?: () => void }) {
+function AssetDialog({ editingAsset, types, wallets, onDone, onClose }: { editingAsset?: any; types: any[]; wallets: any[]; onDone: () => void; onClose?: () => void }) {
   const [open, setOpen] = useState(!editingAsset ? false : true);
   const [form, setForm] = useState<FormShape>(editingAsset ? {
     name: editingAsset.name, type: editingAsset.type, purchase_date: editingAsset.purchase_date ?? toISODate(new Date()),
@@ -268,7 +275,7 @@ function AssetDialog({ editingAsset, wallets, onDone, onClose }: { editingAsset?
             <F label="Type">
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>{(types.length ? types : [{ id: "_", name: form.type || DEFAULT_TYPE }]).map((t: any) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
             </F>
             <F label="Date d'achat"><DatePicker value={form.purchase_date} onChange={(__v) => setForm({ ...form, purchase_date: __v })} /></F>
@@ -504,3 +511,92 @@ function SellDialog({ asset, wallets, onClose, onDone }: { asset: any; wallets: 
     </Dialog>
   );
 }
+
+function AssetTypesDialog({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ["asset_types"],
+    queryFn: async () => (await supabase.from("asset_types").select("*").order("sort_order").order("name")).data ?? [],
+  });
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["asset_types"] }); };
+
+  const add = useMutation({
+    mutationFn: async () => {
+      const n = newName.trim();
+      if (!n) throw new Error("Nom requis");
+      const { data: u } = await supabase.auth.getUser();
+      const maxOrder = Math.max(0, ...((list.data ?? []).map((t: any) => Number(t.sort_order) || 0)));
+      const { error } = await supabase.from("asset_types").insert({ user_id: u.user!.id, name: n, sort_order: maxOrder + 1 });
+      if (error) throw error;
+    },
+    onSuccess: () => { setNewName(""); invalidate(); toast.success("Type ajouté"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rename = useMutation({
+    mutationFn: async () => {
+      const n = editingName.trim();
+      if (!n || !editingId) throw new Error("Nom requis");
+      const old = (list.data ?? []).find((t: any) => t.id === editingId);
+      const { error } = await supabase.from("asset_types").update({ name: n }).eq("id", editingId);
+      if (error) throw error;
+      // Propager le renommage aux actifs existants
+      if (old && old.name !== n) {
+        await supabase.from("assets").update({ type: n }).eq("type", old.name);
+      }
+    },
+    onSuccess: () => { setEditingId(null); setEditingName(""); invalidate(); qc.invalidateQueries({ queryKey: ["assets"] }); toast.success("Type modifié"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const t = (list.data ?? []).find((x: any) => x.id === id);
+      if (!t) return;
+      const { count } = await supabase.from("assets").select("id", { count: "exact", head: true }).eq("type", t.name);
+      if ((count ?? 0) > 0) throw new Error(`Type utilisé par ${count} actif(s). Renommez ou changez-les d'abord.`);
+      const { error } = await supabase.from("asset_types").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Type supprimé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Types d'actifs</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); add.mutate(); }} className="flex gap-2">
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nouveau type (ex : crypto)" />
+          <Button type="submit" disabled={add.isPending || !newName.trim()}><Plus className="h-4 w-4" /></Button>
+        </form>
+        <div className="scroll-thin mt-2 max-h-[50vh] overflow-y-auto rounded-md border border-border/60 divide-y divide-border/60">
+          {(list.data ?? []).length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Aucun type.</p>}
+          {(list.data ?? []).map((t: any) => (
+            <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+              {editingId === t.id ? (
+                <>
+                  <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} className="h-8" autoFocus />
+                  <button onClick={() => rename.mutate()} disabled={rename.isPending} title="Enregistrer" className="rounded-sm p-1 hover:bg-muted"><Check className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => { setEditingId(null); setEditingName(""); }} title="Annuler" className="rounded-sm p-1 hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1">{t.name}</span>
+                  <button onClick={() => { setEditingId(t.id); setEditingName(t.name); }} title="Renommer" className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => confirm(`Supprimer le type "${t.name}" ?`) && remove.mutate(t.id)} title="Supprimer" className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative"><Trash2 className="h-3.5 w-3.5" /></button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+        <DialogFooter><Button variant="secondary" onClick={onClose}>Fermer</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
