@@ -89,9 +89,11 @@ function AssetsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
-          <AssetDialog wallets={wallets.data ?? []} onDone={() => qc.invalidateQueries()} />
+          <Button variant="secondary" size="sm" onClick={() => setManageTypes(true)}><Tags className="mr-2 h-4 w-4" /> Types</Button>
+          <AssetDialog types={assetTypes.data ?? []} wallets={wallets.data ?? []} onDone={() => qc.invalidateQueries()} />
         </div>
       </header>
+      {manageTypes && <AssetTypesDialog onClose={() => setManageTypes(false)} />}
 
       <Panel title={`${visible.length} actifs`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
