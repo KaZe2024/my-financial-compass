@@ -53,8 +53,13 @@ const EMPTY: FormShape = {
 function AssetsPage() {
   const qc = useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
+  const [manageTypes, setManageTypes] = useState(false);
   const wallets = useQuery(walletsQO);
   const nodesQ = useQuery(budgetNodesQO);
+  const assetTypes = useQuery({
+    queryKey: ["asset_types"],
+    queryFn: async () => (await supabase.from("asset_types").select("*").order("sort_order", { ascending: true }).order("name", { ascending: true })).data ?? [],
+  });
   const assets = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await supabase.from("assets").select("*").order("purchase_date", { nullsFirst: false, ascending: false })).data ?? [],
