@@ -275,7 +275,7 @@ function AssetDialog({ editingAsset, types, wallets, onDone, onClose }: { editin
             <F label="Type">
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectContent>{(types.length ? types : [{ id: "_", name: form.type || DEFAULT_TYPE }]).map((t: any) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
             </F>
             <F label="Date d'achat"><DatePicker value={form.purchase_date} onChange={(__v) => setForm({ ...form, purchase_date: __v })} /></F>
