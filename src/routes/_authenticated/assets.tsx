@@ -44,7 +44,7 @@ type FormShape = {
 };
 
 const EMPTY: FormShape = {
-  name: "", type: "vehicle", purchase_date: toISODate(new Date()),
+  name: "", type: DEFAULT_TYPE, purchase_date: toISODate(new Date()),
   purchase_value: "0", current_value: "0", currency: "MGA",
   useful_life_months: "", notes: "",
   link_tx: true, wallet_id: "",
