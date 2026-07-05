@@ -222,7 +222,7 @@ export function RowActions({ table, id, archived, onEdit, linkedTxId, cascadeTo 
   );
 }
 
-function AssetDialog({ editingAsset, wallets, onDone, onClose }: { editingAsset?: any; wallets: any[]; onDone: () => void; onClose?: () => void }) {
+function AssetDialog({ editingAsset, types, wallets, onDone, onClose }: { editingAsset?: any; types: any[]; wallets: any[]; onDone: () => void; onClose?: () => void }) {
   const [open, setOpen] = useState(!editingAsset ? false : true);
   const [form, setForm] = useState<FormShape>(editingAsset ? {
     name: editingAsset.name, type: editingAsset.type, purchase_date: editingAsset.purchase_date ?? toISODate(new Date()),
