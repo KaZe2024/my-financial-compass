@@ -511,3 +511,92 @@ function SellDialog({ asset, wallets, onClose, onDone }: { asset: any; wallets: 
     </Dialog>
   );
 }
+
+function AssetTypesDialog({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ["asset_types"],
+    queryFn: async () => (await supabase.from("asset_types").select("*").order("sort_order").order("name")).data ?? [],
+  });
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["asset_types"] }); };
+
+  const add = useMutation({
+    mutationFn: async () => {
+      const n = newName.trim();
+      if (!n) throw new Error("Nom requis");
+      const { data: u } = await supabase.auth.getUser();
+      const maxOrder = Math.max(0, ...((list.data ?? []).map((t: any) => Number(t.sort_order) || 0)));
+      const { error } = await supabase.from("asset_types").insert({ user_id: u.user!.id, name: n, sort_order: maxOrder + 1 });
+      if (error) throw error;
+    },
+    onSuccess: () => { setNewName(""); invalidate(); toast.success("Type ajouté"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rename = useMutation({
+    mutationFn: async () => {
+      const n = editingName.trim();
+      if (!n || !editingId) throw new Error("Nom requis");
+      const old = (list.data ?? []).find((t: any) => t.id === editingId);
+      const { error } = await supabase.from("asset_types").update({ name: n }).eq("id", editingId);
+      if (error) throw error;
+      // Propager le renommage aux actifs existants
+      if (old && old.name !== n) {
+        await supabase.from("assets").update({ type: n }).eq("type", old.name);
+      }
+    },
+    onSuccess: () => { setEditingId(null); setEditingName(""); invalidate(); qc.invalidateQueries({ queryKey: ["assets"] }); toast.success("Type modifié"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const t = (list.data ?? []).find((x: any) => x.id === id);
+      if (!t) return;
+      const { count } = await supabase.from("assets").select("id", { count: "exact", head: true }).eq("type", t.name);
+      if ((count ?? 0) > 0) throw new Error(`Type utilisé par ${count} actif(s). Renommez ou changez-les d'abord.`);
+      const { error } = await supabase.from("asset_types").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { invalidate(); toast.success("Type supprimé"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Types d'actifs</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); add.mutate(); }} className="flex gap-2">
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nouveau type (ex : crypto)" />
+          <Button type="submit" disabled={add.isPending || !newName.trim()}><Plus className="h-4 w-4" /></Button>
+        </form>
+        <div className="scroll-thin mt-2 max-h-[50vh] overflow-y-auto rounded-md border border-border/60 divide-y divide-border/60">
+          {(list.data ?? []).length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Aucun type.</p>}
+          {(list.data ?? []).map((t: any) => (
+            <div key={t.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+              {editingId === t.id ? (
+                <>
+                  <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} className="h-8" autoFocus />
+                  <button onClick={() => rename.mutate()} disabled={rename.isPending} title="Enregistrer" className="rounded-sm p-1 hover:bg-muted"><Check className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => { setEditingId(null); setEditingName(""); }} title="Annuler" className="rounded-sm p-1 hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1">{t.name}</span>
+                  <button onClick={() => { setEditingId(t.id); setEditingName(t.name); }} title="Renommer" className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => confirm(`Supprimer le type "${t.name}" ?`) && remove.mutate(t.id)} title="Supprimer" className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative"><Trash2 className="h-3.5 w-3.5" /></button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+        <DialogFooter><Button variant="secondary" onClick={onClose}>Fermer</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
