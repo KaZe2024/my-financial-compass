@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { defineTool, type ToolContext } from "@lovable.dev/mcp-js";
-import { z } from "zod";
+
 import { buildFinancialSnapshot } from "@/lib/ai-snapshot.server";
 
 function supabaseForUser(ctx: ToolContext) {
