@@ -96,7 +96,15 @@ function SnapshotsPage() {
   });
 
   const fullList = snaps.data ?? [];
-  const list = useMemo(() => fullList.filter((s: any) => s.snapshot_month >= pFrom && s.snapshot_month <= pTo), [fullList, pFrom, pTo]);
+  const fromMonth = pFrom.slice(0, 7);
+  const toMonth = pTo.slice(0, 7);
+  const list = useMemo(
+    () => fullList.filter((s: any) => {
+      const m = String(s.snapshot_month).slice(0, 7);
+      return m >= fromMonth && m <= toMonth;
+    }),
+    [fullList, fromMonth, toMonth],
+  );
   const last = list[list.length - 1];
   const prev = list[list.length - 2];
   const yearAgo = list.find(s => {
