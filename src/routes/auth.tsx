@@ -9,12 +9,24 @@ import { Activity, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : undefined,
+  }),
   head: () => ({ meta: [{ title: "Connexion — Personal CFO" }] }),
   component: AuthPage,
 });
 
+function safeNext(next: string | undefined): string {
+  if (!next) return "/dashboard";
+  // Only same-origin relative paths.
+  if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  return next;
+}
+
 function AuthPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const target = safeNext(next);
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
   const [signupOpen, setSignupOpen] = useState<boolean>(false);
   const [email, setEmail] = useState("");
@@ -24,13 +36,13 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard" });
+      if (data.user) window.location.href = target;
     });
     fetch("/api/public/signup-open")
       .then((r) => r.json())
       .then((d) => setSignupOpen(Boolean(d?.open)))
       .catch(() => setSignupOpen(false));
-  }, [navigate]);
+  }, [target]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,11 +52,12 @@ function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Connecté");
-        navigate({ to: "/dashboard" });
+        window.location.href = target;
       } else if (mode === "signup") {
+        const redirectTo = window.location.origin + target;
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin, data: { full_name: name } },
+          options: { emailRedirectTo: redirectTo, data: { full_name: name } },
         });
         if (error) throw error;
         if (data.user) {
@@ -52,7 +65,7 @@ function AuthPage() {
           if (pErr) throw new Error(pErr.message);
         }
         toast.success("Compte propriétaire créé");
-        navigate({ to: "/dashboard" });
+        window.location.href = target;
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset-password" });
         if (error) throw error;
