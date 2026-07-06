@@ -24,7 +24,6 @@ function safeNext(next: string | undefined): string {
 }
 
 function AuthPage() {
-  const navigate = useNavigate();
   const { next } = Route.useSearch();
   const target = safeNext(next);
   const [mode, setMode] = useState<"login" | "signup" | "reset">("login");
