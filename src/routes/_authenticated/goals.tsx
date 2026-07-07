@@ -53,7 +53,14 @@ function useProgressData() {
   });
   const assets = useQuery({
     queryKey: ["assets", "all-for-goals"],
-    queryFn: async () => (await supabase.from("assets").select("current_value, status")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("id, purchase_value, current_value, status, archived")).data ?? [],
+  });
+  const assetEvents = useQuery({
+    queryKey: ["asset_events", "all-for-goals"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+      ),
   });
   const rec = useQuery({
     queryKey: ["rec", "all-for-goals"],
@@ -64,6 +71,7 @@ function useProgressData() {
     wallets: (wallets.data as any) ?? [],
     debts: (debts.data as any) ?? [],
     assets: (assets.data as any) ?? [],
+    assetEvents: (assetEvents.data as any) ?? [],
     receivables: (rec.data as any) ?? [],
     nodes: (nodesQ.data as any) ?? [],
   };
