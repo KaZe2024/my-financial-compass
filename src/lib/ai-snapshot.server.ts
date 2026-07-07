@@ -7,6 +7,7 @@ import {
   monthlyCashflowFromTransactions,
   sumAvailableCash,
 } from "@/lib/finance";
+import { computeGoalProgress, type ProgressInput } from "@/lib/goal-progress";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(n));
@@ -52,8 +53,10 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const walletBalances = computeWalletBalances(walletRows as any, txRows);
   const walletTotal = sumAvailableCash(walletRows as any, txRows);
   const assetTotal = computeAssetTotals((assets.data ?? []) as any, assetEvents ?? []).bookValue;
-  const debtTotal = (debts.data ?? []).filter((d: any) => d.status !== "settled").reduce((s, d: any) => s + Number(d.outstanding ?? 0), 0);
-  const receivableTotal = (receivables.data ?? []).filter((r: any) => r.status !== "collected").reduce((s, r: any) => s + Number(r.outstanding ?? 0), 0);
+  const openDebts = (debts.data ?? []).filter((d: any) => d.status !== "settled" && d.status !== "cancelled");
+  const openReceivables = (receivables.data ?? []).filter((r: any) => r.status !== "settled" && r.status !== "cancelled");
+  const debtTotal = openDebts.reduce((s, d: any) => s + Number(d.outstanding ?? 0), 0);
+  const receivableTotal = openReceivables.reduce((s, r: any) => s + Number(r.outstanding ?? 0), 0);
   const netWorth = walletTotal + assetTotal + receivableTotal - debtTotal;
 
   const { income, expense: expenses } = incomeExpenseForPeriod(txRows, monthStart, monthEnd);
@@ -71,14 +74,23 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
     return s + amt * factor;
   }, 0);
 
-  const upcomingDebts = (debts.data ?? []).filter((d: any) => d.due_date && d.status !== "settled").sort((a: any, b: any) => a.due_date.localeCompare(b.due_date)).slice(0, 5);
+  const upcomingDebts = openDebts.filter((d: any) => d.due_date).sort((a: any, b: any) => a.due_date.localeCompare(b.due_date)).slice(0, 5);
   const activeGoals = (goals.data ?? []).filter((g: any) => g.status !== "achieved").slice(0, 8);
+  const progressData: ProgressInput = {
+    txs: txRows,
+    wallets: walletRows as any,
+    debts: openDebts as any,
+    assets: (assets.data ?? []) as any,
+    assetEvents: assetEvents ?? [],
+    receivables: openReceivables as any,
+    nodes: (budgetNodes.data ?? []) as any,
+  };
 
   const walletLines = walletRows.map((w: any) => `  - ${w.name}: ${fmt(walletBalances.get(w.id) ?? 0)} MGA (${w.currency})`).join("\n");
   const debtLines = upcomingDebts.map((d: any) => `  - ${d.creditor}: ${fmt(Number(d.outstanding ?? 0))} MGA due ${d.due_date}`).join("\n") || "  (aucune échéance proche)";
   const goalLines = activeGoals.map((g: any) => {
-    const pct = g.target_amount ? Math.round((Number(g.current_amount ?? 0) / Number(g.target_amount)) * 100) : 0;
-    return `  - ${g.name}: ${pct}% (${fmt(Number(g.current_amount ?? 0))}/${fmt(Number(g.target_amount ?? 0))} MGA)`;
+    const p = computeGoalProgress(g, progressData);
+    return `  - ${g.name}: ${Math.round(p.pct)}% (${fmt(p.current)}/${fmt(Number(g.target_amount ?? 0))} MGA)`;
   }).join("\n") || "  (aucun objectif actif)";
   const projLines = (projects.data ?? []).slice(0, 5).map((p: any) => `  - ${p.name}: enveloppe ${fmt(Number(p.envelope_balance ?? 0))} / objectif ${fmt(Number(p.target_amount ?? 0))} MGA`).join("\n") || "  (aucun projet actif)";
   const provLines = (provisions.data ?? []).filter((p: any) => p.status !== "settled").slice(0, 8).map((p: any) => `  - ${p.name}: ${fmt(Number(p.amount ?? 0))} MGA (${p.direction}) échéance ${p.due_date ?? "?"}`).join("\n") || "  (aucune provision en cours)";
