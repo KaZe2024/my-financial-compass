@@ -27,7 +27,7 @@ const SAVINGS_WALLET_TYPES = new Set(["savings", "hidden_cash"]);
 
 type Tx = { type: string; base_amount: number | string; amount?: number | string | null; exchange_rate?: number | string | null; occurred_on: string; budget_node_id: string | null; wallet_id?: string | null; to_wallet_id?: string | null };
 type Wallet = { id?: string; current_balance: number | string; opening_balance?: number | string | null; currency?: string | null; type?: string; status?: string | null };
-type Debt = { outstanding: number | string; status?: string };
+type Debt = { outstanding: number | string; original_amount?: number | string | null; status?: string };
 type Asset = { id?: string; current_value: number | string; purchase_value?: number | string | null; status?: string; archived?: boolean | null };
 type Receivable = { outstanding: number | string; status?: string };
 
@@ -101,10 +101,13 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
 
   if (type === "debt_reduction") {
     const outstanding = data.debts.filter(d => d.status !== "settled" && d.status !== "cancelled").reduce((s, d) => s + num(d.outstanding), 0);
-    // target = niveau de dette visé (ex 0). progression = (start - current) / (start - target)
-    // Simplification : si target=0, pct = 100 * (1 - current / initialCap), avec initialCap = max(outstanding, 1)
+    const initial = data.debts
+      .filter(d => d.status !== "cancelled")
+      .reduce((s, d) => s + Math.max(num(d.original_amount), num(d.outstanding)), 0);
+    // target = niveau de dette visé (ex 0). progression = (initial - current) / (initial - target)
     // On affiche la dette restante comme "current", cible atteinte quand outstanding <= target.
-    const pct = outstanding <= target ? 100 : (target > 0 ? Math.max(0, 100 * (1 - (outstanding - target) / outstanding)) : Math.max(0, 100 - outstanding / Math.max(outstanding, 1) * 100));
+    const denominator = Math.max(1, initial - target);
+    const pct = outstanding <= target ? 100 : Math.max(0, Math.min(100, ((initial - outstanding) / denominator) * 100));
     return {
       current: outstanding, target,
       pct: Math.min(100, pct),

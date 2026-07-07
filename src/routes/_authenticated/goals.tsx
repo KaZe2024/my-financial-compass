@@ -49,7 +49,7 @@ function useProgressData() {
 
   const debts = useQuery({
     queryKey: ["debts", "all-for-goals"],
-    queryFn: async () => (await supabase.from("debts").select("outstanding, status")).data ?? [],
+    queryFn: async () => (await supabase.from("debts").select("original_amount, outstanding, status")).data ?? [],
   });
   const assets = useQuery({
     queryKey: ["assets", "all-for-goals"],

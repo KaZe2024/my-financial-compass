@@ -74,7 +74,7 @@ function Dashboard() {
   const nodesQ = useQuery(budgetNodesQO);
   const debtsRows = useQuery({
     queryKey: ["debts", "open"],
-    queryFn: async () => (await supabase.from("debts").select("id, creditor, outstanding, due_date, currency").neq("status","settled").neq("status","cancelled")).data ?? [],
+    queryFn: async () => (await supabase.from("debts").select("id, creditor, original_amount, outstanding, due_date, currency").neq("status","settled").neq("status","cancelled")).data ?? [],
   });
   const recRows = useQuery({
     queryKey: ["rec", "open"],
@@ -212,7 +212,8 @@ function Dashboard() {
     const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
     const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
     const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
-    const monthlyCapacity = savings; // savings this month as a proxy
+    const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
+    const monthlyCapacity = (savings / periodDays) * 30;
     const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
     const eta = monthsAtCurrentPace
       ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
