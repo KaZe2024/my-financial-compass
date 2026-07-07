@@ -391,7 +391,7 @@ function Dashboard() {
             const flat = flattenTree(tree);
             // Sum per root, rolling up all descendants
             const spendByNode = new Map<string, number>();
-            for (const r of nodeSpend.data ?? []) if (r.node_id) spendByNode.set(r.node_id, Number(r.spent));
+            for (const r of nodeSpend) if (r.node_id) spendByNode.set(r.node_id, Number(r.spent));
             function sumSubtree(id: string): number {
               const n = flat.find((x) => x.id === id);
               if (!n) return 0;
@@ -406,7 +406,7 @@ function Dashboard() {
               .slice(0, 8);
             // Also: unassigned
             const assignedIds = new Set(flat.map((n) => n.id));
-            const unassigned = (nodeSpend.data ?? []).filter((r) => !r.node_id || !assignedIds.has(r.node_id))
+            const unassigned = nodeSpend.filter((r) => !r.node_id || !assignedIds.has(r.node_id))
               .reduce((s, r) => s + Number(r.spent), 0);
             if (unassigned > 0) rootData.push({ name: "Non assigné", value: unassigned });
             return (
