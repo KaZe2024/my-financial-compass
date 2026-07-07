@@ -15,6 +15,8 @@ import { HistoryDialog } from "@/components/history-dialog";
 import { Plus, Landmark, Pencil, Archive, ArchiveRestore, Trash2, TrendingDown, RefreshCcw, HandCoins, History as HistoryIcon, Tags, Check, X } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { computeAssetTotals, computeAssetValue } from "@/lib/finance";
 
 /** Linear depreciation: returns {months, cumul, vnc, pct} for a given asset. */
 function computeAmortization(a: any, refDate = new Date()) {
@@ -64,10 +66,18 @@ function AssetsPage() {
     queryKey: ["assets"],
     queryFn: async () => (await supabase.from("assets").select("*").order("purchase_date", { nullsFirst: false, ascending: false })).data ?? [],
   });
+  const assetEvents = useQuery({
+    queryKey: ["asset_events", "assets-page"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+      ),
+  });
 
   const visible = (assets.data ?? []).filter((a: any) => showArchived || !a.archived);
-  const totalCur = visible.filter((a: any) => a.status === "owned").reduce((s: number, a: any) => s + Number(a.current_value), 0);
-  const totalPurchase = visible.filter((a: any) => a.status === "owned").reduce((s: number, a: any) => s + Number(a.purchase_value), 0);
+  const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? []);
+  const totalCur = totalAssetValues.bookValue;
+  const totalPurchase = totalAssetValues.cost;
   const gain = totalCur - totalPurchase;
 
   const [editing, setEditing] = useState<any | null>(null);
@@ -110,19 +120,20 @@ function AssetsPage() {
             </thead>
             <tbody>
               {visible.map((a: any) => {
-                const delta = Number(a.current_value) - Number(a.purchase_value);
+                const value = computeAssetValue(a, assetEvents.data ?? []);
+                const delta = value.bookValue - value.cost;
                 const amo = computeAmortization(a);
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
                     <td className="px-4 py-2 text-muted-foreground">{a.type}</td>
                     <td className="num px-4 py-2 text-muted-foreground">{fmtDate(a.purchase_date)}</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(Number(a.purchase_value), a.currency)}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground" title={amo ? `${amo.months}/${amo.life} mois (${Math.round(amo.pct * 100)}%)` : "—"}>
-                      {amo ? fmtMoney(amo.cumul, a.currency) : "—"}
+                    <td className="num px-4 py-2 text-right">{fmtMoney(value.cost, a.currency)}</td>
+                    <td className="num px-4 py-2 text-right text-muted-foreground" title={amo ? `${amo.months}/${amo.life} mois théoriques (${Math.round(amo.pct * 100)}%)` : "Amortissements saisis"}>
+                      {value.depreciation ? fmtMoney(value.depreciation, a.currency) : "—"}
                     </td>
-                    <td className="num px-4 py-2 text-right">{amo ? fmtMoney(amo.vnc, a.currency) : "—"}</td>
-                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(Number(a.current_value), a.currency)}</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
+                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.bookValue, a.currency)}</td>
                     <td className={`num px-4 py-2 text-right ${delta >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(delta, a.currency, { sign: true })}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
                     <td className="px-2 py-2 text-right">
