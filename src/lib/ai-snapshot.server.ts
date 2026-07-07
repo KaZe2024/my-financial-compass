@@ -1,4 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  averageDailyCashOut,
+  computeAssetTotals,
+  computeWalletBalances,
+  incomeExpenseForPeriod,
+  monthlyCashflowFromTransactions,
+  sumAvailableCash,
+} from "@/lib/finance";
 
 function fmt(n: number) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(Math.round(n));
@@ -11,11 +19,25 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
   const ytdStart = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
 
-  const [wallets, txMonth, txYtd, assets, debts, receivables, goals, subs, provisions, projects, budgetNodes] = await Promise.all([
-    supabase.from("wallets").select("name, balance, currency, base_balance"),
-    supabase.from("transactions").select("type, base_amount, occurred_on").gte("occurred_on", monthStart).lte("occurred_on", monthEnd),
-    supabase.from("transactions").select("type, base_amount").gte("occurred_on", ytdStart),
-    supabase.from("assets").select("name, current_value, type, status").eq("archived", false),
+  const ltmStart = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().slice(0, 10);
+
+  async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>) {
+    const out: T[] = [];
+    for (let from = 0; from < 1_000_000; from += 1000) {
+      const { data, error } = await build(from, from + 999);
+      if (error) throw new Error(error.message ?? String(error));
+      const page = data ?? [];
+      out.push(...page);
+      if (page.length < 1000) break;
+    }
+    return out;
+  }
+
+  const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes] = await Promise.all([
+    supabase.from("wallets").select("id, name, type, currency, opening_balance, current_balance, status"),
+    fetchAll<any>((from, to) => supabase.from("transactions").select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id").range(from, to)),
+    supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived").eq("archived", false),
+    fetchAll<any>((from, to) => supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to)),
     supabase.from("debts").select("creditor, outstanding, due_date, status").eq("archived", false),
     supabase.from("receivables").select("debtor, outstanding, due_date, status").eq("archived", false),
     supabase.from("financial_goals").select("name, current_amount, target_amount, target_date, status"),
@@ -25,19 +47,22 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
     supabase.from("budget_nodes").select("id, name, parent_id, kind, is_income").eq("archived", false),
   ]);
 
-  const walletTotal = (wallets.data ?? []).reduce((s, w: any) => s + Number(w.base_balance ?? 0), 0);
-  const assetTotal = (assets.data ?? []).reduce((s, a: any) => s + Number(a.current_value ?? 0), 0);
+  const txRows = txAll ?? [];
+  const walletRows = wallets.data ?? [];
+  const walletBalances = computeWalletBalances(walletRows as any, txRows);
+  const walletTotal = sumAvailableCash(walletRows as any, txRows);
+  const assetTotal = computeAssetTotals((assets.data ?? []) as any, assetEvents ?? []).bookValue;
   const debtTotal = (debts.data ?? []).filter((d: any) => d.status !== "settled").reduce((s, d: any) => s + Number(d.outstanding ?? 0), 0);
   const receivableTotal = (receivables.data ?? []).filter((r: any) => r.status !== "collected").reduce((s, r: any) => s + Number(r.outstanding ?? 0), 0);
   const netWorth = walletTotal + assetTotal + receivableTotal - debtTotal;
 
-  const income = (txMonth.data ?? []).filter((t: any) => t.type === "income").reduce((s, t: any) => s + Number(t.base_amount ?? 0), 0);
-  const expenses = (txMonth.data ?? []).filter((t: any) => t.type === "expense").reduce((s, t: any) => s + Number(t.base_amount ?? 0), 0);
+  const { income, expense: expenses } = incomeExpenseForPeriod(txRows, monthStart, monthEnd);
   const savings = income - expenses;
   const savingsRate = income > 0 ? (savings / income) * 100 : 0;
 
-  const ytdIncome = (txYtd.data ?? []).filter((t: any) => t.type === "income").reduce((s, t: any) => s + Number(t.base_amount ?? 0), 0);
-  const ytdExpenses = (txYtd.data ?? []).filter((t: any) => t.type === "expense").reduce((s, t: any) => s + Number(t.base_amount ?? 0), 0);
+  const { income: ytdIncome, expense: ytdExpenses } = incomeExpenseForPeriod(txRows, ytdStart, monthEnd);
+  const ltmCashflow = monthlyCashflowFromTransactions(txRows, ltmStart, monthEnd);
+  const avgDailyOut = averageDailyCashOut(txRows, 90, now);
 
   const monthlySubs = (subs.data ?? []).reduce((s, x: any) => {
     const amt = Number(x.amount ?? 0);
@@ -49,7 +74,7 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const upcomingDebts = (debts.data ?? []).filter((d: any) => d.due_date && d.status !== "settled").sort((a: any, b: any) => a.due_date.localeCompare(b.due_date)).slice(0, 5);
   const activeGoals = (goals.data ?? []).filter((g: any) => g.status !== "achieved").slice(0, 8);
 
-  const walletLines = (wallets.data ?? []).map((w: any) => `  - ${w.name}: ${fmt(Number(w.base_balance ?? 0))} MGA (${w.currency})`).join("\n");
+  const walletLines = walletRows.map((w: any) => `  - ${w.name}: ${fmt(walletBalances.get(w.id) ?? 0)} MGA (${w.currency})`).join("\n");
   const debtLines = upcomingDebts.map((d: any) => `  - ${d.creditor}: ${fmt(Number(d.outstanding ?? 0))} MGA due ${d.due_date}`).join("\n") || "  (aucune échéance proche)";
   const goalLines = activeGoals.map((g: any) => {
     const pct = g.target_amount ? Math.round((Number(g.current_amount ?? 0) / Number(g.target_amount)) * 100) : 0;
@@ -73,10 +98,14 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
 - Dépenses: ${fmt(expenses)} MGA
 - Épargne nette: ${fmt(savings)} MGA (taux ${savingsRate.toFixed(1)}%)
 - Coût mensualisé des abonnements: ${fmt(monthlySubs)} MGA
+- Sorties moyennes 90j: ${fmt(avgDailyOut * 30)} MGA/mois
 
 **YTD** (depuis ${ytdStart})
 - Revenus cumulés: ${fmt(ytdIncome)} MGA
 - Dépenses cumulées: ${fmt(ytdExpenses)} MGA
+
+**Flux 12 derniers mois**
+${ltmCashflow.map((r) => `  - ${r.month.slice(0, 7)}: revenus ${fmt(r.income)} MGA · sorties ${fmt(r.expense)} MGA`).join("\n") || "  (aucune transaction)"}
 
 **Portefeuilles**
 ${walletLines || "  (aucun)"}
