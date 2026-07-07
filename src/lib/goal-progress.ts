@@ -1,5 +1,6 @@
 import { buildTree, descendantIds, type BudgetNode } from "@/lib/budget-nodes";
 import { resolvePeriod, isoDate, type PeriodPreset } from "@/lib/period";
+import { baseAmount, computeAssetTotals, sumAvailableCash, type AssetEventLike } from "@/lib/finance";
 
 export type GoalType =
   | "savings_balance"    // Solde d'épargne (trésorerie cumulée)
@@ -24,10 +25,10 @@ export const GOAL_TYPES_NEED_PERIOD: GoalType[] = ["spending_cap", "category_spe
 // Wallet types considered "savings buckets" for the savings_rate goal.
 const SAVINGS_WALLET_TYPES = new Set(["savings", "hidden_cash"]);
 
-type Tx = { type: string; base_amount: number | string; occurred_on: string; budget_node_id: string | null };
-type Wallet = { current_balance: number | string; type?: string };
+type Tx = { type: string; base_amount: number | string; amount?: number | string | null; exchange_rate?: number | string | null; occurred_on: string; budget_node_id: string | null; wallet_id?: string | null; to_wallet_id?: string | null };
+type Wallet = { id?: string; current_balance: number | string; opening_balance?: number | string | null; currency?: string | null; type?: string; status?: string | null };
 type Debt = { outstanding: number | string; status?: string };
-type Asset = { current_value: number | string; status?: string };
+type Asset = { id?: string; current_value: number | string; purchase_value?: number | string | null; status?: string; archived?: boolean | null };
 type Receivable = { outstanding: number | string; status?: string };
 
 export type ProgressInput = {
@@ -35,6 +36,7 @@ export type ProgressInput = {
   wallets: Wallet[];
   debts: Debt[];
   assets: Asset[];
+  assetEvents?: AssetEventLike[];
   receivables: Receivable[];
   nodes: BudgetNode[];
 };
@@ -49,6 +51,18 @@ export type ProgressResult = {
 
 function num(v: any) { return Number(v ?? 0); }
 
+function cashFromTransactions(data: ProgressInput) {
+  const wallets = data.wallets.filter((w): w is Wallet & { id: string } => !!w.id);
+  if (!wallets.length) return data.wallets.reduce((s, w) => s + num(w.current_balance), 0);
+  return sumAvailableCash(wallets, data.txs as any);
+}
+
+function assetTotalFromEvents(data: ProgressInput) {
+  const assets = data.assets.filter((a): a is Asset & { id: string } => !!a.id);
+  if (!assets.length) return data.assets.filter(a => (a.status ?? "owned") === "owned").reduce((s, a) => s + num(a.current_value), 0);
+  return computeAssetTotals(assets as any, data.assetEvents ?? []).bookValue;
+}
+
 function periodWindow(scope: string | null | undefined, ps?: string | null, pe?: string | null) {
   const preset = (scope ?? "ytd") as PeriodPreset;
   const custom = preset === "custom" ? { from: ps ?? undefined, to: pe ?? undefined } : undefined;
@@ -61,10 +75,8 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   const target = num(goal.target_amount);
 
   if (type === "savings_balance") {
-    // Solde de trésorerie disponible: tous les portefeuilles sauf crédit
-    const current = data.wallets
-      .filter(w => (w.type ?? "") !== "credit")
-      .reduce((s, w) => s + num(w.current_balance), 0);
+    // Solde de trésorerie disponible: solde d'ouverture + impacts de transactions.
+    const current = cashFromTransactions({ ...data, wallets: data.wallets.filter(w => (w.type ?? "") !== "credit") });
     return {
       current, target,
       pct: target > 0 ? Math.min(100, (current / target) * 100) : 0,
@@ -74,8 +86,8 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
   }
 
   if (type === "net_worth") {
-    const cash = data.wallets.reduce((s, w) => s + num(w.current_balance), 0);
-    const assets = data.assets.filter(a => (a.status ?? "owned") === "owned").reduce((s, a) => s + num(a.current_value), 0);
+    const cash = cashFromTransactions(data);
+    const assets = assetTotalFromEvents(data);
     const debts = data.debts.filter(d => d.status !== "settled" && d.status !== "cancelled").reduce((s, d) => s + num(d.outstanding), 0);
     const rec = data.receivables.filter(r => r.status !== "settled" && r.status !== "cancelled").reduce((s, r) => s + num(r.outstanding), 0);
     const current = cash + assets + rec - debts;
@@ -113,7 +125,7 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
     const spent = data.txs
       .filter(t => t.type === "expense" && inRange(t))
       .filter(t => !nodeIds || (t.budget_node_id && nodeIds.has(t.budget_node_id)))
-      .reduce((s, t) => s + num(t.base_amount), 0);
+      .reduce((s, t) => s + baseAmount(t as any), 0);
     return {
       current: spent, target,
       pct: target > 0 ? Math.min(100, (spent / target) * 100) : 0,
@@ -124,12 +136,9 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
 
   if (type === "savings_rate") {
     const inPeriod = data.txs.filter(inRange);
-    const income = inPeriod.filter(t => t.type === "income").reduce((s, t) => s + num(t.base_amount), 0);
-    // Épargne = solde des wallets de type "savings" ou "hidden_cash"
-    const saved = data.wallets
-      .filter(w => SAVINGS_WALLET_TYPES.has(w.type ?? ""))
-      .reduce((s, w) => s + num(w.current_balance), 0);
-    const rate = income > 0 ? (saved / income) * 100 : 0;
+    const income = inPeriod.filter(t => t.type === "income").reduce((s, t) => s + baseAmount(t as any), 0);
+    const expense = inPeriod.filter(t => t.type === "expense").reduce((s, t) => s + baseAmount(t as any), 0);
+    const rate = income > 0 ? ((income - expense) / income) * 100 : 0;
     return {
       current: rate, target,
       pct: target > 0 ? Math.min(100, Math.max(0, (rate / target) * 100)) : 0,
