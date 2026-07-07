@@ -43,7 +43,7 @@ function useProgressData() {
     queryKey: ["tx", "for-goals"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
-        supabase.from("transactions").select("type, base_amount, occurred_on, budget_node_id").range(from, to),
+        supabase.from("transactions").select("type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id").range(from, to),
       ),
   });
 
