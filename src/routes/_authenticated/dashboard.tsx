@@ -11,6 +11,17 @@ import { resolvePeriod, isoDate } from "@/lib/period";
 import { NodePicker } from "@/components/node-picker";
 import { advanceDate } from "@/lib/recurring";
 import { logAudit } from "@/lib/audit";
+import { fetchAllRows } from "@/lib/fetch-all";
+import {
+  averageDailyCashOut,
+  computeAssetTotals,
+  computeAssetValue,
+  directNodeSpendFromTransactions,
+  incomeExpenseForPeriod,
+  monthlyCashflowFromTransactions,
+  sumAvailableCash,
+} from "@/lib/finance";
+import { computeGoalProgress, type ProgressInput } from "@/lib/goal-progress";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +33,7 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  buildAllocation, buildForecast, computeHealth, dailyAverageExpense,
+  buildAllocation, buildForecast, computeHealth,
   dailyRecurringIncome, dailySubscriptions, forecastAt, growthRate, scoreTone,
 } from "@/lib/analytics";
 
@@ -49,52 +60,21 @@ function Dashboard() {
   const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
   const ninetyAgo = new Date(now.getTime() - 90 * 86_400_000);
 
-  const txMonth = useQuery({
-    queryKey: ["tx", "period", periodFrom, periodTo],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("transactions")
-        .select("type, base_amount, occurred_on")
-        .gte("occurred_on", periodFrom)
-        .lte("occurred_on", periodTo);
-      if (error) throw error;
-      return data;
-    },
-  });
-
-
-  const tx90 = useQuery({
-    queryKey: ["tx", "90d"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("transactions")
-        .select("type, base_amount, occurred_on")
-        .gte("occurred_on", toISODate(ninetyAgo));
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const cashflow = useQuery({
-    queryKey: ["cashflow", "12m"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("v_monthly_cashflow").select("*").gte("month", toISODate(twelveAgo)).order("month");
-      if (error) throw error;
-      return data;
-    },
+  const allTx = useQuery({
+    queryKey: ["transactions", "for-dashboard"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+          .range(from, to),
+      ),
   });
 
   const nodesQ = useQuery(budgetNodesQO);
-  const nodeSpend = useQuery({
-    queryKey: ["nodespend", "month", monthStartISO],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("v_node_spend").select("*").eq("month", monthStartISO);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   const debtsRows = useQuery({
     queryKey: ["debts", "open"],
-    queryFn: async () => (await supabase.from("debts").select("id, creditor, outstanding, due_date, currency").neq("status","settled").neq("status","cancelled")).data ?? [],
+    queryFn: async () => (await supabase.from("debts").select("id, creditor, original_amount, outstanding, due_date, currency").neq("status","settled").neq("status","cancelled")).data ?? [],
   });
   const recRows = useQuery({
     queryKey: ["rec", "open"],
@@ -115,7 +95,14 @@ function Dashboard() {
   const nodesForToday = useQuery(budgetNodesQO);
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
-    queryFn: async () => (await supabase.from("assets").select("type, current_value").eq("status","owned")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_value, current_value, status, archived").eq("status","owned")).data ?? [],
+  });
+  const assetEvents = useQuery({
+    queryKey: ["asset_events", "dashboard"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+      ),
   });
   const snaps = useQuery({
     queryKey: ["snapshots", "recent"],
@@ -123,7 +110,7 @@ function Dashboard() {
   });
   const goals = useQuery({
     queryKey: ["goals", "active"],
-    queryFn: async () => (await supabase.from("financial_goals").select("id, name, target_amount, current_amount, target_date, currency").eq("status","active").order("target_date", { ascending: true })).data ?? [],
+    queryFn: async () => (await supabase.from("financial_goals").select("*").eq("status","active").order("target_date", { ascending: true })).data ?? [],
   });
   const recentTx = useQuery({
     queryKey: ["tx", "recent"],
@@ -137,18 +124,24 @@ function Dashboard() {
   });
 
   const cur = profile.data?.base_currency ?? "MGA";
-  const cash = (wallets.data ?? []).reduce((s, w) => s + Number(w.current_balance), 0);
-  const totalAssets = (assetsRows.data ?? []).reduce((s, a) => s + Number(a.current_value), 0);
+  const txRows = allTx.data ?? [];
+  const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
+  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? []);
+  const totalAssets = assetTotals.bookValue;
   const totalDebt = (debtsRows.data ?? []).reduce((s, d) => s + Number(d.outstanding), 0);
   const totalRec = (recRows.data ?? []).reduce((s, r) => s + Number(r.outstanding), 0);
-  const income = (txMonth.data ?? []).filter(t => t.type === "income").reduce((s, t) => s + Number(t.base_amount), 0);
-  const expense = (txMonth.data ?? []).filter(t => t.type === "expense").reduce((s, t) => s + Number(t.base_amount), 0);
+  const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);
   const savings = income - expense;
   const savingsRate = income > 0 ? (savings / income) * 100 : 0;
   const netWorth = cash + totalAssets + totalRec - totalDebt;
 
   // Growth from snapshots
-  const snapList = snaps.data ?? [];
+  const fromMonth = periodFrom.slice(0, 7);
+  const toMonth = periodTo.slice(0, 7);
+  const snapList = (snaps.data ?? []).filter((s: any) => {
+    const m = String(s.snapshot_month).slice(0, 7);
+    return m >= fromMonth && m <= toMonth;
+  });
   const lastSnap = snapList[snapList.length - 1];
   const monthAgoSnap = snapList[snapList.length - 2];
   const threeAgoSnap = snapList[snapList.length - 4];
@@ -162,7 +155,7 @@ function Dashboard() {
 
   // Forecast
   const dailyIn = dailyRecurringIncome(incomeSrc.data ?? []);
-  const dailyExp = dailyAverageExpense(tx90.data ?? [], 90) + dailySubscriptions(subs.data ?? []);
+  const dailyExp = averageDailyCashOut(txRows, 90) + dailySubscriptions(subs.data ?? []);
   const forecast = buildForecast({
     startingCash: cash,
     dailyIncome: dailyIn,
@@ -190,7 +183,11 @@ function Dashboard() {
   });
 
   // Allocation
-  const allocation = buildAllocation(assetsRows.data ?? [], cash);
+  const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
+    type: a.type,
+    current_value: computeAssetValue(a, assetEvents.data ?? []).bookValue,
+  }));
+  const allocation = buildAllocation(assetAllocationRows, cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 
   // Wealth evolution (snapshots + current point)
@@ -201,22 +198,35 @@ function Dashboard() {
 
   // Goal forecast
   const goalForecasts = (goals.data ?? []).slice(0, 4).map((g: any) => {
-    const remaining = Math.max(0, Number(g.target_amount) - Number(g.current_amount));
+    const progressData: ProgressInput = {
+      txs: txRows,
+      wallets: wallets.data ?? [],
+      debts: debtsRows.data ?? [],
+      assets: assetsRows.data ?? [],
+      assetEvents: assetEvents.data ?? [],
+      receivables: recRows.data ?? [],
+      nodes: nodesQ.data ?? [],
+    };
+    const computed = computeGoalProgress(g, progressData);
+    const currentAmount = computed.current;
+    const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
     const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
     const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
-    const monthlyCapacity = savings; // savings this month as a proxy
+    const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
+    const monthlyCapacity = (savings / periodDays) * 30;
     const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
     const eta = monthsAtCurrentPace
       ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
       : null;
     const onTrack = monthlyNeeded != null && monthlyCapacity >= monthlyNeeded;
-    const progress = Number(g.target_amount) > 0 ? (Number(g.current_amount) / Number(g.target_amount)) * 100 : 0;
-    return { ...g, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
+    const progress = computed.pct;
+    return { ...g, current_amount: currentAmount, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
   });
 
-  const cfChart = (cashflow.data ?? []).map((r: any) => ({
+  const cfChart = monthlyCashflowFromTransactions(txRows, toISODate(twelveAgo), toISODate(now)).map((r: any) => ({
     month: fmtMonth(r.month), income: Number(r.income), expense: Number(r.expense),
   }));
+  const nodeSpend = directNodeSpendFromTransactions(txRows, periodFrom, periodTo);
 
   return (
     <div className="space-y-6">
@@ -382,7 +392,7 @@ function Dashboard() {
             const flat = flattenTree(tree);
             // Sum per root, rolling up all descendants
             const spendByNode = new Map<string, number>();
-            for (const r of nodeSpend.data ?? []) if (r.node_id) spendByNode.set(r.node_id, Number(r.spent));
+            for (const r of nodeSpend) if (r.node_id) spendByNode.set(r.node_id, Number(r.spent));
             function sumSubtree(id: string): number {
               const n = flat.find((x) => x.id === id);
               if (!n) return 0;
@@ -397,7 +407,7 @@ function Dashboard() {
               .slice(0, 8);
             // Also: unassigned
             const assignedIds = new Set(flat.map((n) => n.id));
-            const unassigned = (nodeSpend.data ?? []).filter((r) => !r.node_id || !assignedIds.has(r.node_id))
+            const unassigned = nodeSpend.filter((r) => !r.node_id || !assignedIds.has(r.node_id))
               .reduce((s, r) => s + Number(r.spent), 0);
             if (unassigned > 0) rootData.push({ name: "Non assigné", value: unassigned });
             return (
