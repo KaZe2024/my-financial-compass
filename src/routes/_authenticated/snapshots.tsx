@@ -14,6 +14,8 @@ import { buildAllocation, growthRate } from "@/lib/analytics";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
 import { logAudit } from "@/lib/audit";
+import { fetchAllRows } from "@/lib/fetch-all";
+import { computeAssetTotals, computeAssetValue, incomeExpenseForPeriod, sumAvailableCash } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
   head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
@@ -35,11 +37,28 @@ function SnapshotsPage() {
   });
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
-    queryFn: async () => (await supabase.from("assets").select("type, current_value").eq("status", "owned")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_value, current_value, status, archived").eq("status", "owned")).data ?? [],
+  });
+  const assetEvents = useQuery({
+    queryKey: ["asset_events", "snapshots"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+      ),
   });
   const wallets = useQuery({
     queryKey: ["wallets"],
-    queryFn: async () => (await supabase.from("wallets").select("current_balance")).data ?? [],
+    queryFn: async () => (await supabase.from("wallets").select("id, type, currency, opening_balance, current_balance, status")).data ?? [],
+  });
+  const allTx = useQuery({
+    queryKey: ["transactions", "snapshots"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+          .range(from, to),
+      ),
   });
 
   const [captureFor, setCaptureFor] = useState<string | null>(null);
@@ -53,21 +72,28 @@ function SnapshotsPage() {
       const from = month;
       const to = toISODate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0));
 
-      const [wRes, dRes, rRes, aRes, txRes] = await Promise.all([
-        supabase.from("wallets").select("current_balance"),
+      const [wRes, dRes, rRes, aRes, aeRows, txRows] = await Promise.all([
+        supabase.from("wallets").select("id, type, currency, opening_balance, current_balance, status"),
         supabase.from("debts").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
         supabase.from("receivables").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
-        supabase.from("assets").select("current_value").eq("status", "owned"),
-        supabase.from("transactions").select("type, base_amount").gte("occurred_on", from).lte("occurred_on", to),
+        supabase.from("assets").select("id, purchase_value, current_value, status, archived").eq("status", "owned"),
+        fetchAllRows<any>((fromRange, toRange) =>
+          supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(fromRange, toRange),
+        ),
+        fetchAllRows<any>((fromRange, toRange) =>
+          supabase
+            .from("transactions")
+            .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+            .range(fromRange, toRange),
+        ),
       ]);
 
-      const cash = (wRes.data ?? []).reduce((s, w) => s + Number(w.current_balance), 0);
+      const cash = sumAvailableCash(wRes.data ?? [], txRows, { through: to });
       const totalDebt = (dRes.data ?? []).reduce((s, w) => s + Number(w.outstanding), 0);
       const totalRec = (rRes.data ?? []).reduce((s, w) => s + Number(w.outstanding), 0);
-      const totalAssets = (aRes.data ?? []).reduce((s, w) => s + Number(w.current_value), 0);
+      const totalAssets = computeAssetTotals(aRes.data ?? [], aeRows, { through: to }).bookValue;
       const net = cash + totalAssets + totalRec - totalDebt;
-      const income = (txRes.data ?? []).filter(t => t.type === "income").reduce((s, t) => s + Number(t.base_amount), 0);
-      const expense = (txRes.data ?? []).filter(t => t.type === "expense").reduce((s, t) => s + Number(t.base_amount), 0);
+      const { income, expense } = incomeExpenseForPeriod(txRows, from, to);
 
       const { error } = await supabase.from("monthly_snapshots").upsert({
         user_id: uid, snapshot_month: month,
@@ -132,8 +158,12 @@ function SnapshotsPage() {
     debt: -Number(s.total_debt),
   }));
 
-  const cash = (Array.isArray(wallets.data) ? wallets.data : []).reduce((s: number, w: any) => s + Number(w.current_balance), 0);
-  const allocation = buildAllocation(assetsRows.data ?? [], cash);
+  const cash = sumAvailableCash(Array.isArray(wallets.data) ? wallets.data : [], allTx.data ?? []);
+  const allocationRows = (assetsRows.data ?? []).map((a: any) => ({
+    type: a.type,
+    current_value: computeAssetValue(a, assetEvents.data ?? []).bookValue,
+  }));
+  const allocation = buildAllocation(allocationRows, cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 
   return (
