@@ -394,9 +394,8 @@ function AmortDialog({ asset, nodes, onClose, onDone }: { asset: any; nodes: any
         } as any);
         if (error) throw error;
       }
-      // Baisse la valeur courante
-      const currentVal = Math.max(0, Number(asset.current_value) - totalPending);
-      await supabase.from("assets").update({ current_value: currentVal }).eq("id", asset.id);
+      // Ne pas toucher à current_value : la Valeur est pilotée par la réévaluation.
+      // Le VNC (Coût − Amortissement cumulé) est recalculé à la volée.
     },
     onSuccess: () => { toast.success(`${pending.length} amortissement(s) générés`); onDone(); },
     onError: (e: Error) => toast.error(e.message),
