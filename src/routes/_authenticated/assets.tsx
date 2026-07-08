@@ -245,7 +245,7 @@ function AssetDialog({ editingAsset, types, wallets, onDone, onClose }: { editin
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       const pv = Number(form.purchase_value || 0);
-      const cv = Number(form.current_value || pv);
+      const cv = Number(form.current_value || 0); // 0 = pas de réévaluation → Valeur = VNC
       const payload: any = {
         user_id: u.user!.id, name: form.name, type: form.type,
         purchase_date: form.purchase_date || null, purchase_value: pv, current_value: cv,
