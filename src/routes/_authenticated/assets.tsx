@@ -76,7 +76,7 @@ function AssetsPage() {
 
   const visible = (assets.data ?? []).filter((a: any) => showArchived || !a.archived);
   const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? []);
-  const totalCur = totalAssetValues.bookValue;
+  const totalCur = totalAssetValues.marketValue;
   const totalPurchase = totalAssetValues.cost;
   const gain = totalCur - totalPurchase;
 
@@ -121,7 +121,6 @@ function AssetsPage() {
             <tbody>
               {visible.map((a: any) => {
                 const value = computeAssetValue(a, assetEvents.data ?? []);
-                const delta = value.bookValue - value.cost;
                 const amo = computeAmortization(a);
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
@@ -133,8 +132,8 @@ function AssetsPage() {
                       {value.depreciation ? fmtMoney(value.depreciation, a.currency) : "—"}
                     </td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className={`num px-4 py-2 text-right ${delta >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(delta, a.currency, { sign: true })}</td>
+                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.marketValue, a.currency)}</td>
+                    <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
                     <td className="px-2 py-2 text-right">
                       <div className="flex items-center justify-end gap-0.5 text-muted-foreground">
@@ -246,7 +245,7 @@ function AssetDialog({ editingAsset, types, wallets, onDone, onClose }: { editin
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       const pv = Number(form.purchase_value || 0);
-      const cv = Number(form.current_value || pv);
+      const cv = Number(form.current_value || 0); // 0 = pas de réévaluation → Valeur = VNC
       const payload: any = {
         user_id: u.user!.id, name: form.name, type: form.type,
         purchase_date: form.purchase_date || null, purchase_value: pv, current_value: cv,
@@ -395,9 +394,8 @@ function AmortDialog({ asset, nodes, onClose, onDone }: { asset: any; nodes: any
         } as any);
         if (error) throw error;
       }
-      // Baisse la valeur courante
-      const currentVal = Math.max(0, Number(asset.current_value) - totalPending);
-      await supabase.from("assets").update({ current_value: currentVal }).eq("id", asset.id);
+      // Ne pas toucher à current_value : la Valeur est pilotée par la réévaluation.
+      // Le VNC (Coût − Amortissement cumulé) est recalculé à la volée.
     },
     onSuccess: () => { toast.success(`${pending.length} amortissement(s) générés`); onDone(); },
     onError: (e: Error) => toast.error(e.message),

@@ -294,18 +294,18 @@ function PayDialog({ prov, wallets, onDone, onClose }: { prov: any; wallets: any
       if (!prov.booking_tx_id) {
         await bookProvisionTx(prov, uid);
       }
-      // 2) Extourne (sens inverse, sans portefeuille, même budget)
-      const reversalType = prov.direction === "in" ? "expense" : "income";
+      // 2) Extourne : même type que la constatation, montant négatif (auto-annulation)
+      const reversalType = prov.direction === "in" ? "income" : "expense";
       const { data: reversal, error: rErr } = await supabase.from("transactions").insert({
         user_id: uid,
         type: reversalType,
         occurred_on: paidOn,
         description: `Extourne provision · ${prov.name}`,
         wallet_id: null,
-        amount: amt,
+        amount: -amt,
         currency: prov.currency ?? "MGA",
         exchange_rate: 1,
-        base_amount: amt,
+        base_amount: -amt,
         budget_node_id: prov.budget_node_id ?? null,
         counterparty_id: prov.counterparty_id ?? null,
         source_kind: "provision",

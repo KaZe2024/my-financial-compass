@@ -13,6 +13,7 @@ import { advanceDate } from "@/lib/recurring";
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 import {
+  averageDailyCashIn,
   averageDailyCashOut,
   computeAssetTotals,
   computeAssetValue,
@@ -34,7 +35,7 @@ import {
 } from "recharts";
 import {
   buildAllocation, buildForecast, computeHealth,
-  dailyRecurringIncome, dailySubscriptions, forecastAt, growthRate, scoreTone,
+  forecastAt, growthRate, scoreTone,
 } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -66,7 +67,7 @@ function Dashboard() {
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind")
           .range(from, to),
       ),
   });
@@ -127,7 +128,7 @@ function Dashboard() {
   const txRows = allTx.data ?? [];
   const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
   const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? []);
-  const totalAssets = assetTotals.bookValue;
+  const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC)
   const totalDebt = (debtsRows.data ?? []).reduce((s, d) => s + Number(d.outstanding), 0);
   const totalRec = (recRows.data ?? []).reduce((s, r) => s + Number(r.outstanding), 0);
   const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);
@@ -153,9 +154,9 @@ function Dashboard() {
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
 
-  // Forecast
-  const dailyIn = dailyRecurringIncome(incomeSrc.data ?? []);
-  const dailyExp = averageDailyCashOut(txRows, 90) + dailySubscriptions(subs.data ?? []);
+  // Forecast — moyennes basées sur les transactions opérationnelles réelles (90 j).
+  const dailyIn = averageDailyCashIn(txRows, 90);
+  const dailyExp = averageDailyCashOut(txRows, 90);
   const forecast = buildForecast({
     startingCash: cash,
     dailyIncome: dailyIn,
@@ -185,7 +186,7 @@ function Dashboard() {
   // Allocation
   const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
     type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? []).bookValue,
+    current_value: computeAssetValue(a, assetEvents.data ?? []).marketValue,
   }));
   const allocation = buildAllocation(assetAllocationRows, cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
@@ -334,7 +335,7 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
           <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Basé sur revenus récurrents ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois), dépenses moyennes ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois), dettes, créances et provisions.
+            Basé sur les revenus moyens observés ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois) et dépenses moyennes hors investissements/provisions ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois) sur 90 j, plus dettes/créances/provisions échéant.
           </p>
         </Panel>
 

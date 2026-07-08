@@ -11,6 +11,7 @@ export type TransactionLike = {
   currency?: string | null;
   occurred_on?: string | null;
   budget_node_id?: string | null;
+  source_kind?: string | null;
 };
 
 export type WalletLike = {
@@ -55,6 +56,19 @@ export function baseAmount(t: TransactionLike) {
   const stored = num(t.base_amount);
   if (stored !== 0) return stored;
   return num(t.amount) * (num(t.exchange_rate) || 1);
+}
+
+/**
+ * Vrai flux de trésorerie opérationnel = mouvement de cash sur un portefeuille,
+ * hors écritures comptables (constatation/extourne de provisions, dotations
+ * aux amortissements). Utilisé pour l'analyse revenus / dépenses / train de vie.
+ * Les achats/ventes d'actifs sont exclus car ils ne sont pas de type income/expense.
+ */
+export function isOperationalIE(t: TransactionLike) {
+  if (t.type !== "income" && t.type !== "expense") return false;
+  if (!t.wallet_id) return false; // écritures d'amortissement / constatation / extourne
+  if (t.source_kind === "asset") return false;
+  return true;
 }
 
 export function signedCashImpact(t: TransactionLike, walletId?: string | null) {
@@ -115,13 +129,14 @@ export function transactionsInPeriod<T extends TransactionLike>(txs: T[], from: 
 }
 
 export function incomeExpenseForPeriod(txs: TransactionLike[], from: string, to: string) {
-  const period = transactionsInPeriod(txs, from, to);
+  const period = transactionsInPeriod(txs, from, to).filter(isOperationalIE);
   return {
     income: period.filter((t) => t.type === "income").reduce((s, t) => s + baseAmount(t), 0),
     expense: period.filter((t) => t.type === "expense").reduce((s, t) => s + baseAmount(t), 0),
   };
 }
 
+/** Moyenne des sorties opérationnelles par jour (hors achats d'actifs, provisions, amortissements, transferts). */
 export function averageDailyCashOut(txs: TransactionLike[], daysWindow = 90, ref = new Date()) {
   const cutoff = new Date(ref);
   cutoff.setDate(cutoff.getDate() - daysWindow);
@@ -129,21 +144,35 @@ export function averageDailyCashOut(txs: TransactionLike[], daysWindow = 90, ref
   const to = ref.toISOString().slice(0, 10);
   const total = txs
     .filter((t) => inWindow(t.occurred_on, from, to))
-    .reduce((s, t) => {
-      const impact = signedCashImpact(t, null);
-      return impact < 0 ? s + Math.abs(impact) : s;
-    }, 0);
+    .filter(isOperationalIE)
+    .filter((t) => t.type === "expense")
+    .reduce((s, t) => s + baseAmount(t), 0);
+  return total / daysWindow;
+}
+
+/** Moyenne des entrées opérationnelles par jour sur la fenêtre donnée. */
+export function averageDailyCashIn(txs: TransactionLike[], daysWindow = 90, ref = new Date()) {
+  const cutoff = new Date(ref);
+  cutoff.setDate(cutoff.getDate() - daysWindow);
+  const from = cutoff.toISOString().slice(0, 10);
+  const to = ref.toISOString().slice(0, 10);
+  const total = txs
+    .filter((t) => inWindow(t.occurred_on, from, to))
+    .filter(isOperationalIE)
+    .filter((t) => t.type === "income")
+    .reduce((s, t) => s + baseAmount(t), 0);
   return total / daysWindow;
 }
 
 export function monthlyCashflowFromTransactions(txs: TransactionLike[], from: string, to: string) {
   const months = new Map<string, { month: string; income: number; expense: number }>();
   for (const t of transactionsInPeriod(txs, from, to)) {
+    if (!isOperationalIE(t)) continue;
     const month = String(t.occurred_on).slice(0, 7) + "-01";
     const row = months.get(month) ?? { month, income: 0, expense: 0 };
-    const impact = signedCashImpact(t, null);
-    if (impact > 0) row.income += impact;
-    if (impact < 0) row.expense += Math.abs(impact);
+    const amt = baseAmount(t);
+    if (t.type === "income") row.income += amt;
+    else if (t.type === "expense") row.expense += amt;
     months.set(month, row);
   }
   return Array.from(months.values()).sort((a, b) => a.month.localeCompare(b.month));
@@ -154,6 +183,7 @@ export function directNodeSpendFromTransactions(txs: TransactionLike[], from: st
   let unassigned = 0;
   for (const t of transactionsInPeriod(txs, from, to)) {
     if (t.type !== "expense") continue;
+    if (!isOperationalIE(t)) continue;
     const nodeId = t.budget_node_id ?? null;
     if (!nodeId) {
       unassigned += baseAmount(t);
@@ -168,20 +198,27 @@ export function directNodeSpendFromTransactions(txs: TransactionLike[], from: st
   return out;
 }
 
+/**
+ * Valorisation d'un actif :
+ * - depreciation = somme des dotations aux amortissements enregistrées.
+ * - bookValue (VNC) = Coût − Amortissement cumulé.
+ * - marketValue (Valeur) = current_value si saisi (>0, réévaluation), sinon VNC.
+ * - variation = marketValue − Coût.
+ * bookValue reste rétro-compatible pour les anciens appels.
+ */
 export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string } = {}) {
   const relevant = events.filter((e) => e.asset_id === asset.id && (!opts.through || (e.event_date ?? e.event_month ?? "9999-99-99") <= opts.through));
   const depreciation = relevant
     .filter((e) => e.event_type === "depreciation")
     .reduce((s, e) => s + Math.abs(num(e.amount)), 0);
-  const adjustments = relevant
-    .filter((e) => e.event_type === "revaluation" || e.event_type === "impairment")
-    .reduce((s, e) => s + num(e.amount), 0);
   const sold = (asset.status ?? "owned") === "sold" || relevant.some((e) => e.event_type === "sale");
   const cost = num(asset.purchase_value);
   const stored = num(asset.current_value);
-  const hasBookEvents = depreciation !== 0 || adjustments !== 0;
-  const bookValue = sold ? 0 : Math.max(0, hasBookEvents ? cost - depreciation + adjustments : (stored || cost));
-  return { cost, depreciation, adjustments, bookValue, sold };
+  const vnc = Math.max(0, cost - depreciation);
+  const bookValue = sold ? 0 : vnc;
+  const marketValue = sold ? 0 : (stored > 0 ? stored : vnc);
+  const variation = marketValue - cost;
+  return { cost, depreciation, bookValue, marketValue, variation, sold };
 }
 
 export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string } = {}) {
@@ -193,8 +230,9 @@ export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[]
         acc.cost += v.cost;
         acc.depreciation += v.depreciation;
         acc.bookValue += v.bookValue;
+        acc.marketValue += v.marketValue;
         return acc;
       },
-      { cost: 0, depreciation: 0, bookValue: 0 },
+      { cost: 0, depreciation: 0, bookValue: 0, marketValue: 0 },
     );
 }

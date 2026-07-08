@@ -60,7 +60,7 @@ function cashFromTransactions(data: ProgressInput) {
 function assetTotalFromEvents(data: ProgressInput) {
   const assets = data.assets.filter((a): a is Asset & { id: string } => !!a.id);
   if (!assets.length) return data.assets.filter(a => (a.status ?? "owned") === "owned").reduce((s, a) => s + num(a.current_value), 0);
-  return computeAssetTotals(assets as any, data.assetEvents ?? []).bookValue;
+  return computeAssetTotals(assets as any, data.assetEvents ?? []).marketValue;
 }
 
 function periodWindow(scope: string | null | undefined, ps?: string | null, pe?: string | null) {
