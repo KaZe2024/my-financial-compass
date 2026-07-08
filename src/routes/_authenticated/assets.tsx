@@ -76,7 +76,7 @@ function AssetsPage() {
 
   const visible = (assets.data ?? []).filter((a: any) => showArchived || !a.archived);
   const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? []);
-  const totalCur = totalAssetValues.bookValue;
+  const totalCur = totalAssetValues.marketValue;
   const totalPurchase = totalAssetValues.cost;
   const gain = totalCur - totalPurchase;
 
