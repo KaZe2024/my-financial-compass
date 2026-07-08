@@ -128,7 +128,7 @@ function Dashboard() {
   const txRows = allTx.data ?? [];
   const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
   const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? []);
-  const totalAssets = assetTotals.bookValue;
+  const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC)
   const totalDebt = (debtsRows.data ?? []).reduce((s, d) => s + Number(d.outstanding), 0);
   const totalRec = (recRows.data ?? []).reduce((s, r) => s + Number(r.outstanding), 0);
   const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);
