@@ -36,7 +36,7 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
 
   const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes] = await Promise.all([
     supabase.from("wallets").select("id, name, type, currency, opening_balance, current_balance, status"),
-    fetchAll<any>((from, to) => supabase.from("transactions").select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id").range(from, to)),
+    fetchAll<any>((from, to) => supabase.from("transactions").select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind").range(from, to)),
     supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived").eq("archived", false),
     fetchAll<any>((from, to) => supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to)),
     supabase.from("debts").select("creditor, outstanding, due_date, status").eq("archived", false),
@@ -52,7 +52,7 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const walletRows = wallets.data ?? [];
   const walletBalances = computeWalletBalances(walletRows as any, txRows);
   const walletTotal = sumAvailableCash(walletRows as any, txRows);
-  const assetTotal = computeAssetTotals((assets.data ?? []) as any, assetEvents ?? []).bookValue;
+  const assetTotal = computeAssetTotals((assets.data ?? []) as any, assetEvents ?? []).marketValue;
   const openDebts = (debts.data ?? []).filter((d: any) => d.status !== "settled" && d.status !== "cancelled");
   const openReceivables = (receivables.data ?? []).filter((r: any) => r.status !== "settled" && r.status !== "cancelled");
   const debtTotal = openDebts.reduce((s, d: any) => s + Number(d.outstanding ?? 0), 0);
