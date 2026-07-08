@@ -121,7 +121,6 @@ function AssetsPage() {
             <tbody>
               {visible.map((a: any) => {
                 const value = computeAssetValue(a, assetEvents.data ?? []);
-                const delta = value.bookValue - value.cost;
                 const amo = computeAmortization(a);
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
@@ -133,8 +132,8 @@ function AssetsPage() {
                       {value.depreciation ? fmtMoney(value.depreciation, a.currency) : "—"}
                     </td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className={`num px-4 py-2 text-right ${delta >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(delta, a.currency, { sign: true })}</td>
+                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.marketValue, a.currency)}</td>
+                    <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
                     <td className="px-2 py-2 text-right">
                       <div className="flex items-center justify-end gap-0.5 text-muted-foreground">
