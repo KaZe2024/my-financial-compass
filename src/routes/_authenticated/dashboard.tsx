@@ -154,9 +154,9 @@ function Dashboard() {
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
 
-  // Forecast
-  const dailyIn = dailyRecurringIncome(incomeSrc.data ?? []);
-  const dailyExp = averageDailyCashOut(txRows, 90) + dailySubscriptions(subs.data ?? []);
+  // Forecast — moyennes basées sur les transactions opérationnelles réelles (90 j).
+  const dailyIn = averageDailyCashIn(txRows, 90);
+  const dailyExp = averageDailyCashOut(txRows, 90);
   const forecast = buildForecast({
     startingCash: cash,
     dailyIncome: dailyIn,
