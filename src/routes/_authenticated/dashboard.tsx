@@ -335,7 +335,7 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
           <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Basé sur revenus récurrents ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois), dépenses moyennes ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois), dettes, créances et provisions.
+            Basé sur les revenus moyens observés ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois) et dépenses moyennes hors investissements/provisions ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois) sur 90 j, plus dettes/créances/provisions échéant.
           </p>
         </Panel>
 
