@@ -67,7 +67,7 @@ function Dashboard() {
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind")
           .range(from, to),
       ),
   });
