@@ -186,7 +186,7 @@ function Dashboard() {
   // Allocation
   const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
     type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? []).bookValue,
+    current_value: computeAssetValue(a, assetEvents.data ?? []).marketValue,
   }));
   const allocation = buildAllocation(assetAllocationRows, cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
