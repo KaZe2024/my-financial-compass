@@ -13,6 +13,7 @@ import { advanceDate } from "@/lib/recurring";
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 import {
+  averageDailyCashIn,
   averageDailyCashOut,
   computeAssetTotals,
   computeAssetValue,
@@ -34,7 +35,7 @@ import {
 } from "recharts";
 import {
   buildAllocation, buildForecast, computeHealth,
-  dailyRecurringIncome, dailySubscriptions, forecastAt, growthRate, scoreTone,
+  forecastAt, growthRate, scoreTone,
 } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
