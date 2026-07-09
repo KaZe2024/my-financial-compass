@@ -5,6 +5,10 @@ export type TransactionLike = {
   type: string | null;
   wallet_id?: string | null;
   to_wallet_id?: string | null;
+  asset_id?: string | null;
+  debt_id?: string | null;
+  receivable_id?: string | null;
+  source_id?: string | null;
   amount?: number | string | null;
   base_amount?: number | string | null;
   exchange_rate?: number | string | null;
@@ -12,6 +16,8 @@ export type TransactionLike = {
   occurred_on?: string | null;
   budget_node_id?: string | null;
   source_kind?: string | null;
+  description?: string | null;
+  notes?: string | null;
 };
 
 export type WalletLike = {
@@ -26,6 +32,7 @@ export type WalletLike = {
 export type AssetLike = {
   id: string;
   type?: string | null;
+  purchase_date?: string | null;
   purchase_value?: number | string | null;
   current_value?: number | string | null;
   status?: string | null;
@@ -40,6 +47,16 @@ export type AssetEventLike = {
   event_month?: string | null;
 };
 
+export type ObligationLike = {
+  id: string;
+  original_amount?: number | string | null;
+  outstanding?: number | string | null;
+  status?: string | null;
+  archived?: boolean | null;
+  created_at?: string | null;
+  linked_transaction_id?: string | null;
+};
+
 function num(v: unknown) {
   const n = Number(v ?? 0);
   return Number.isFinite(n) ? n : 0;
@@ -50,6 +67,20 @@ function inWindow(date: string | null | undefined, from?: string, to?: string) {
   if (from && date < from) return false;
   if (to && date > to) return false;
   return true;
+}
+
+function eventDate(e: AssetEventLike) {
+  return e.event_date ?? e.event_month ?? null;
+}
+
+function linkedToAsset(t: TransactionLike, assetId: string) {
+  return t.asset_id === assetId || (t.source_kind === "asset" && t.source_id === assetId);
+}
+
+function linkedToObligation(t: TransactionLike, id: string, kind: "debt" | "receivable") {
+  return kind === "debt"
+    ? t.debt_id === id || (t.source_kind === "debt" && t.source_id === id)
+    : t.receivable_id === id || (t.source_kind === "receivable" && t.source_id === id);
 }
 
 export function baseAmount(t: TransactionLike) {
@@ -198,6 +229,26 @@ export function directNodeSpendFromTransactions(txs: TransactionLike[], from: st
   return out;
 }
 
+export function assetDepreciationFromTransactions(asset: AssetLike, transactions: TransactionLike[] = [], opts: { through?: string } = {}) {
+  return transactions
+    .filter((t) => linkedToAsset(t, asset.id))
+    .filter((t) => t.type === "expense")
+    .filter((t) => !opts.through || !t.occurred_on || t.occurred_on <= opts.through!)
+    .filter((t) => {
+      const marker = `${t.description ?? ""} ${t.notes ?? ""}`.toLowerCase();
+      return marker.includes("amort");
+    })
+    .reduce((s, t) => s + Math.abs(baseAmount(t)), 0);
+}
+
+function assetDepreciationFromEvents(asset: AssetLike, events: AssetEventLike[], opts: { through?: string } = {}) {
+  return events
+    .filter((e) => e.asset_id === asset.id)
+    .filter((e) => e.event_type === "depreciation")
+    .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!)
+    .reduce((s, e) => s + Math.abs(num(e.amount)), 0);
+}
+
 /**
  * Valorisation d'un actif :
  * - depreciation = somme des dotations aux amortissements enregistrées.
@@ -206,14 +257,20 @@ export function directNodeSpendFromTransactions(txs: TransactionLike[], from: st
  * - variation = marketValue − Coût.
  * bookValue reste rétro-compatible pour les anciens appels.
  */
-export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string } = {}) {
-  const relevant = events.filter((e) => e.asset_id === asset.id && (!opts.through || (e.event_date ?? e.event_month ?? "9999-99-99") <= opts.through));
-  const depreciation = relevant
-    .filter((e) => e.event_type === "depreciation")
-    .reduce((s, e) => s + Math.abs(num(e.amount)), 0);
-  const sold = (asset.status ?? "owned") === "sold" || relevant.some((e) => e.event_type === "sale");
+export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
+  const relevant = events
+    .filter((e) => e.asset_id === asset.id)
+    .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!);
+  const depreciation = opts.transactions
+    ? assetDepreciationFromTransactions(asset, opts.transactions, opts)
+    : assetDepreciationFromEvents(asset, events, opts);
+  const sold = relevant.some((e) => e.event_type === "sale") || (!opts.through && (asset.status ?? "owned") === "sold");
   const cost = num(asset.purchase_value);
-  const stored = num(asset.current_value);
+  const latestValuation = relevant
+    .filter((e) => e.event_type === "revaluation" || e.event_type === "impairment")
+    .sort((a, b) => String(eventDate(a) ?? "").localeCompare(String(eventDate(b) ?? "")))
+    .at(-1);
+  const stored = opts.through ? num(latestValuation?.amount) : num(asset.current_value);
   const vnc = Math.max(0, cost - depreciation);
   const bookValue = sold ? 0 : vnc;
   const marketValue = sold ? 0 : (stored > 0 ? stored : vnc);
@@ -221,9 +278,10 @@ export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], op
   return { cost, depreciation, bookValue, marketValue, variation, sold };
 }
 
-export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string } = {}) {
+export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
   return assets
-    .filter((a) => !a.archived && (a.status ?? "owned") === "owned")
+    .filter((a) => !a.archived)
+    .filter((a) => !opts.through || !a.purchase_date || a.purchase_date <= opts.through)
     .reduce(
       (acc, a) => {
         const v = computeAssetValue(a, events, opts);
@@ -235,4 +293,32 @@ export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[]
       },
       { cost: 0, depreciation: 0, bookValue: 0, marketValue: 0 },
     );
+}
+
+export function computeObligationTotalAsOf(
+  rows: ObligationLike[],
+  transactions: TransactionLike[],
+  kind: "debt" | "receivable",
+  through?: string,
+) {
+  const txType = kind === "debt" ? "dette" : "creance";
+  return rows
+    .filter((r) => !r.archived)
+    .filter((r) => r.status !== "cancelled")
+    .reduce((sum, r) => {
+      const linked = transactions.filter((t) => linkedToObligation(t, r.id, kind));
+      const firstTxDate = linked.map((t) => t.occurred_on).filter(Boolean).sort()[0] ?? null;
+      const createdDate = r.created_at?.slice(0, 10) ?? null;
+      const startDate = [firstTxDate, createdDate].filter(Boolean).sort()[0] ?? null;
+      if (through && startDate && startDate > through) return sum;
+
+      const current = Math.max(0, num(r.outstanding));
+      if (!through) return sum + current;
+
+      const laterDelta = linked
+        .filter((t) => t.type === txType)
+        .filter((t) => t.occurred_on && t.occurred_on > through)
+        .reduce((s, t) => s + baseAmount(t), 0);
+      return sum + Math.max(0, current - laterDelta);
+    }, 0);
 }

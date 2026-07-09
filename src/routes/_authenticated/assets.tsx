@@ -70,12 +70,23 @@ function AssetsPage() {
     queryKey: ["asset_events", "assets-page"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
-        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").in("event_type", ["sale", "revaluation", "impairment"]).range(from, to),
+      ),
+  });
+  const assetTx = useQuery({
+    queryKey: ["transactions", "asset-amortization"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase
+          .from("transactions")
+          .select("id, type, wallet_id, asset_id, source_kind, source_id, amount, base_amount, exchange_rate, occurred_on, description, notes")
+          .or("asset_id.not.is.null,source_kind.eq.asset")
+          .range(from, to),
       ),
   });
 
   const visible = (assets.data ?? []).filter((a: any) => showArchived || !a.archived);
-  const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? []);
+  const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
   const totalCur = totalAssetValues.marketValue;
   const totalPurchase = totalAssetValues.cost;
   const gain = totalCur - totalPurchase;
@@ -120,7 +131,7 @@ function AssetsPage() {
             </thead>
             <tbody>
               {visible.map((a: any) => {
-                const value = computeAssetValue(a, assetEvents.data ?? []);
+                const value = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
                 const amo = computeAmortization(a);
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
@@ -449,12 +460,11 @@ function RevalueDialog({ asset, onClose, onDone }: { asset: any; onClose: () => 
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
       const newVal = Number(value);
-      const delta = newVal - Number(asset.current_value);
       await supabase.from("assets").update({ current_value: newVal }).eq("id", asset.id);
       await supabase.from("asset_events").insert({
         user_id: u.user!.id, asset_id: asset.id,
-        event_type: delta >= 0 ? "revaluation" : "impairment",
-        event_date: date, amount: delta, notes: notes || (delta >= 0 ? "Réévaluation" : "Dépréciation exceptionnelle"),
+        event_type: newVal > 0 ? "revaluation" : "impairment",
+        event_date: date, amount: newVal, notes: notes || (newVal > 0 ? "Réévaluation" : "Dépréciation exceptionnelle"),
       } as any);
     },
     onSuccess: () => { toast.success("Réévaluation enregistrée"); onDone(); },

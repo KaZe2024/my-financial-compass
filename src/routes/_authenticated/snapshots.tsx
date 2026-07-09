@@ -15,7 +15,7 @@ import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
-import { computeAssetTotals, computeAssetValue, incomeExpenseForPeriod, sumAvailableCash } from "@/lib/finance";
+import { computeAssetTotals, computeObligationTotalAsOf, incomeExpenseForPeriod, sumAvailableCash } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
   head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
@@ -34,17 +34,6 @@ function SnapshotsPage() {
   const snaps = useQuery({
     queryKey: ["snapshots"],
     queryFn: async () => (await supabase.from("monthly_snapshots").select("*").order("snapshot_month")).data ?? [],
-  });
-  const assetsRows = useQuery({
-    queryKey: ["assets", "owned"],
-    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_value, current_value, status, archived").eq("status", "owned")).data ?? [],
-  });
-  const assetEvents = useQuery({
-    queryKey: ["asset_events", "snapshots"],
-    queryFn: async () =>
-      await fetchAllRows<any>((from, to) =>
-        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
-      ),
   });
   const wallets = useQuery({
     queryKey: ["wallets"],
@@ -74,24 +63,24 @@ function SnapshotsPage() {
 
       const [wRes, dRes, rRes, aRes, aeRows, txRows] = await Promise.all([
         supabase.from("wallets").select("id, type, currency, opening_balance, current_balance, status"),
-        supabase.from("debts").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
-        supabase.from("receivables").select("outstanding").neq("status", "settled").neq("status", "cancelled"),
-        supabase.from("assets").select("id, purchase_value, current_value, status, archived").eq("status", "owned"),
+        supabase.from("debts").select("id, original_amount, outstanding, status, archived, created_at, linked_transaction_id"),
+        supabase.from("receivables").select("id, original_amount, outstanding, status, archived, created_at, linked_transaction_id"),
+        supabase.from("assets").select("id, purchase_date, purchase_value, current_value, status, archived"),
         fetchAllRows<any>((fromRange, toRange) =>
           supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(fromRange, toRange),
         ),
         fetchAllRows<any>((fromRange, toRange) =>
           supabase
             .from("transactions")
-            .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
+            .select("id, type, wallet_id, to_wallet_id, asset_id, debt_id, receivable_id, source_kind, source_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, description, notes")
             .range(fromRange, toRange),
         ),
       ]);
 
       const cash = sumAvailableCash(wRes.data ?? [], txRows, { through: to });
-      const totalDebt = (dRes.data ?? []).reduce((s, w) => s + Number(w.outstanding), 0);
-      const totalRec = (rRes.data ?? []).reduce((s, w) => s + Number(w.outstanding), 0);
-      const totalAssets = computeAssetTotals(aRes.data ?? [], aeRows, { through: to }).bookValue;
+      const totalDebt = computeObligationTotalAsOf(dRes.data ?? [], txRows, "debt", to);
+      const totalRec = computeObligationTotalAsOf(rRes.data ?? [], txRows, "receivable", to);
+      const totalAssets = computeAssetTotals(aRes.data ?? [], aeRows, { through: to, transactions: txRows }).marketValue;
       const net = cash + totalAssets + totalRec - totalDebt;
       const { income, expense } = incomeExpenseForPeriod(txRows, from, to);
 
@@ -159,11 +148,7 @@ function SnapshotsPage() {
   }));
 
   const cash = sumAvailableCash(Array.isArray(wallets.data) ? wallets.data : [], allTx.data ?? []);
-  const allocationRows = (assetsRows.data ?? []).map((a: any) => ({
-    type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? []).bookValue,
-  }));
-  const allocation = buildAllocation(allocationRows, cash);
+  const allocation = buildAllocation([{ type: "Snapshots", current_value: Math.max(0, Number(last?.total_assets ?? 0)) }], cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 
   return (
