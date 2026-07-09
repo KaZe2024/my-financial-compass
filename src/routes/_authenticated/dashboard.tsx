@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard, Panel } from "@/components/stat-card";
-import { fmtMoney, fmtDate, fmtMonth, fmtPct, monthStart, toISODate } from "@/lib/format";
+import { fmtMoney, fmtDate, fmtMonth, fmtPct, toISODate } from "@/lib/format";
 import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
@@ -17,6 +17,7 @@ import {
   averageDailyCashOut,
   computeAssetTotals,
   computeAssetValue,
+  computeObligationTotalAsOf,
   directNodeSpendFromTransactions,
   incomeExpenseForPeriod,
   monthlyCashflowFromTransactions,
@@ -57,9 +58,7 @@ function Dashboard() {
   const periodTo = isoDate(resolved.to);
 
   const now = new Date();
-  const monthStartISO = toISODate(monthStart(now));
   const twelveAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  const ninetyAgo = new Date(now.getTime() - 90 * 86_400_000);
 
   const allTx = useQuery({
     queryKey: ["transactions", "for-dashboard"],
@@ -93,16 +92,15 @@ function Dashboard() {
     queryKey: ["subscriptions"],
     queryFn: async () => (await supabase.from("subscriptions").select("*")).data ?? [],
   });
-  const nodesForToday = useQuery(budgetNodesQO);
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
-    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_value, current_value, status, archived").eq("status","owned")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_date, purchase_value, current_value, status, archived")).data ?? [],
   });
   const assetEvents = useQuery({
     queryKey: ["asset_events", "dashboard"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
-        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to),
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").eq("event_type", "depreciation").range(from, to),
       ),
   });
   const snaps = useQuery({
@@ -127,10 +125,10 @@ function Dashboard() {
   const cur = profile.data?.base_currency ?? "MGA";
   const txRows = allTx.data ?? [];
   const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
-  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? []);
+  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows });
   const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC)
-  const totalDebt = (debtsRows.data ?? []).reduce((s, d) => s + Number(d.outstanding), 0);
-  const totalRec = (recRows.data ?? []).reduce((s, r) => s + Number(r.outstanding), 0);
+  const totalDebt = computeObligationTotalAsOf(debtsRows.data ?? [], txRows, "debt");
+  const totalRec = computeObligationTotalAsOf(recRows.data ?? [], txRows, "receivable");
   const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);
   const savings = income - expense;
   const savingsRate = income > 0 ? (savings / income) * 100 : 0;
@@ -143,7 +141,6 @@ function Dashboard() {
     const m = String(s.snapshot_month).slice(0, 7);
     return m >= fromMonth && m <= toMonth;
   });
-  const lastSnap = snapList[snapList.length - 1];
   const monthAgoSnap = snapList[snapList.length - 2];
   const threeAgoSnap = snapList[snapList.length - 4];
   const yearAgoSnap = snapList.find(s => {
@@ -186,7 +183,7 @@ function Dashboard() {
   // Allocation
   const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
     type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? []).marketValue,
+    current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows }).marketValue,
   }));
   const allocation = buildAllocation(assetAllocationRows, cash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
@@ -253,7 +250,7 @@ function Dashboard() {
         <StatCard label="Actifs" value={fmtMoney(totalAssets, cur)} sub={`Créances ${fmtMoney(totalRec, cur, { compact: true })}`} icon={<Landmark className="h-4 w-4" />} />
       </section>
 
-      <TodaySection subs={subs.data ?? []} sources={incomeSrc.data ?? []} nodes={nodesForToday.data ?? []} wallets={wallets.data ?? []} />
+      <TodaySection subs={subs.data ?? []} sources={incomeSrc.data ?? []} nodes={nodesQ.data ?? []} wallets={wallets.data ?? []} />
 
 
 
