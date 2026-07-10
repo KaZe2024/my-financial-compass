@@ -14,7 +14,16 @@ import {
 } from "lucide-react";
 import { profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
-import { fmtMoney, fmtPct, monthStart, toISODate } from "@/lib/format";
+import { fmtMoney, fmtPct, monthStart } from "@/lib/format";
+
+// Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
+// que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
+function toLocalISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
