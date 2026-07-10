@@ -119,19 +119,20 @@ function ProductsPage() {
                 </div>
               )}
               <div className="scroll-thin -mx-4 overflow-x-auto">
-                <table className="w-full min-w-[400px] text-sm">
+                <table className="w-full min-w-[500px] text-sm">
                   <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <tr><th className="px-4 py-2">Date</th><th className="px-4 py-2">Fournisseur</th><th className="px-4 py-2 text-right">Prix unit.</th></tr>
+                    <tr><th className="px-4 py-2">Date</th><th className="px-4 py-2">Fournisseur</th><th className="px-4 py-2 text-right">Prix unit.</th><th className="px-4 py-2">Note</th></tr>
                   </thead>
                   <tbody>
                     {(prices.data ?? []).map((p: any) => (
-                      <tr key={p.id} className="border-t border-border/60">
+                      <tr key={p.id} className="border-t border-border/60 align-top">
                         <td className="num px-4 py-1.5 text-muted-foreground">{fmtDate(p.observed_on)}</td>
                         <td className="px-4 py-1.5">{p.supplier ?? "—"}</td>
                         <td className="num px-4 py-1.5 text-right">{fmtMoney(Number(p.unit_price), p.currency)}</td>
+                        <td className="px-4 py-1.5"><PriceNoteCell priceId={p.id} initial={p.notes ?? ""} productId={selected!} /></td>
                       </tr>
                     ))}
-                    {(prices.data ?? []).length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-muted-foreground">Aucun achat enregistré.</td></tr>}
+                    {(prices.data ?? []).length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">Aucun achat enregistré.</td></tr>}
                   </tbody>
                 </table>
               </div>
