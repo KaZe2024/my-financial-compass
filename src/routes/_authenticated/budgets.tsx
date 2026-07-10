@@ -36,7 +36,7 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   const out: string[] = [];
   const start = new Date(viewMonth);
   start.setDate(1);
-  if (view === "month") return [toISODate(start)];
+  if (view === "month") return [toLocalISO(start)];
   const count = view === "quarter" ? 3 : 12;
   if (view === "quarter") {
     const q = Math.floor(start.getMonth() / 3) * 3;
@@ -46,7 +46,7 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   }
   for (let i = 0; i < count; i++) {
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    out.push(toISODate(d));
+    out.push(toLocalISO(d));
   }
   return out;
 }
@@ -59,7 +59,7 @@ function BudgetsPage() {
   const nodesQ = useQuery(budgetNodesQO);
   const cur = profile.data?.base_currency ?? "MGA";
 
-  const [anchorMonth, setAnchorMonth] = useState<string>(toISODate(monthStart()));
+  const [anchorMonth, setAnchorMonth] = useState<string>(toLocalISO(monthStart()));
   const [view, setView] = useState<"month" | "quarter" | "year">("month");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
