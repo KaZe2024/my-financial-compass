@@ -177,3 +177,34 @@ function EditProductDialog({ product, onClose, onDone }: { product: any; onClose
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-sm border border-border bg-muted/20 p-2"><div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{label}</div><div className="num text-sm font-semibold">{value}</div></div>;
 }
+
+function PriceNoteCell({ priceId, initial, productId }: { priceId: string; initial: string; productId: string }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initial);
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("product_prices").update({ notes: value || null }).eq("id", priceId);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["product_prices", productId] }); toast.success("Note enregistrée"); setEditing(false); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!editing) {
+    return (
+      <button onClick={() => { setValue(initial); setEditing(true); }} className="group flex w-full items-start gap-1 rounded-sm px-1 py-0.5 text-left text-xs text-muted-foreground hover:bg-muted">
+        {initial ? <span className="line-clamp-2">{initial}</span> : <span className="italic opacity-60">Ajouter une note</span>}
+        <StickyNote className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-70" />
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-start gap-1">
+      <Textarea autoFocus rows={2} value={value} onChange={(e) => setValue(e.target.value)} className="min-h-[48px] text-xs" />
+      <div className="flex flex-col gap-1">
+        <button title="Enregistrer" onClick={() => save.mutate()} disabled={save.isPending} className="rounded-sm p-1 text-positive hover:bg-muted"><Check className="h-3.5 w-3.5" /></button>
+        <button title="Annuler" onClick={() => setEditing(false)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+      </div>
+    </div>
+  );
+}
