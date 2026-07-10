@@ -1139,6 +1139,7 @@ export type Database = {
           created_at: string
           currency: string
           id: string
+          notes: string | null
           observed_on: string
           product_id: string
           source_item_id: string | null
@@ -1150,6 +1151,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          notes?: string | null
           observed_on?: string
           product_id: string
           source_item_id?: string | null
@@ -1161,6 +1163,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          notes?: string | null
           observed_on?: string
           product_id?: string
           source_item_id?: string | null

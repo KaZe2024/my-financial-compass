@@ -1,0 +1,1 @@
+ALTER TABLE public.product_prices ADD COLUMN IF NOT EXISTS notes text;
