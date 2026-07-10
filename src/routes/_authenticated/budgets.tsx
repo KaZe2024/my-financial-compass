@@ -14,7 +14,16 @@ import {
 } from "lucide-react";
 import { profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
-import { fmtMoney, fmtPct, monthStart, toISODate } from "@/lib/format";
+import { fmtMoney, fmtPct, monthStart } from "@/lib/format";
+
+// Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
+// que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
+function toLocalISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +36,7 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   const out: string[] = [];
   const start = new Date(viewMonth);
   start.setDate(1);
-  if (view === "month") return [toISODate(start)];
+  if (view === "month") return [toLocalISO(start)];
   const count = view === "quarter" ? 3 : 12;
   if (view === "quarter") {
     const q = Math.floor(start.getMonth() / 3) * 3;
@@ -37,7 +46,7 @@ function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[
   }
   for (let i = 0; i < count; i++) {
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
-    out.push(toISODate(d));
+    out.push(toLocalISO(d));
   }
   return out;
 }
@@ -50,7 +59,7 @@ function BudgetsPage() {
   const nodesQ = useQuery(budgetNodesQO);
   const cur = profile.data?.base_currency ?? "MGA";
 
-  const [anchorMonth, setAnchorMonth] = useState<string>(toISODate(monthStart()));
+  const [anchorMonth, setAnchorMonth] = useState<string>(toLocalISO(monthStart()));
   const [view, setView] = useState<"month" | "quarter" | "year">("month");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
@@ -62,6 +71,7 @@ function BudgetsPage() {
   const [editing, setEditing] = useState<TreeNode | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null; kind: "normal" | "subtotal" } | null>(null);
   const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const months = useMemo(() => monthsFor(new Date(anchorMonth), view), [anchorMonth, view]);
   const monthStartISO = months[0]!;
@@ -309,6 +319,7 @@ function BudgetsPage() {
             </SelectContent>
           </Select>
           <Input type="month" value={anchorMonth.slice(0, 7)} onChange={(e) => setAnchorMonth(`${e.target.value}-01`)} className="w-40" />
+          <Button variant="outline" onClick={() => setBulkOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Modifier montants (période)</Button>
           <Button variant="secondary" onClick={() => setCreatingUnder({ parent: null, kind: "subtotal" })}><Sigma className="mr-2 h-4 w-4" /> Sous-total</Button>
           <Button onClick={() => setCreatingUnder({ parent: null, kind: "normal" })}><Plus className="mr-2 h-4 w-4" /> Racine</Button>
         </div>
@@ -411,6 +422,15 @@ function BudgetsPage() {
         months={months}
         amounts={amounts.data ?? []}
         onDone={() => { qc.invalidateQueries({ queryKey: ["bna"] }); setAmountFor(null); }}
+        cur={cur}
+      />
+      <BulkAmountDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        nodes={flat.filter((n) => n.kind !== "subtotal" && n.childCount === 0 && !n.archived)}
+        months={months}
+        amounts={amounts.data ?? []}
+        onDone={() => { qc.invalidateQueries({ queryKey: ["bna"] }); setBulkOpen(false); }}
         cur={cur}
       />
     </div>
@@ -746,6 +766,146 @@ function AmountDialog({ open, onOpenChange, node, months, amounts, onDone, cur }
           </div>
           <DialogFooter><Button type="submit" disabled={save.isPending}>Enregistrer</Button></DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BulkAmountDialog({ open, onOpenChange, nodes, months, amounts, onDone, cur }: {
+  open: boolean; onOpenChange: (v: boolean) => void;
+  nodes: TreeNode[]; months: string[]; amounts: any[]; onDone: () => void; cur: string;
+}) {
+  const qc = useQueryClient();
+  // key: `${node_id}|${month}` -> raw string value
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState("");
+
+  // Seed values from existing amounts every time dialog opens or data changes.
+  useEffect(() => {
+    if (!open) return;
+    const seed: Record<string, string> = {};
+    for (const n of nodes) {
+      for (const m of months) {
+        const row = amounts.find((a) => a.node_id === n.id && a.period_month === m);
+        const v = row ? Number(row.revised ?? row.planned ?? 0) : 0;
+        seed[`${n.id}|${m}`] = v ? String(v) : "";
+      }
+    }
+    setVals(seed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, amounts, nodes.length, months.join(",")]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      const rows: any[] = [];
+      for (const n of nodes) {
+        for (const m of months) {
+          const key = `${n.id}|${m}`;
+          const raw = vals[key];
+          if (raw === undefined) continue;
+          const num = raw === "" ? 0 : Number(raw);
+          if (Number.isNaN(num)) continue;
+          rows.push({ user_id: u.user!.id, node_id: n.id, period_month: m, planned: num, revised: null });
+        }
+      }
+      if (!rows.length) return;
+      // Upsert replaces (no cumul) via unique key (node_id, period_month).
+      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const visible = nodes.filter((n) => !filter.trim() || pathLabel(n).toLowerCase().includes(filter.toLowerCase()));
+
+  function fillRow(nodeId: string, from: string) {
+    setVals((s) => {
+      const next = { ...s };
+      const val = s[`${nodeId}|${from}`] ?? "";
+      for (const m of months) next[`${nodeId}|${m}`] = val;
+      return next;
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] sm:max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>
+            Modifier montants · {months.length} mois
+            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{cur} · valeur exacte saisie (aucun cumul)</span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer les lignes…" className="h-8 pl-7 text-xs" />
+          </div>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{visible.length}/{nodes.length} lignes</span>
+        </div>
+        <div className="scroll-thin -mx-6 max-h-[60vh] overflow-auto border-y border-border">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-card font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="sticky left-0 z-10 bg-card px-3 py-2 text-left">Ligne</th>
+                {months.map((m) => (
+                  <th key={m} className="px-2 py-2 text-right">{m.slice(0, 7)}</th>
+                ))}
+                <th className="px-2 py-2 text-right">Total</th>
+                <th className="px-2 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((n) => {
+                const rowTotal = months.reduce((s, m) => s + Number(vals[`${n.id}|${m}`] || 0), 0);
+                return (
+                  <tr key={n.id} className="border-t border-border/60">
+                    <td className="sticky left-0 z-10 bg-card px-3 py-1.5">
+                      <div className="max-w-[260px] truncate" title={pathLabel(n)}>
+                        <span className={cn("font-medium", n.is_income && "text-positive")}>{n.name}</span>
+                        <span className="ml-1.5 font-mono text-[9px] text-muted-foreground">{n.path.slice(0, -1).join(" › ") || "—"}</span>
+                      </div>
+                    </td>
+                    {months.map((m) => (
+                      <td key={m} className="px-1 py-1">
+                        <Input
+                          type="number"
+                          step="any"
+                          value={vals[`${n.id}|${m}`] ?? ""}
+                          placeholder="0"
+                          onChange={(e) => setVals((s) => ({ ...s, [`${n.id}|${m}`]: e.target.value }))}
+                          className="h-7 w-24 text-right text-xs"
+                        />
+                      </td>
+                    ))}
+                    <td className="num px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground">{fmtMoney(rowTotal, cur)}</td>
+                    <td className="px-1 py-1">
+                      {months.length > 1 && (
+                        <button
+                          type="button"
+                          title="Copier la 1re valeur sur tous les mois"
+                          onClick={() => fillRow(n.id, months[0]!)}
+                          className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <ArrowUp className="h-3 w-3 rotate-90" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {visible.length === 0 && (
+                <tr><td colSpan={months.length + 3} className="py-8 text-center text-muted-foreground">Aucune ligne de budget (créez une feuille d'abord).</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || visible.length === 0}>Enregistrer</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
