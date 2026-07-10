@@ -71,6 +71,7 @@ function BudgetsPage() {
   const [editing, setEditing] = useState<TreeNode | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<{ parent: TreeNode | null; kind: "normal" | "subtotal" } | null>(null);
   const [amountFor, setAmountFor] = useState<TreeNode | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const months = useMemo(() => monthsFor(new Date(anchorMonth), view), [anchorMonth, view]);
   const monthStartISO = months[0]!;
