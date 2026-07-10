@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Pencil, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Pencil, Archive, ArchiveRestore, Trash2, StickyNote, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
@@ -119,19 +119,20 @@ function ProductsPage() {
                 </div>
               )}
               <div className="scroll-thin -mx-4 overflow-x-auto">
-                <table className="w-full min-w-[400px] text-sm">
+                <table className="w-full min-w-[500px] text-sm">
                   <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <tr><th className="px-4 py-2">Date</th><th className="px-4 py-2">Fournisseur</th><th className="px-4 py-2 text-right">Prix unit.</th></tr>
+                    <tr><th className="px-4 py-2">Date</th><th className="px-4 py-2">Fournisseur</th><th className="px-4 py-2 text-right">Prix unit.</th><th className="px-4 py-2">Note</th></tr>
                   </thead>
                   <tbody>
                     {(prices.data ?? []).map((p: any) => (
-                      <tr key={p.id} className="border-t border-border/60">
+                      <tr key={p.id} className="border-t border-border/60 align-top">
                         <td className="num px-4 py-1.5 text-muted-foreground">{fmtDate(p.observed_on)}</td>
                         <td className="px-4 py-1.5">{p.supplier ?? "—"}</td>
                         <td className="num px-4 py-1.5 text-right">{fmtMoney(Number(p.unit_price), p.currency)}</td>
+                        <td className="px-4 py-1.5"><PriceNoteCell priceId={p.id} initial={p.notes ?? ""} productId={selected!} /></td>
                       </tr>
                     ))}
-                    {(prices.data ?? []).length === 0 && <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-muted-foreground">Aucun achat enregistré.</td></tr>}
+                    {(prices.data ?? []).length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground">Aucun achat enregistré.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -175,4 +176,35 @@ function EditProductDialog({ product, onClose, onDone }: { product: any; onClose
 
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-sm border border-border bg-muted/20 p-2"><div className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{label}</div><div className="num text-sm font-semibold">{value}</div></div>;
+}
+
+function PriceNoteCell({ priceId, initial, productId }: { priceId: string; initial: string; productId: string }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initial);
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("product_prices").update({ notes: value || null }).eq("id", priceId);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["product_prices", productId] }); toast.success("Note enregistrée"); setEditing(false); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!editing) {
+    return (
+      <button onClick={() => { setValue(initial); setEditing(true); }} className="group flex w-full items-start gap-1 rounded-sm px-1 py-0.5 text-left text-xs text-muted-foreground hover:bg-muted">
+        {initial ? <span className="line-clamp-2">{initial}</span> : <span className="italic opacity-60">Ajouter une note</span>}
+        <StickyNote className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-70" />
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-start gap-1">
+      <Textarea autoFocus rows={2} value={value} onChange={(e) => setValue(e.target.value)} className="min-h-[48px] text-xs" />
+      <div className="flex flex-col gap-1">
+        <button title="Enregistrer" onClick={() => save.mutate()} disabled={save.isPending} className="rounded-sm p-1 text-positive hover:bg-muted"><Check className="h-3.5 w-3.5" /></button>
+        <button title="Annuler" onClick={() => setEditing(false)} className="rounded-sm p-1 text-muted-foreground hover:bg-muted"><X className="h-3.5 w-3.5" /></button>
+      </div>
+    </div>
+  );
 }
