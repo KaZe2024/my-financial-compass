@@ -424,6 +424,15 @@ function BudgetsPage() {
         onDone={() => { qc.invalidateQueries({ queryKey: ["bna"] }); setAmountFor(null); }}
         cur={cur}
       />
+      <BulkAmountDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        nodes={flat.filter((n) => n.kind !== "subtotal" && n.childCount === 0 && !n.archived)}
+        months={months}
+        amounts={amounts.data ?? []}
+        onDone={() => { qc.invalidateQueries({ queryKey: ["bna"] }); setBulkOpen(false); }}
+        cur={cur}
+      />
     </div>
   );
 }
