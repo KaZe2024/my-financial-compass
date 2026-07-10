@@ -319,6 +319,7 @@ function BudgetsPage() {
             </SelectContent>
           </Select>
           <Input type="month" value={anchorMonth.slice(0, 7)} onChange={(e) => setAnchorMonth(`${e.target.value}-01`)} className="w-40" />
+          <Button variant="outline" onClick={() => setBulkOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Modifier montants (période)</Button>
           <Button variant="secondary" onClick={() => setCreatingUnder({ parent: null, kind: "subtotal" })}><Sigma className="mr-2 h-4 w-4" /> Sous-total</Button>
           <Button onClick={() => setCreatingUnder({ parent: null, kind: "normal" })}><Plus className="mr-2 h-4 w-4" /> Racine</Button>
         </div>
