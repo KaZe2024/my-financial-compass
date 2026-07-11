@@ -323,11 +323,12 @@ function BudgetsPage() {
           <h1 className="mt-1 text-2xl font-semibold">Budgets · Arborescence</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={view} onValueChange={(v) => setView(v as typeof view)}>
+          <Select value={view} onValueChange={(v) => setView(v as BudgetView)}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Mensuel</SelectItem>
               <SelectItem value="quarter">Trimestriel</SelectItem>
+              <SelectItem value="ytd">YTD (Année en cours)</SelectItem>
               <SelectItem value="year">Annuel</SelectItem>
             </SelectContent>
           </Select>
