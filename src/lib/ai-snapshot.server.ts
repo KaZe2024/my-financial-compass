@@ -98,7 +98,46 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const projLines = (projects.data ?? []).slice(0, 5).map((p: any) => `  - ${p.name}: enveloppe ${fmt(Number(p.envelope_balance ?? 0))} / objectif ${fmt(Number(p.target_amount ?? 0))} MGA`).join("\n") || "  (aucun projet actif)";
   const provLines = (provisions.data ?? []).filter((p: any) => p.status !== "settled").slice(0, 8).map((p: any) => `  - ${p.name}: ${fmt(Number(p.amount ?? 0))} MGA (${p.direction}) échéance ${p.due_date ?? "?"}`).join("\n") || "  (aucune provision en cours)";
 
-  const budgetSummary = (budgetNodes.data ?? []).filter((n: any) => !n.parent_id).slice(0, 12).map((n: any) => `${n.name}${n.is_income ? " (revenu)" : ""}`).join(", ") || "aucun budget configuré";
+  // Budgets: agrégat MTD plan vs réel par racine.
+  const nodesById = new Map<string, any>();
+  for (const n of (budgetNodes.data ?? []) as any[]) nodesById.set(n.id, n);
+  function rootOf(id: string | null | undefined): any | null {
+    let cur = id ? nodesById.get(id) : null;
+    while (cur && cur.parent_id) cur = nodesById.get(cur.parent_id) ?? null;
+    return cur;
+  }
+  const plannedByRoot = new Map<string, number>();
+  const monthKey = monthStart;
+  for (const a of (budgetAmounts ?? []) as any[]) {
+    if (a.period_month !== monthKey) continue;
+    const r = rootOf(a.node_id);
+    if (!r) continue;
+    plannedByRoot.set(r.id, (plannedByRoot.get(r.id) ?? 0) + Number(a.revised ?? a.planned ?? 0));
+  }
+  const spentByRoot = new Map<string, number>();
+  for (const s of (nodeSpendMTD.data ?? []) as any[]) {
+    const r = rootOf(s.node_id);
+    if (!r) continue;
+    spentByRoot.set(r.id, (spentByRoot.get(r.id) ?? 0) + Number(s.spent ?? 0));
+  }
+  const budgetLines = ((budgetNodes.data ?? []) as any[])
+    .filter((n) => !n.parent_id && n.kind !== "subtotal")
+    .slice(0, 20)
+    .map((n) => {
+      const p = plannedByRoot.get(n.id) ?? 0;
+      const s = spentByRoot.get(n.id) ?? 0;
+      const tag = n.is_income ? "revenu" : "dépense";
+      return `  - ${n.name} (${tag}) — planifié ${fmt(p)} / réel ${fmt(s)} MGA`;
+    })
+    .join("\n") || "  (aucun budget configuré)";
+
+  const assetLines = ((assets.data ?? []) as any[]).slice(0, 12).map((a: any) => {
+    return `  - ${a.name} (${a.type ?? "actif"}): coût ${fmt(Number(a.purchase_value ?? 0))}, valeur ${fmt(Number(a.current_value ?? 0))} MGA${a.acquired_on ? `, acquis ${a.acquired_on}` : ""}`;
+  }).join("\n") || "  (aucun actif)";
+
+  const shoppingLines = ((shoppingLists.data ?? []) as any[]).slice(0, 8).map((l: any) => {
+    return `  - ${l.occurred_on} · ${l.store ?? "—"}: ${fmt(Number(l.total_amount ?? 0))} ${l.currency ?? "MGA"}`;
+  }).join("\n") || "  (aucune liste d'achats récente)";
 
   return `## Situation financière du foyer (référence: MGA)
 
