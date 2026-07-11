@@ -69,7 +69,7 @@ function BudgetsPage() {
   const cur = profile.data?.base_currency ?? "MGA";
 
   const [anchorMonth, setAnchorMonth] = useState<string>(toLocalISO(monthStart()));
-  const [view, setView] = useState<"month" | "quarter" | "year">("month");
+  const [view, setView] = useState<BudgetView>("month");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
