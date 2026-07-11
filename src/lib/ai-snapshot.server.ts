@@ -176,7 +176,14 @@ ${projLines}
 **Provisions actives**
 ${provLines}
 
-**Postes budgétaires principaux**: ${budgetSummary}
+**Budgets — plan vs réel (mois en cours)**
+${budgetLines}
+
+**Actifs (principaux)**
+${assetLines}
+
+**Listes d'achats récentes**
+${shoppingLines}
 `;
 }
 
