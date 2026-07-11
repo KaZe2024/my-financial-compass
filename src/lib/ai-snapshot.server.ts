@@ -34,18 +34,21 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
     return out;
   }
 
-  const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes] = await Promise.all([
+  const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes, budgetAmounts, nodeSpendMTD, shoppingLists] = await Promise.all([
     supabase.from("wallets").select("id, name, type, currency, opening_balance, current_balance, status"),
     fetchAll<any>((from, to) => supabase.from("transactions").select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind").range(from, to)),
-    supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived").eq("archived", false),
+    supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived, acquired_on, useful_life_years").eq("archived", false),
     fetchAll<any>((from, to) => supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to)),
     supabase.from("debts").select("creditor, outstanding, due_date, status").eq("archived", false),
     supabase.from("receivables").select("debtor, outstanding, due_date, status").eq("archived", false),
     supabase.from("financial_goals").select("name, current_amount, target_amount, target_date, status"),
     supabase.from("subscriptions").select("name, amount, billing_cycle, next_billing_date").eq("active", true),
     supabase.from("provisions").select("name, amount, due_date, status, direction"),
-    supabase.from("projects").select("name, target_amount, envelope_balance, status").limit(20),
+    supabase.from("projects").select("name, target_amount, envelope_balance, total_spent, status").limit(50),
     supabase.from("budget_nodes").select("id, name, parent_id, kind, is_income").eq("archived", false),
+    fetchAll<any>((from, to) => supabase.from("budget_node_amounts").select("node_id, period_month, planned, revised").gte("period_month", ytdStart).lte("period_month", monthEnd).range(from, to)),
+    supabase.from("v_node_spend").select("node_id, month, spent").gte("month", monthStart).lte("month", monthEnd),
+    supabase.from("shopping_lists").select("id, store, occurred_on, total_amount, currency").order("occurred_on", { ascending: false }).limit(10),
   ]);
 
   const txRows = txAll ?? [];
@@ -95,7 +98,46 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
   const projLines = (projects.data ?? []).slice(0, 5).map((p: any) => `  - ${p.name}: enveloppe ${fmt(Number(p.envelope_balance ?? 0))} / objectif ${fmt(Number(p.target_amount ?? 0))} MGA`).join("\n") || "  (aucun projet actif)";
   const provLines = (provisions.data ?? []).filter((p: any) => p.status !== "settled").slice(0, 8).map((p: any) => `  - ${p.name}: ${fmt(Number(p.amount ?? 0))} MGA (${p.direction}) échéance ${p.due_date ?? "?"}`).join("\n") || "  (aucune provision en cours)";
 
-  const budgetSummary = (budgetNodes.data ?? []).filter((n: any) => !n.parent_id).slice(0, 12).map((n: any) => `${n.name}${n.is_income ? " (revenu)" : ""}`).join(", ") || "aucun budget configuré";
+  // Budgets: agrégat MTD plan vs réel par racine.
+  const nodesById = new Map<string, any>();
+  for (const n of (budgetNodes.data ?? []) as any[]) nodesById.set(n.id, n);
+  function rootOf(id: string | null | undefined): any | null {
+    let cur = id ? nodesById.get(id) : null;
+    while (cur && cur.parent_id) cur = nodesById.get(cur.parent_id) ?? null;
+    return cur;
+  }
+  const plannedByRoot = new Map<string, number>();
+  const monthKey = monthStart;
+  for (const a of (budgetAmounts ?? []) as any[]) {
+    if (a.period_month !== monthKey) continue;
+    const r = rootOf(a.node_id);
+    if (!r) continue;
+    plannedByRoot.set(r.id, (plannedByRoot.get(r.id) ?? 0) + Number(a.revised ?? a.planned ?? 0));
+  }
+  const spentByRoot = new Map<string, number>();
+  for (const s of (nodeSpendMTD.data ?? []) as any[]) {
+    const r = rootOf(s.node_id);
+    if (!r) continue;
+    spentByRoot.set(r.id, (spentByRoot.get(r.id) ?? 0) + Number(s.spent ?? 0));
+  }
+  const budgetLines = ((budgetNodes.data ?? []) as any[])
+    .filter((n) => !n.parent_id && n.kind !== "subtotal")
+    .slice(0, 20)
+    .map((n) => {
+      const p = plannedByRoot.get(n.id) ?? 0;
+      const s = spentByRoot.get(n.id) ?? 0;
+      const tag = n.is_income ? "revenu" : "dépense";
+      return `  - ${n.name} (${tag}) — planifié ${fmt(p)} / réel ${fmt(s)} MGA`;
+    })
+    .join("\n") || "  (aucun budget configuré)";
+
+  const assetLines = ((assets.data ?? []) as any[]).slice(0, 12).map((a: any) => {
+    return `  - ${a.name} (${a.type ?? "actif"}): coût ${fmt(Number(a.purchase_value ?? 0))}, valeur ${fmt(Number(a.current_value ?? 0))} MGA${a.acquired_on ? `, acquis ${a.acquired_on}` : ""}`;
+  }).join("\n") || "  (aucun actif)";
+
+  const shoppingLines = ((shoppingLists.data ?? []) as any[]).slice(0, 8).map((l: any) => {
+    return `  - ${l.occurred_on} · ${l.store ?? "—"}: ${fmt(Number(l.total_amount ?? 0))} ${l.currency ?? "MGA"}`;
+  }).join("\n") || "  (aucune liste d'achats récente)";
 
   return `## Situation financière du foyer (référence: MGA)
 
@@ -134,7 +176,14 @@ ${projLines}
 **Provisions actives**
 ${provLines}
 
-**Postes budgétaires principaux**: ${budgetSummary}
+**Budgets — plan vs réel (mois en cours)**
+${budgetLines}
+
+**Actifs (principaux)**
+${assetLines}
+
+**Listes d'achats récentes**
+${shoppingLines}
 `;
 }
 

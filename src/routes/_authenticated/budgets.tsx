@@ -15,6 +15,7 @@ import {
 import { profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
 import { fmtMoney, fmtPct, monthStart } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 // Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
 // que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
@@ -32,11 +33,20 @@ export const Route = createFileRoute("/_authenticated/budgets")({
   component: BudgetsPage,
 });
 
-function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[] {
+type BudgetView = "month" | "quarter" | "year" | "ytd";
+
+function monthsFor(viewMonth: Date, view: BudgetView): string[] {
   const out: string[] = [];
   const start = new Date(viewMonth);
   start.setDate(1);
   if (view === "month") return [toLocalISO(start)];
+  if (view === "ytd") {
+    // Janvier de l'année d'ancrage jusqu'au mois d'ancrage inclus.
+    const year = start.getFullYear();
+    const lastMonth = start.getMonth();
+    for (let m = 0; m <= lastMonth; m++) out.push(toLocalISO(new Date(year, m, 1)));
+    return out;
+  }
   const count = view === "quarter" ? 3 : 12;
   if (view === "quarter") {
     const q = Math.floor(start.getMonth() / 3) * 3;
@@ -60,7 +70,7 @@ function BudgetsPage() {
   const cur = profile.data?.base_currency ?? "MGA";
 
   const [anchorMonth, setAnchorMonth] = useState<string>(toLocalISO(monthStart()));
-  const [view, setView] = useState<"month" | "quarter" | "year">("month");
+  const [view, setView] = useState<BudgetView>("month");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
@@ -79,41 +89,41 @@ function BudgetsPage() {
 
   const amounts = useQuery({
     queryKey: ["bna", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("budget_node_amounts")
-        .select("*")
-        .gte("period_month", monthStartISO)
-        .lte("period_month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("budget_node_amounts")
+          .select("*")
+          .gte("period_month", monthStartISO)
+          .lte("period_month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const spend = useQuery({
     queryKey: ["nodespend-roll", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_node_spend_rollup")
-        .select("*")
-        .gte("month", monthStartISO)
-        .lte("month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("v_node_spend_rollup")
+          .select("*")
+          .gte("month", monthStartISO)
+          .lte("month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const directSpend = useQuery({
     queryKey: ["nodespend", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_node_spend")
-        .select("*")
-        .gte("month", monthStartISO)
-        .lte("month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("v_node_spend")
+          .select("*")
+          .gte("month", monthStartISO)
+          .lte("month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const tree = useMemo(() => {
@@ -174,18 +184,22 @@ function BudgetsPage() {
     return new Set(flat.filter((n) => pathLabel(n).toLowerCase().includes(q)).map((n) => n.id));
   }, [search, flat]);
 
+  // Net planifié = Σ(revenus planifiés) − Σ(dépenses planifiées) sur la période.
+  // Net réel      = Σ(revenus réels)     − Σ(dépenses réelles)     depuis transactions.
   const totals = useMemo(() => {
-    let planned = 0, spent = 0;
+    let plannedInc = 0, plannedExp = 0, realInc = 0, realExp = 0;
     for (const root of tree) {
       if (root.kind === "subtotal") continue;
-      planned += plannedRollupByNode.get(root.id) ?? 0;
-      spent += spentRollupByNode.get(root.id) ?? 0;
+      const p = plannedRollupByNode.get(root.id) ?? 0;
+      const s = spentRollupByNode.get(root.id) ?? 0;
+      if (root.is_income) { plannedInc += p; realInc += s; }
+      else { plannedExp += p; realExp += s; }
     }
-    return { planned, spent };
+    return { plannedInc, plannedExp, realInc, realExp, planned: plannedInc - plannedExp, real: realInc - realExp };
   }, [tree, plannedRollupByNode, spentRollupByNode]);
 
-  const totalPct = totals.planned > 0 ? (totals.spent / totals.planned) * 100 : 0;
-  const variance = totals.planned - totals.spent;
+  const totalPct = totals.plannedExp > 0 ? (totals.realExp / totals.plannedExp) * 100 : 0;
+  const variance = totals.planned - totals.real;
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
@@ -310,11 +324,12 @@ function BudgetsPage() {
           <h1 className="mt-1 text-2xl font-semibold">Budgets · Arborescence</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={view} onValueChange={(v) => setView(v as typeof view)}>
+          <Select value={view} onValueChange={(v) => setView(v as BudgetView)}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="month">Mensuel</SelectItem>
               <SelectItem value="quarter">Trimestriel</SelectItem>
+              <SelectItem value="ytd">YTD (Année en cours)</SelectItem>
               <SelectItem value="year">Annuel</SelectItem>
             </SelectContent>
           </Select>
@@ -326,10 +341,10 @@ function BudgetsPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Planifié" value={fmtMoney(totals.planned, cur)} />
-        <Stat label="Dépensé" value={fmtMoney(totals.spent, cur)} />
-        <Stat label="Consommation" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
-        <Stat label="Variance" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
+        <Stat label="Planifié (Revenus − Dépenses)" value={fmtMoney(totals.planned, cur)} tone={totals.planned >= 0 ? "positive" : "negative"} />
+        <Stat label="Réel (Revenus − Dépenses)" value={fmtMoney(totals.real, cur)} tone={totals.real >= 0 ? "positive" : "negative"} />
+        <Stat label="Consommation dépenses" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
+        <Stat label="Écart net (Plan − Réel)" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
       </section>
 
       <Panel

@@ -163,6 +163,91 @@
           ]
         },
         "outputSchema": null
+      },
+      {
+        "name": "list_budgets",
+        "title": "List budgets",
+        "description": "Retourne l'arborescence budgétaire (nodes + montants planifiés/révisés + dépensé réel par mois) sur la période demandée. Utile pour analyser l'écart budget vs réalisé.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "from": {
+              "description": "Début (YYYY-MM-DD), 1er du mois. Par défaut: début de l'année en cours.",
+              "type": "string"
+            },
+            "to": {
+              "description": "Fin (YYYY-MM-DD), 1er du mois. Par défaut: mois en cours.",
+              "type": "string"
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_projects",
+        "title": "List projects",
+        "description": "Liste tous les projets/enveloppes de l'utilisateur avec budget, dépensé, solde d'enveloppe et statut.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_assets",
+        "title": "List assets",
+        "description": "Liste les actifs (immobilisations) avec leur type, coût d'acquisition, date, durée d'amortissement, valeur de marché et notes. Inclut les événements récents (amortissements, réévaluations).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_shopping_lists",
+        "title": "List shopping lists",
+        "description": "Liste les listes d'achats (courses) avec leurs items, quantités, prix unitaires et magasin. Utile pour analyser les dépenses par produit.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "include_items": {
+              "default": true,
+              "description": "Inclure la ligne détaillée des items.",
+              "type": "boolean"
+            },
+            "limit": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        },
+        "outputSchema": null
       }
     ]
   }
