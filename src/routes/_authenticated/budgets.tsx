@@ -183,18 +183,22 @@ function BudgetsPage() {
     return new Set(flat.filter((n) => pathLabel(n).toLowerCase().includes(q)).map((n) => n.id));
   }, [search, flat]);
 
+  // Net planifié = Σ(revenus planifiés) − Σ(dépenses planifiées) sur la période.
+  // Net réel      = Σ(revenus réels)     − Σ(dépenses réelles)     depuis transactions.
   const totals = useMemo(() => {
-    let planned = 0, spent = 0;
+    let plannedInc = 0, plannedExp = 0, realInc = 0, realExp = 0;
     for (const root of tree) {
       if (root.kind === "subtotal") continue;
-      planned += plannedRollupByNode.get(root.id) ?? 0;
-      spent += spentRollupByNode.get(root.id) ?? 0;
+      const p = plannedRollupByNode.get(root.id) ?? 0;
+      const s = spentRollupByNode.get(root.id) ?? 0;
+      if (root.is_income) { plannedInc += p; realInc += s; }
+      else { plannedExp += p; realExp += s; }
     }
-    return { planned, spent };
+    return { plannedInc, plannedExp, realInc, realExp, planned: plannedInc - plannedExp, real: realInc - realExp };
   }, [tree, plannedRollupByNode, spentRollupByNode]);
 
-  const totalPct = totals.planned > 0 ? (totals.spent / totals.planned) * 100 : 0;
-  const variance = totals.planned - totals.spent;
+  const totalPct = totals.plannedExp > 0 ? (totals.realExp / totals.plannedExp) * 100 : 0;
+  const variance = totals.planned - totals.real;
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
