@@ -89,41 +89,41 @@ function BudgetsPage() {
 
   const amounts = useQuery({
     queryKey: ["bna", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("budget_node_amounts")
-        .select("*")
-        .gte("period_month", monthStartISO)
-        .lte("period_month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("budget_node_amounts")
+          .select("*")
+          .gte("period_month", monthStartISO)
+          .lte("period_month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const spend = useQuery({
     queryKey: ["nodespend-roll", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_node_spend_rollup")
-        .select("*")
-        .gte("month", monthStartISO)
-        .lte("month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("v_node_spend_rollup")
+          .select("*")
+          .gte("month", monthStartISO)
+          .lte("month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const directSpend = useQuery({
     queryKey: ["nodespend", monthStartISO, monthEndExclusive],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("v_node_spend")
-        .select("*")
-        .gte("month", monthStartISO)
-        .lte("month", monthEndExclusive);
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from("v_node_spend")
+          .select("*")
+          .gte("month", monthStartISO)
+          .lte("month", monthEndExclusive)
+          .range(from, to),
+      ),
   });
 
   const tree = useMemo(() => {
