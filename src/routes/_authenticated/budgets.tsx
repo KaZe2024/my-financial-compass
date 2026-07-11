@@ -15,6 +15,7 @@ import {
 import { profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
 import { fmtMoney, fmtPct, monthStart } from "@/lib/format";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 // Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
 // que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
