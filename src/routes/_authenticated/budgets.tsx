@@ -32,11 +32,20 @@ export const Route = createFileRoute("/_authenticated/budgets")({
   component: BudgetsPage,
 });
 
-function monthsFor(viewMonth: Date, view: "month" | "quarter" | "year"): string[] {
+type BudgetView = "month" | "quarter" | "year" | "ytd";
+
+function monthsFor(viewMonth: Date, view: BudgetView): string[] {
   const out: string[] = [];
   const start = new Date(viewMonth);
   start.setDate(1);
   if (view === "month") return [toLocalISO(start)];
+  if (view === "ytd") {
+    // Janvier de l'année d'ancrage jusqu'au mois d'ancrage inclus.
+    const year = start.getFullYear();
+    const lastMonth = start.getMonth();
+    for (let m = 0; m <= lastMonth; m++) out.push(toLocalISO(new Date(year, m, 1)));
+    return out;
+  }
   const count = view === "quarter" ? 3 : 12;
   if (view === "quarter") {
     const q = Math.floor(start.getMonth() / 3) * 3;
