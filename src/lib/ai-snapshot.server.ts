@@ -34,18 +34,21 @@ export async function buildFinancialSnapshot(supabase: SupabaseClient): Promise<
     return out;
   }
 
-  const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes] = await Promise.all([
+  const [wallets, txAll, assets, assetEvents, debts, receivables, goals, subs, provisions, projects, budgetNodes, budgetAmounts, nodeSpendMTD, shoppingLists] = await Promise.all([
     supabase.from("wallets").select("id, name, type, currency, opening_balance, current_balance, status"),
     fetchAll<any>((from, to) => supabase.from("transactions").select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind").range(from, to)),
-    supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived").eq("archived", false),
+    supabase.from("assets").select("id, name, purchase_value, current_value, type, status, archived, acquired_on, useful_life_years").eq("archived", false),
     fetchAll<any>((from, to) => supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").range(from, to)),
     supabase.from("debts").select("creditor, outstanding, due_date, status").eq("archived", false),
     supabase.from("receivables").select("debtor, outstanding, due_date, status").eq("archived", false),
     supabase.from("financial_goals").select("name, current_amount, target_amount, target_date, status"),
     supabase.from("subscriptions").select("name, amount, billing_cycle, next_billing_date").eq("active", true),
     supabase.from("provisions").select("name, amount, due_date, status, direction"),
-    supabase.from("projects").select("name, target_amount, envelope_balance, status").limit(20),
+    supabase.from("projects").select("name, target_amount, envelope_balance, total_spent, status").limit(50),
     supabase.from("budget_nodes").select("id, name, parent_id, kind, is_income").eq("archived", false),
+    fetchAll<any>((from, to) => supabase.from("budget_node_amounts").select("node_id, period_month, planned, revised").gte("period_month", ytdStart).lte("period_month", monthEnd).range(from, to)),
+    supabase.from("v_node_spend").select("node_id, month, spent").gte("month", monthStart).lte("month", monthEnd),
+    supabase.from("shopping_lists").select("id, store, occurred_on, total_amount, currency").order("occurred_on", { ascending: false }).limit(10),
   ]);
 
   const txRows = txAll ?? [];
