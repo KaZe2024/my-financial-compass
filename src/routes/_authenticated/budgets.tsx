@@ -340,10 +340,10 @@ function BudgetsPage() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Planifié" value={fmtMoney(totals.planned, cur)} />
-        <Stat label="Dépensé" value={fmtMoney(totals.spent, cur)} />
-        <Stat label="Consommation" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
-        <Stat label="Variance" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
+        <Stat label="Planifié (Revenus − Dépenses)" value={fmtMoney(totals.planned, cur)} tone={totals.planned >= 0 ? "positive" : "negative"} />
+        <Stat label="Réel (Revenus − Dépenses)" value={fmtMoney(totals.real, cur)} tone={totals.real >= 0 ? "positive" : "negative"} />
+        <Stat label="Consommation dépenses" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
+        <Stat label="Écart net (Plan − Réel)" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
       </section>
 
       <Panel
