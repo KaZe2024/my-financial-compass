@@ -151,6 +151,25 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
       }).join(" + ");
       const { data: u } = await supabase.auth.getUser();
       const desc = list.title || list.store || "Courses";
+
+      // Tiers = Magasin
+      let cpId: string | null = null;
+      const storeName = (list.store ?? "").trim();
+      if (storeName) {
+        const { data: cps } = await supabase.from("counterparties").select("id,name");
+        const existing = (cps ?? []).find((c: any) => (c.name ?? "").toLowerCase() === storeName.toLowerCase());
+        if (existing) {
+          cpId = existing.id;
+        } else {
+          const { data: created, error: cerr } = await supabase
+            .from("counterparties")
+            .insert({ user_id: u.user!.id, name: storeName })
+            .select("id").single();
+          if (cerr) throw cerr;
+          cpId = created.id;
+        }
+      }
+
       const { data: tx, error: terr } = await supabase.from("transactions").insert({
         user_id: u.user!.id,
         type: "expense",
@@ -162,17 +181,18 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
         exchange_rate: 1,
         base_amount: amount,
         budget_node_id: list.budget_node_id ?? null,
+        counterparty_id: cpId,
+        counterparty_label: storeName || null,
         notes,
       }).select("id").single();
       if (terr) throw terr;
-      // Tags
       const tagIds: string[] = list.tag_ids ?? [];
       if (tagIds.length) {
         await supabase.from("transaction_tags").insert(tagIds.map((tag_id) => ({ transaction_id: tx.id, tag_id, user_id: u.user!.id })));
       }
       await supabase.from("shopping_lists").update({ transaction_id: tx.id, total: amount }).eq("id", list.id);
     },
-    onSuccess: () => { toast.success("Envoyé vers transactions"); onChange(); },
+    onSuccess: () => { toast.success("Envoyé vers transactions"); onChange(); qc.invalidateQueries({ queryKey: ["counterparties"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -363,6 +383,29 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
   const [tagIds, setTagIds] = useState<string[]>(profile?.shopping_default_tag_ids ?? []);
   const [items, setItems] = useState<Item[]>([{ product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }]);
 
+  // Product suggestions with last known unit + price
+  const productSuggest = useQuery({
+    queryKey: ["product_suggest"],
+    enabled: open,
+    queryFn: async () => {
+      const products = await fetchAllRows<any>((from, to) =>
+        supabase.from("products").select("id,name,unit,archived").order("name").range(from, to),
+      );
+      const prices = await fetchAllRows<any>((from, to) =>
+        supabase.from("product_prices").select("product_id,unit_price,observed_on").order("observed_on", { ascending: false }).range(from, to),
+      );
+      const lastPrice = new Map<string, number>();
+      for (const p of prices) if (!lastPrice.has(p.product_id)) lastPrice.set(p.product_id, Number(p.unit_price));
+      return products.filter((p) => !p.archived).map((p) => ({ name: p.name, unit: p.unit ?? "", lastPrice: lastPrice.get(p.id) ?? null }));
+    },
+  });
+  const suggestListId = useMemo(() => `prod-suggest-${Math.random().toString(36).slice(2, 8)}`, []);
+  const suggestByName = useMemo(() => {
+    const m = new Map<string, { unit: string; lastPrice: number | null }>();
+    for (const p of productSuggest.data ?? []) m.set(p.name.toLowerCase(), { unit: p.unit, lastPrice: p.lastPrice });
+    return m;
+  }, [productSuggest.data]);
+
   useEffect(() => {
     if (open) {
       setWalletId(profile?.shopping_default_wallet_id ?? "");
@@ -375,6 +418,24 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
   function updateItem(i: number, patch: Partial<Item>) {
     setItems((s) => s.map((it, idx) => idx === i ? { ...it, ...patch } : it));
   }
+  function onProductNameChange(i: number, name: string) {
+    setItems((s) => s.map((it, idx) => {
+      if (idx !== i) return it;
+      const match = suggestByName.get(name.trim().toLowerCase());
+      const prevMatch = suggestByName.get(it.product_name.trim().toLowerCase());
+      // Autofill only when transitioning to a new matched product
+      if (match && (!prevMatch || prevMatch !== match)) {
+        return {
+          ...it,
+          product_name: name,
+          unit: match.unit || it.unit,
+          unit_price: match.lastPrice != null ? String(match.lastPrice) : it.unit_price,
+        };
+      }
+      return { ...it, product_name: name };
+    }));
+  }
+
 
   const m = useMutation({
     mutationFn: async () => {
@@ -456,6 +517,11 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
           </details>
 
+          <datalist id={suggestListId}>
+            {(productSuggest.data ?? []).map((p) => (
+              <option key={p.name} value={p.name}>{p.unit ? `${p.unit}${p.lastPrice != null ? ` · ${p.lastPrice} MGA` : ""}` : p.lastPrice != null ? `${p.lastPrice} MGA` : ""}</option>
+            ))}
+          </datalist>
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="grid grid-cols-12 gap-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
               <span className="col-span-5">Produit</span>
@@ -465,7 +531,7 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Input className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => updateItem(i, { product_name: e.target.value })} />
+                <Input list={suggestListId} className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => onProductNameChange(i, e.target.value)} />
                 <Input className="col-span-1" placeholder="kg" value={it.unit} onChange={(e) => updateItem(i, { unit: e.target.value })} />
                 <Input className="col-span-2 text-right" type="number" step="any" value={it.quantity} onChange={(e) => updateItem(i, { quantity: e.target.value })} />
                 <Input className="col-span-3 text-right" type="number" step="any" value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: e.target.value })} />
