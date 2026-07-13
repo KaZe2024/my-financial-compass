@@ -52,11 +52,10 @@ export const profileQO = queryOptions({
 export const qkCounterparties = ["counterparties"] as const;
 export const counterpartiesQO = queryOptions({
   queryKey: qkCounterparties,
-  queryFn: async () => {
-    const { data, error } = await supabase.from("counterparties").select("*").order("name");
-    if (error) throw error;
-    return data ?? [];
-  },
+  queryFn: async () =>
+    await fetchAllRows<any>((from, to) =>
+      supabase.from("counterparties").select("*").order("name").range(from, to),
+    ),
 });
 
 export const qkProjects = ["projects"] as const;
