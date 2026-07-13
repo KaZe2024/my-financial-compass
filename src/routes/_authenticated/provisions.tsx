@@ -28,16 +28,19 @@ export const Route = createFileRoute("/_authenticated/provisions")({
  */
 export async function bookProvisionTx(prov: any, userId: string) {
   const type = prov.direction === "in" ? "income" : "expense";
+  const rate = Number(prov.exchange_rate ?? 1) || 1;
+  const amt = Number(prov.amount) || 0;
+  const base = amt * rate;
   const { data: tx, error } = await supabase.from("transactions").insert({
     user_id: userId,
     type,
     occurred_on: prov.due_date ?? toISODate(new Date()),
     description: prov.description || `Provision · ${prov.name}`,
     wallet_id: null,
-    amount: Number(prov.amount),
+    amount: amt,
     currency: prov.currency ?? "MGA",
-    exchange_rate: 1,
-    base_amount: Number(prov.amount),
+    exchange_rate: rate,
+    base_amount: base,
     budget_node_id: prov.budget_node_id ?? null,
     counterparty_id: prov.counterparty_id ?? null,
     source_kind: "provision",
