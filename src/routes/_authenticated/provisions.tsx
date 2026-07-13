@@ -183,9 +183,20 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
     wallet_id: editing?.wallet_id ?? "",
     amount: String(editing?.amount ?? ""),
     currency: editing?.currency ?? "MGA",
+    exchange_rate: String(editing?.exchange_rate ?? 1),
     direction: editing?.direction === "in" ? "in" : "out",
     due_date: editing?.due_date ?? toISODate(new Date()),
     notes: editing?.notes ?? "",
+  });
+
+  const currencies = useQuery({
+    queryKey: ["fx_currencies_all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("currencies").select("code").order("code");
+      const set = new Set<string>(["MGA","EUR","USD","GBP","CHF","JPY","CNY","CAD","AUD"]);
+      for (const c of (data ?? []) as any[]) if (c.code) set.add(c.code);
+      return Array.from(set).sort();
+    },
   });
 
   const m = useMutation({
@@ -193,6 +204,9 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user!.id;
       const cpId = form.counterparty.trim() ? await ensureCounterparty(form.counterparty, cps) : null;
+      const rate = Number(form.exchange_rate) || 1;
+      const amt = Number(form.amount) || 0;
+      const base = amt * rate;
       const payload: any = {
         user_id: uid,
         name: form.name.trim(),
@@ -200,8 +214,9 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
         counterparty_id: cpId,
         budget_node_id: form.budget_node_id,
         wallet_id: form.wallet_id || null,
-        amount: Number(form.amount) || 0,
+        amount: amt,
         currency: form.currency || "MGA",
+        exchange_rate: rate,
         direction: form.direction,
         due_date: form.due_date || null,
         notes: form.notes.trim() || null,
@@ -210,14 +225,14 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
       if (editing) {
         const { error } = await supabase.from("provisions").update(payload).eq("id", editing.id);
         if (error) throw error;
-        // Sync la transaction de constatation si elle existe
         if (editing.booking_tx_id) {
           await supabase.from("transactions").update({
             type: form.direction === "in" ? "income" : "expense",
             occurred_on: form.due_date || toISODate(new Date()),
             description: form.description || `Provision · ${form.name}`,
-            amount: Number(form.amount) || 0,
-            base_amount: Number(form.amount) || 0,
+            amount: amt,
+            base_amount: base,
+            exchange_rate: rate,
             currency: form.currency || "MGA",
             budget_node_id: form.budget_node_id,
             counterparty_id: cpId,
