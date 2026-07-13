@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
 import type { BudgetNode } from "@/lib/budget-nodes";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const qkWallets = ["wallets"] as const;
 export const walletsQO = queryOptions({
@@ -51,11 +52,10 @@ export const profileQO = queryOptions({
 export const qkCounterparties = ["counterparties"] as const;
 export const counterpartiesQO = queryOptions({
   queryKey: qkCounterparties,
-  queryFn: async () => {
-    const { data, error } = await supabase.from("counterparties").select("*").order("name");
-    if (error) throw error;
-    return data ?? [];
-  },
+  queryFn: async () =>
+    await fetchAllRows<any>((from, to) =>
+      supabase.from("counterparties").select("*").order("name").range(from, to),
+    ),
 });
 
 export const qkProjects = ["projects"] as const;

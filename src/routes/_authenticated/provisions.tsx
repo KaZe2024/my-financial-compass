@@ -28,16 +28,19 @@ export const Route = createFileRoute("/_authenticated/provisions")({
  */
 export async function bookProvisionTx(prov: any, userId: string) {
   const type = prov.direction === "in" ? "income" : "expense";
+  const rate = Number(prov.exchange_rate ?? 1) || 1;
+  const amt = Number(prov.amount) || 0;
+  const base = amt * rate;
   const { data: tx, error } = await supabase.from("transactions").insert({
     user_id: userId,
     type,
     occurred_on: prov.due_date ?? toISODate(new Date()),
     description: prov.description || `Provision · ${prov.name}`,
     wallet_id: null,
-    amount: Number(prov.amount),
+    amount: amt,
     currency: prov.currency ?? "MGA",
-    exchange_rate: 1,
-    base_amount: Number(prov.amount),
+    exchange_rate: rate,
+    base_amount: base,
     budget_node_id: prov.budget_node_id ?? null,
     counterparty_id: prov.counterparty_id ?? null,
     source_kind: "provision",
@@ -180,9 +183,20 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
     wallet_id: editing?.wallet_id ?? "",
     amount: String(editing?.amount ?? ""),
     currency: editing?.currency ?? "MGA",
+    exchange_rate: String(editing?.exchange_rate ?? 1),
     direction: editing?.direction === "in" ? "in" : "out",
     due_date: editing?.due_date ?? toISODate(new Date()),
     notes: editing?.notes ?? "",
+  });
+
+  const currencies = useQuery({
+    queryKey: ["fx_currencies_all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("currencies").select("code").order("code");
+      const set = new Set<string>(["MGA","EUR","USD","GBP","CHF","JPY","CNY","CAD","AUD"]);
+      for (const c of (data ?? []) as any[]) if (c.code) set.add(c.code);
+      return Array.from(set).sort();
+    },
   });
 
   const m = useMutation({
@@ -190,6 +204,9 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user!.id;
       const cpId = form.counterparty.trim() ? await ensureCounterparty(form.counterparty, cps) : null;
+      const rate = Number(form.exchange_rate) || 1;
+      const amt = Number(form.amount) || 0;
+      const base = amt * rate;
       const payload: any = {
         user_id: uid,
         name: form.name.trim(),
@@ -197,8 +214,9 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
         counterparty_id: cpId,
         budget_node_id: form.budget_node_id,
         wallet_id: form.wallet_id || null,
-        amount: Number(form.amount) || 0,
+        amount: amt,
         currency: form.currency || "MGA",
+        exchange_rate: rate,
         direction: form.direction,
         due_date: form.due_date || null,
         notes: form.notes.trim() || null,
@@ -207,14 +225,14 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
       if (editing) {
         const { error } = await supabase.from("provisions").update(payload).eq("id", editing.id);
         if (error) throw error;
-        // Sync la transaction de constatation si elle existe
         if (editing.booking_tx_id) {
           await supabase.from("transactions").update({
             type: form.direction === "in" ? "income" : "expense",
             occurred_on: form.due_date || toISODate(new Date()),
             description: form.description || `Provision · ${form.name}`,
-            amount: Number(form.amount) || 0,
-            base_amount: Number(form.amount) || 0,
+            amount: amt,
+            base_amount: base,
+            exchange_rate: rate,
             currency: form.currency || "MGA",
             budget_node_id: form.budget_node_id,
             counterparty_id: cpId,
@@ -255,11 +273,26 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
           <F label="Catégorie budgétaire">
             <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => setForm({ ...form, budget_node_id: id })} placeholder="Sélectionner…" />
           </F>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <F label="Montant"><Input type="number" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></F>
-            <F label="Devise"><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></F>
             <F label="Échéance"><DatePicker value={form.due_date} onChange={(__v) => setForm({ ...form, due_date: __v })} /></F>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <F label="Devise">
+              <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(currencies.data ?? ["MGA"]).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </F>
+            <F label={`Taux de change (1 ${form.currency} → MGA)`}>
+              <Input type="number" step="any" value={form.exchange_rate} onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })} disabled={form.currency === "MGA"} />
+            </F>
+          </div>
+          {form.currency !== "MGA" && (
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+              Contre-valeur MGA : <span className="num font-semibold">{((Number(form.amount) || 0) * (Number(form.exchange_rate) || 1)).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <F label="Portefeuille cible (paiement futur)">
             <Select value={form.wallet_id || "none"} onValueChange={(v) => setForm({ ...form, wallet_id: v === "none" ? "" : v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>

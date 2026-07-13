@@ -38,7 +38,7 @@ function CounterpartiesPage() {
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label")
+          .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label, wallet_id")
           .gte("occurred_on", isoDate(period.from))
           .lte("occurred_on", isoDate(period.to))
           .range(from, to),
@@ -47,9 +47,15 @@ function CounterpartiesPage() {
 
 
   const stats = useMemo(() => {
+    const byName = new Map<string, string>(); // lowercased name -> cp id
+    for (const c of (cps.data ?? []) as any[]) byName.set((c.name ?? "").toLowerCase(), c.id);
     const m = new Map<string, { in: number; out: number; count: number }>();
     for (const t of txs.data ?? []) {
-      const key = (t as any).counterparty_id;
+      let key: string | null = (t as any).counterparty_id ?? null;
+      if (!key) {
+        const label = ((t as any).counterparty_label ?? "").toString().trim().toLowerCase();
+        if (label && byName.has(label)) key = byName.get(label)!;
+      }
       if (!key) continue;
       const cur = m.get(key) ?? { in: 0, out: 0, count: 0 };
       const mga = Number((t as any).base_amount ?? Number((t as any).amount) * Number((t as any).exchange_rate ?? 1));
@@ -62,7 +68,7 @@ function CounterpartiesPage() {
       m.set(key, cur);
     }
     return m;
-  }, [txs.data]);
+  }, [txs.data, cps.data]);
 
   const groups = useMemo(() => Array.from(new Set((cps.data ?? []).map((c: any) => c.group_name).filter(Boolean))) as string[], [cps.data]);
   const services = useMemo(() => Array.from(new Set((cps.data ?? []).map((c: any) => c.service_name).filter(Boolean))) as string[], [cps.data]);
