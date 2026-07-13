@@ -38,7 +38,7 @@ function CounterpartiesPage() {
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label")
+          .select("id, type, occurred_on, amount, base_amount, exchange_rate, counterparty_id, counterparty_label, wallet_id")
           .gte("occurred_on", isoDate(period.from))
           .lte("occurred_on", isoDate(period.to))
           .range(from, to),
