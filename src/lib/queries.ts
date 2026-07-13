@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
 import type { BudgetNode } from "@/lib/budget-nodes";
+import { fetchAllRows } from "@/lib/fetch-all";
 
 export const qkWallets = ["wallets"] as const;
 export const walletsQO = queryOptions({
