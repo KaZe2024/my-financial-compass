@@ -526,7 +526,7 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Input className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => updateItem(i, { product_name: e.target.value })} />
+                <Input list={suggestListId} className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => onProductNameChange(i, e.target.value)} />
                 <Input className="col-span-1" placeholder="kg" value={it.unit} onChange={(e) => updateItem(i, { unit: e.target.value })} />
                 <Input className="col-span-2 text-right" type="number" step="any" value={it.quantity} onChange={(e) => updateItem(i, { quantity: e.target.value })} />
                 <Input className="col-span-3 text-right" type="number" step="any" value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: e.target.value })} />
