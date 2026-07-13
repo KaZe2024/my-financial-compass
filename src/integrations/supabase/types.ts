@@ -1397,6 +1397,7 @@ export type Database = {
           description: string | null
           direction: string
           due_date: string | null
+          exchange_rate: number
           id: string
           name: string
           notes: string | null
@@ -1421,6 +1422,7 @@ export type Database = {
           description?: string | null
           direction?: string
           due_date?: string | null
+          exchange_rate?: number
           id?: string
           name: string
           notes?: string | null
@@ -1445,6 +1447,7 @@ export type Database = {
           description?: string | null
           direction?: string
           due_date?: string | null
+          exchange_rate?: number
           id?: string
           name?: string
           notes?: string | null
@@ -1934,6 +1937,7 @@ export type Database = {
           debt_id: string | null
           description: string
           exchange_rate: number
+          fx_exclude: boolean
           id: string
           notes: string | null
           occurred_on: string
@@ -1962,6 +1966,7 @@ export type Database = {
           debt_id?: string | null
           description: string
           exchange_rate?: number
+          fx_exclude?: boolean
           id?: string
           notes?: string | null
           occurred_on?: string
@@ -1990,6 +1995,7 @@ export type Database = {
           debt_id?: string | null
           description?: string
           exchange_rate?: number
+          fx_exclude?: boolean
           id?: string
           notes?: string | null
           occurred_on?: string
