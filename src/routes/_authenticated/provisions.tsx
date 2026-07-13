@@ -273,11 +273,26 @@ function ProvDialog({ editing, wallets, nodes, cps, onDone, onClose }: { editing
           <F label="Catégorie budgétaire">
             <NodePicker nodes={nodes} value={form.budget_node_id} onChange={(id) => setForm({ ...form, budget_node_id: id })} placeholder="Sélectionner…" />
           </F>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <F label="Montant"><Input type="number" step="any" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></F>
-            <F label="Devise"><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></F>
             <F label="Échéance"><DatePicker value={form.due_date} onChange={(__v) => setForm({ ...form, due_date: __v })} /></F>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <F label="Devise">
+              <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{(currencies.data ?? ["MGA"]).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </F>
+            <F label={`Taux de change (1 ${form.currency} → MGA)`}>
+              <Input type="number" step="any" value={form.exchange_rate} onChange={(e) => setForm({ ...form, exchange_rate: e.target.value })} disabled={form.currency === "MGA"} />
+            </F>
+          </div>
+          {form.currency !== "MGA" && (
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+              Contre-valeur MGA : <span className="num font-semibold">{((Number(form.amount) || 0) * (Number(form.exchange_rate) || 1)).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <F label="Portefeuille cible (paiement futur)">
             <Select value={form.wallet_id || "none"} onValueChange={(v) => setForm({ ...form, wallet_id: v === "none" ? "" : v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
