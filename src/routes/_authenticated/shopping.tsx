@@ -517,6 +517,11 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
           </details>
 
+          <datalist id={suggestListId}>
+            {(productSuggest.data ?? []).map((p) => (
+              <option key={p.name} value={p.name}>{p.unit ? `${p.unit}${p.lastPrice != null ? ` · ${p.lastPrice} MGA` : ""}` : p.lastPrice != null ? `${p.lastPrice} MGA` : ""}</option>
+            ))}
+          </datalist>
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="grid grid-cols-12 gap-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
               <span className="col-span-5">Produit</span>
