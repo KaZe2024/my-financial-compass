@@ -95,10 +95,10 @@ function FxPage() {
 
   const excludeDay = useMutation({
     mutationFn: async ({ day, side }: { day: string; side: "buy" | "sell" }) => {
-      const types = side === "buy" ? Array.from(BUY_TYPES) : Array.from(SELL_TYPES);
+      const types = (side === "buy" ? Array.from(BUY_TYPES) : Array.from(SELL_TYPES)) as Array<"expense" | "income">;
       const { error } = await supabase
         .from("transactions")
-        .update({ fx_exclude: true })
+        .update({ fx_exclude: true } as any)
         .eq("currency", currency)
         .eq("occurred_on", day)
         .in("type", types);
