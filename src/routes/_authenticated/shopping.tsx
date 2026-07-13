@@ -151,6 +151,25 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
       }).join(" + ");
       const { data: u } = await supabase.auth.getUser();
       const desc = list.title || list.store || "Courses";
+
+      // Tiers = Magasin
+      let cpId: string | null = null;
+      const storeName = (list.store ?? "").trim();
+      if (storeName) {
+        const { data: cps } = await supabase.from("counterparties").select("id,name");
+        const existing = (cps ?? []).find((c: any) => (c.name ?? "").toLowerCase() === storeName.toLowerCase());
+        if (existing) {
+          cpId = existing.id;
+        } else {
+          const { data: created, error: cerr } = await supabase
+            .from("counterparties")
+            .insert({ user_id: u.user!.id, name: storeName })
+            .select("id").single();
+          if (cerr) throw cerr;
+          cpId = created.id;
+        }
+      }
+
       const { data: tx, error: terr } = await supabase.from("transactions").insert({
         user_id: u.user!.id,
         type: "expense",
@@ -162,17 +181,18 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
         exchange_rate: 1,
         base_amount: amount,
         budget_node_id: list.budget_node_id ?? null,
+        counterparty_id: cpId,
+        counterparty_label: storeName || null,
         notes,
       }).select("id").single();
       if (terr) throw terr;
-      // Tags
       const tagIds: string[] = list.tag_ids ?? [];
       if (tagIds.length) {
         await supabase.from("transaction_tags").insert(tagIds.map((tag_id) => ({ transaction_id: tx.id, tag_id, user_id: u.user!.id })));
       }
       await supabase.from("shopping_lists").update({ transaction_id: tx.id, total: amount }).eq("id", list.id);
     },
-    onSuccess: () => { toast.success("Envoyé vers transactions"); onChange(); },
+    onSuccess: () => { toast.success("Envoyé vers transactions"); onChange(); qc.invalidateQueries({ queryKey: ["counterparties"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
