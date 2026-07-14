@@ -187,7 +187,42 @@ function ProductsPage() {
       </div>
 
       {editing && <EditProductDialog product={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["products"] }); }} />}
+
+      {mergeOpen && (
+        <MergeProductsDialog
+          products={selectedList}
+          onClose={() => setMergeOpen(false)}
+          onMerge={(targetId) => merge.mutate({ targetId, sourceIds: selectedList.map((p: any) => p.id) })}
+          pending={merge.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+function MergeProductsDialog({ products, onClose, onMerge, pending }: { products: any[]; onClose: () => void; onMerge: (targetId: string) => void; pending: boolean }) {
+  const [target, setTarget] = useState<string>(products[0]?.id ?? "");
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Fusionner {products.length} produits</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Sélectionnez le produit maître. L'historique de prix et les items de listes des autres seront réaffectés au produit maître, puis les doublons seront supprimés.</p>
+          <ul className="space-y-1 max-h-64 overflow-y-auto rounded-md border border-border p-2">
+            {products.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 text-sm">
+                <input type="radio" name="mtarget" checked={target === p.id} onChange={() => setTarget(p.id)} />
+                <span>{p.name} {p.unit ? <span className="text-xs text-muted-foreground">/ {p.unit}</span> : null}</span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button variant="ghost" onClick={onClose}>Annuler</Button>
+            <Button disabled={!target || pending} onClick={() => onMerge(target)}>Fusionner</Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
