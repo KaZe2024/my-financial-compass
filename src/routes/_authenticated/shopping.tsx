@@ -517,11 +517,6 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
           </details>
 
-          <datalist id={suggestListId}>
-            {(productSuggest.data ?? []).map((p) => (
-              <option key={p.name} value={p.name}>{p.unit ? `${p.unit}${p.lastPrice != null ? ` · ${p.lastPrice} MGA` : ""}` : p.lastPrice != null ? `${p.lastPrice} MGA` : ""}</option>
-            ))}
-          </datalist>
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="grid grid-cols-12 gap-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
               <span className="col-span-5">Produit</span>
@@ -531,7 +526,14 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Input list={suggestListId} className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => onProductNameChange(i, e.target.value)} />
+                <div className="col-span-5">
+                  <ProductAutocomplete
+                    value={it.product_name}
+                    suggestions={productSuggest.data ?? []}
+                    onChange={(name) => updateItem(i, { product_name: name })}
+                    onPick={(s) => updateItem(i, { product_name: s.name, unit: s.unit || it.unit, unit_price: s.lastPrice != null ? String(s.lastPrice) : it.unit_price })}
+                  />
+                </div>
                 <Input className="col-span-1" placeholder="kg" value={it.unit} onChange={(e) => updateItem(i, { unit: e.target.value })} />
                 <Input className="col-span-2 text-right" type="number" step="any" value={it.quantity} onChange={(e) => updateItem(i, { quantity: e.target.value })} />
                 <Input className="col-span-3 text-right" type="number" step="any" value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: e.target.value })} />
