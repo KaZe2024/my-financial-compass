@@ -37,19 +37,50 @@ export function dailyAverageExpense(tx: Array<{ type: string; base_amount: numbe
   return exp / daysWindow;
 }
 
+export interface RecurringSchedule {
+  amount: number;
+  cycle: string;
+  /** Next occurrence — anchor date. If in the past, we roll forward to first future date. */
+  nextDate: string | null;
+}
+
 export interface ForecastInputs {
   startingCash: number;
+  /** Residual (non-recurring) daily income baseline — small ambient flow. */
   dailyIncome: number;
+  /** Residual (non-recurring) daily expense baseline — discretionary spend. */
   dailyExpense: number;
-  /** Scheduled inflows: receivables expected by due_date */
+  /** Recurring inflows scheduled on their real cadence (salary, rent income, ...). */
+  recurringInflows?: RecurringSchedule[];
+  /** Recurring outflows scheduled on their real cadence (subscriptions, rent, ...). */
+  recurringOutflows?: RecurringSchedule[];
+  /** One-off scheduled inflows: receivables expected by due_date */
   inflows: Array<{ amount: number; due_date: string | null }>;
-  /** Scheduled outflows: debts + provisions due by date */
+  /** One-off scheduled outflows: debts + provisions due by date */
   outflows: Array<{ amount: number; due_date: string | null }>;
 }
 
 export interface ForecastPoint { day: number; date: string; balance: number; }
 
-export function buildForecast({ startingCash, dailyIncome, dailyExpense, inflows, outflows }: ForecastInputs, horizonDays = 365): ForecastPoint[] {
+function cycleDays(cycle: string): number {
+  switch ((cycle || "monthly").toLowerCase()) {
+    case "daily": return 1;
+    case "weekly": return 7;
+    case "biweekly": case "bi-weekly": return 14;
+    case "monthly": return 30;
+    case "bimonthly": return 60;
+    case "quarterly": return 91;
+    case "semiannual": case "semiannually": return 182;
+    case "yearly": case "annual": case "annually": return 365;
+    case "one_off": return 0;
+    default: return 30;
+  }
+}
+
+export function buildForecast(
+  { startingCash, dailyIncome, dailyExpense, recurringInflows = [], recurringOutflows = [], inflows, outflows }: ForecastInputs,
+  horizonDays = 365,
+): ForecastPoint[] {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const dayMs = 86_400_000;
 
@@ -62,6 +93,24 @@ export function buildForecast({ startingCash, dailyIncome, dailyExpense, inflows
     if (offset < 0 || offset > horizonDays) return;
     bucket.set(offset, (bucket.get(offset) ?? 0) + amt);
   };
+
+  const scheduleRecurring = (r: RecurringSchedule, sign: 1 | -1) => {
+    const step = cycleDays(r.cycle);
+    if (step <= 0 || !r.amount) return;
+    // Anchor: nextDate if provided, else today.
+    const anchor = r.nextDate ? new Date(r.nextDate) : new Date(today);
+    anchor.setHours(0, 0, 0, 0);
+    let offset = Math.round((anchor.getTime() - today.getTime()) / dayMs);
+    // Roll forward past dates to first future occurrence.
+    while (offset < 0) offset += step;
+    while (offset <= horizonDays) {
+      bucket.set(offset, (bucket.get(offset) ?? 0) + sign * Number(r.amount));
+      offset += step;
+    }
+  };
+
+  for (const r of recurringInflows) scheduleRecurring(r, 1);
+  for (const r of recurringOutflows) scheduleRecurring(r, -1);
   for (const i of inflows) addBucket(i.due_date, Number(i.amount));
   for (const o of outflows) addBucket(o.due_date, -Number(o.amount));
 
