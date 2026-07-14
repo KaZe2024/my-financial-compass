@@ -24,6 +24,8 @@ function ProductsPage() {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const products = useQuery({
     queryKey: ["products", search, showArchived],
@@ -74,6 +76,39 @@ function ProductsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const merge = useMutation({
+    mutationFn: async ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) => {
+      const dedup = sourceIds.filter((id) => id !== targetId);
+      if (dedup.length === 0) throw new Error("Sélectionnez au moins deux produits différents");
+      // Réaffecter l'historique de prix et les items de listes vers le produit cible
+      const { error: e1 } = await (supabase as any).from("product_prices").update({ product_id: targetId }).in("product_id", dedup);
+      if (e1) throw e1;
+      const { error: e2 } = await (supabase as any).from("shopping_list_items").update({ product_id: targetId }).in("product_id", dedup);
+      if (e2) throw e2;
+      const { error: e3 } = await supabase.from("products").delete().in("id", dedup);
+      if (e3) throw e3;
+      for (const id of dedup) await logAudit("product", id, "merge", { into: targetId });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product_prices"] });
+      setSelectedIds(new Set());
+      setMergeOpen(false);
+      toast.success("Produits fusionnés");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  function toggleSelect(id: string) {
+    setSelectedIds((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  }
+
+  const selectedList = (products.data ?? []).filter((p: any) => selectedIds.has(p.id));
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -82,7 +117,15 @@ function ProductsPage() {
           <h1 className="mt-1 text-2xl font-semibold">Prix produits</h1>
           <p className="mt-1 text-sm text-muted-foreground">Les produits sont créés automatiquement depuis les listes d'achat. L'historique de prix est en lecture seule.</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setShowArchived(v => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size >= 2 && (
+            <Button size="sm" onClick={() => setMergeOpen(true)}>Fusionner ({selectedIds.size})</Button>
+          )}
+          {selectedIds.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>Effacer sélection</Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setShowArchived(v => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
+        </div>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
@@ -91,6 +134,7 @@ function ProductsPage() {
           <ul className="scroll-thin max-h-[560px] space-y-1 overflow-y-auto pr-1">
             {(products.data ?? []).map((p: any) => (
               <li key={p.id} className={`flex items-center gap-1 rounded-sm ${selected === p.id ? "bg-muted" : ""} ${p.archived ? "opacity-50" : ""}`}>
+                <input type="checkbox" className="ml-1 h-3.5 w-3.5" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} title="Sélectionner pour fusion" />
                 <button onClick={() => setSelected(p.id)} className={`flex-1 px-2 py-1.5 text-left text-sm hover:bg-muted rounded-sm ${selected === p.id ? "text-primary" : ""}`}>
                   {p.name} {p.unit ? <span className="text-xs text-muted-foreground">/ {p.unit}</span> : null}
                 </button>
@@ -106,6 +150,7 @@ function ProductsPage() {
             {(products.data ?? []).length === 0 && <li className="px-2 py-4 text-sm text-muted-foreground">Aucun produit. Ajoutez des articles à une liste d'achat pour peupler le catalogue.</li>}
           </ul>
         </Panel>
+
 
         <Panel title={selected ? "Historique de prix (lecture seule)" : "Sélectionnez un produit"}>
           {!selected && <p className="py-10 text-center text-sm text-muted-foreground">Choisissez un produit à gauche.</p>}
