@@ -355,7 +355,7 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
           <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Basé sur les revenus moyens observés ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois) et dépenses moyennes hors investissements/provisions ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois) sur 90 j, plus dettes/créances/provisions échéant.
+            Planifie les revenus récurrents (~{fmtMoney(recurringIncomePerDay * 30, cur, { compact: true })}/mois) et abonnements (~{fmtMoney(subscriptionsPerDay * 30, cur, { compact: true })}/mois) sur leur vraie cadence, plus une base résiduelle (revenus {fmtMoney(residualDailyIncome * 30, cur, { compact: true })}/mois, dépenses {fmtMoney(residualDailyExpense * 30, cur, { compact: true })}/mois) et les échéances dettes/créances/provisions.
           </p>
         </Panel>
 
