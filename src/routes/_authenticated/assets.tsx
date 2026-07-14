@@ -351,10 +351,12 @@ function AmortDialog({ asset, nodes, onClose, onDone }: { asset: any; nodes: any
     const cost = Number(asset.purchase_value ?? 0);
     if (!life || !asset.purchase_date || cost <= 0) return [] as { month: string; amount: number }[];
     const monthly = cost / life;
-    const start = new Date(asset.purchase_date);
+    // Parse la date d'achat en local (YYYY-MM-DD) pour éviter tout décalage TZ
+    // qui ferait démarrer l'amortissement le mois précédent.
+    const [ys, ms] = String(asset.purchase_date).slice(0, 10).split("-").map(Number);
     const today = new Date();
     const out: { month: string; amount: number }[] = [];
-    const first = new Date(start.getFullYear(), start.getMonth(), 1);
+    const first = new Date(ys, (ms || 1) - 1, 1); // 1er du mois d'acquisition
     for (let i = 0; i < life; i++) {
       const d = new Date(first.getFullYear(), first.getMonth() + i, 1);
       if (d > today) break;
