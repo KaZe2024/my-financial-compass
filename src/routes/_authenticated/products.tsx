@@ -87,7 +87,7 @@ function ProductsPage() {
       if (e2) throw e2;
       const { error: e3 } = await supabase.from("products").delete().in("id", dedup);
       if (e3) throw e3;
-      for (const id of dedup) await logAudit("product", id, "merge", { into: targetId });
+      for (const id of dedup) await logAudit("product", id, "delete", { merged_into: targetId });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
