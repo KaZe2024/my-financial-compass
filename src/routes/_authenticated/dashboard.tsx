@@ -151,13 +151,36 @@ function Dashboard() {
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
 
-  // Forecast — moyennes basées sur les transactions opérationnelles réelles (90 j).
-  const dailyIn = averageDailyCashIn(txRows, 90);
-  const dailyExp = averageDailyCashOut(txRows, 90);
+  // Forecast — planifie les flux récurrents (salaires, abonnements…) sur leur vraie cadence,
+  // puis complète avec une base quotidienne résiduelle (discrétionnaire). Cela évite les
+  // trajectoires trop lisses/agressives et respecte la saisonnalité mensuelle du salaire.
+  const activeIncomeSrc = (incomeSrc.data ?? []).filter((r: any) => r.active && r.recurring);
+  const activeSubs = (subs.data ?? []).filter((s: any) => s.active);
+  const perDay = (amt: number, cyc: string) => {
+    const c = (cyc || "monthly").toLowerCase();
+    if (c === "weekly") return amt / 7;
+    if (c === "biweekly" || c === "bi-weekly") return amt / 14;
+    if (c === "monthly") return amt / 30;
+    if (c === "bimonthly") return amt / 60;
+    if (c === "quarterly") return amt / 91;
+    if (c === "semiannual" || c === "semiannually") return amt / 182;
+    if (c === "yearly" || c === "annual" || c === "annually") return amt / 365;
+    if (c === "daily") return amt;
+    return amt / 30;
+  };
+  const recurringIncomePerDay = activeIncomeSrc.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.cycle), 0);
+  const subscriptionsPerDay = activeSubs.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.billing_cycle), 0);
+  const avgIn = averageDailyCashIn(txRows, 90);
+  const avgOut = averageDailyCashOut(txRows, 90);
+  // Résiduel = ce qui n'est pas déjà expliqué par les récurrents.
+  const residualDailyIncome = Math.max(0, avgIn - recurringIncomePerDay);
+  const residualDailyExpense = Math.max(0, avgOut - subscriptionsPerDay);
   const forecast = buildForecast({
     startingCash: cash,
-    dailyIncome: dailyIn,
-    dailyExpense: dailyExp,
+    dailyIncome: residualDailyIncome,
+    dailyExpense: residualDailyExpense,
+    recurringInflows: activeIncomeSrc.map((r: any) => ({ amount: Number(r.amount), cycle: r.cycle, nextDate: r.next_date })),
+    recurringOutflows: activeSubs.map((s: any) => ({ amount: Number(s.amount), cycle: s.billing_cycle, nextDate: s.next_billing_date })),
     inflows: (recRows.data ?? []).map(r => ({ amount: Number(r.outstanding), due_date: r.due_date })),
     outflows: [
       ...(debtsRows.data ?? []).map(d => ({ amount: Number(d.outstanding), due_date: d.due_date })),
@@ -332,7 +355,7 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
           <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Basé sur les revenus moyens observés ({fmtMoney(dailyIn * 30, cur, { compact: true })}/mois) et dépenses moyennes hors investissements/provisions ({fmtMoney(dailyExp * 30, cur, { compact: true })}/mois) sur 90 j, plus dettes/créances/provisions échéant.
+            Planifie les revenus récurrents (~{fmtMoney(recurringIncomePerDay * 30, cur, { compact: true })}/mois) et abonnements (~{fmtMoney(subscriptionsPerDay * 30, cur, { compact: true })}/mois) sur leur vraie cadence, plus une base résiduelle (revenus {fmtMoney(residualDailyIncome * 30, cur, { compact: true })}/mois, dépenses {fmtMoney(residualDailyExpense * 30, cur, { compact: true })}/mois) et les échéances dettes/créances/provisions.
           </p>
         </Panel>
 

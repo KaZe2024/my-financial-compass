@@ -517,11 +517,6 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
           </details>
 
-          <datalist id={suggestListId}>
-            {(productSuggest.data ?? []).map((p) => (
-              <option key={p.name} value={p.name}>{p.unit ? `${p.unit}${p.lastPrice != null ? ` · ${p.lastPrice} MGA` : ""}` : p.lastPrice != null ? `${p.lastPrice} MGA` : ""}</option>
-            ))}
-          </datalist>
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="grid grid-cols-12 gap-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
               <span className="col-span-5">Produit</span>
@@ -531,7 +526,14 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
             </div>
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2">
-                <Input list={suggestListId} className="col-span-5" placeholder="Produit" value={it.product_name} onChange={(e) => onProductNameChange(i, e.target.value)} />
+                <div className="col-span-5">
+                  <ProductAutocomplete
+                    value={it.product_name}
+                    suggestions={productSuggest.data ?? []}
+                    onChange={(name) => updateItem(i, { product_name: name })}
+                    onPick={(s) => updateItem(i, { product_name: s.name, unit: s.unit || it.unit, unit_price: s.lastPrice != null ? String(s.lastPrice) : it.unit_price })}
+                  />
+                </div>
                 <Input className="col-span-1" placeholder="kg" value={it.unit} onChange={(e) => updateItem(i, { unit: e.target.value })} />
                 <Input className="col-span-2 text-right" type="number" step="any" value={it.quantity} onChange={(e) => updateItem(i, { quantity: e.target.value })} />
                 <Input className="col-span-3 text-right" type="number" step="any" value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: e.target.value })} />
@@ -559,4 +561,62 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</Label>{children}</div>;
+}
+
+type Suggestion = { name: string; unit: string; lastPrice: number | null };
+function ProductAutocomplete({
+  value, suggestions, onChange, onPick,
+}: {
+  value: string;
+  suggestions: Suggestion[];
+  onChange: (name: string) => void;
+  onPick: (s: Suggestion) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hover, setHover] = useState(0);
+  const filtered = useMemo(() => {
+    const q = value.trim().toLowerCase();
+    const list = q
+      ? suggestions.filter((s) => s.name.toLowerCase().includes(q))
+      : suggestions;
+    // Prioritise exact "starts with" matches
+    return list.slice(0, 20);
+  }, [value, suggestions]);
+  return (
+    <div className="relative">
+      <Input
+        placeholder="Produit"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setHover(0); }}
+        onKeyDown={(e) => {
+          if (!open || filtered.length === 0) return;
+          if (e.key === "ArrowDown") { e.preventDefault(); setHover((h) => Math.min(h + 1, filtered.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setHover((h) => Math.max(h - 1, 0)); }
+          else if (e.key === "Enter") {
+            const pick = filtered[hover];
+            if (pick && pick.name.toLowerCase() !== value.trim().toLowerCase()) {
+              e.preventDefault(); onPick(pick); setOpen(false);
+            }
+          } else if (e.key === "Escape") { setOpen(false); }
+        }}
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-popover shadow-md">
+          {filtered.map((s, idx) => (
+            <li
+              key={s.name}
+              onMouseDown={(e) => { e.preventDefault(); onPick(s); setOpen(false); }}
+              onMouseEnter={() => setHover(idx)}
+              className={`flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm ${idx === hover ? "bg-muted" : ""}`}
+            >
+              <span className="truncate">{s.name}{s.unit ? <span className="ml-1 text-xs text-muted-foreground">/ {s.unit}</span> : null}</span>
+              {s.lastPrice != null && <span className="ml-2 font-mono text-[10px] text-muted-foreground">{s.lastPrice.toLocaleString()} MGA</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
