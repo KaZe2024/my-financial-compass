@@ -607,7 +607,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</Label>{children}</div>;
 }
 
-type Suggestion = { name: string; unit: string; lastPrice: number | null };
+type Suggestion = { id: string; name: string; unit: string; avgPrice: number | null; observations: number };
 function ProductAutocomplete({
   value, suggestions, onChange, onPick,
 }: {
@@ -656,7 +656,7 @@ function ProductAutocomplete({
               className={`flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm ${idx === hover ? "bg-muted" : ""}`}
             >
               <span className="truncate">{s.name}{s.unit ? <span className="ml-1 text-xs text-muted-foreground">/ {s.unit}</span> : null}</span>
-              {s.lastPrice != null && <span className="ml-2 font-mono text-[10px] text-muted-foreground">{s.lastPrice.toLocaleString()} MGA</span>}
+              {s.avgPrice != null && <span className="ml-2 font-mono text-[10px] text-muted-foreground">moy. {Math.round(s.avgPrice).toLocaleString()} MGA</span>}
             </li>
           ))}
         </ul>
