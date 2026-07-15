@@ -1197,6 +1197,7 @@ export type Database = {
       }
       products: {
         Row: {
+          archived: boolean
           category: string | null
           created_at: string
           id: string
@@ -1206,6 +1207,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          archived?: boolean
           category?: string | null
           created_at?: string
           id?: string
@@ -1215,6 +1217,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          archived?: boolean
           category?: string | null
           created_at?: string
           id?: string
@@ -1724,6 +1727,7 @@ export type Database = {
       }
       shopping_lists: {
         Row: {
+          archived: boolean
           budget_node_id: string | null
           created_at: string
           currency: string
@@ -1739,6 +1743,7 @@ export type Database = {
           wallet_id: string | null
         }
         Insert: {
+          archived?: boolean
           budget_node_id?: string | null
           created_at?: string
           currency?: string
@@ -1754,6 +1759,7 @@ export type Database = {
           wallet_id?: string | null
         }
         Update: {
+          archived?: boolean
           budget_node_id?: string | null
           created_at?: string
           currency?: string

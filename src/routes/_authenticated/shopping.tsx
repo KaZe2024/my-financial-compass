@@ -12,7 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check, Archive, ArchiveRestore } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
@@ -23,13 +23,14 @@ export const Route = createFileRoute("/_authenticated/shopping")({
   component: ShoppingPage,
 });
 
-type Item = { id?: string; product_name: string; unit: string; quantity: string; unit_price: string; checked: boolean };
+type Item = { id?: string; product_id?: string | null; product_name: string; unit: string; quantity: string; unit_price: string; checked: boolean };
 
 function ShoppingPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
   const profile = useQuery(profileQO);
   const nodes = useQuery(budgetNodesQO);
+  const [showArchived, setShowArchived] = useState(false);
   const tags = useQuery({
     queryKey: ["analytical_tags"],
     queryFn: async () =>
@@ -44,15 +45,15 @@ function ShoppingPage() {
   }, [nodes.data]);
 
   const lists = useQuery({
-    queryKey: ["shopping_lists"],
+    queryKey: ["shopping_lists", showArchived],
     queryFn: async () =>
-      await fetchAllRows<any>((from, to) =>
+      (await fetchAllRows<any>((from, to) =>
         supabase
           .from("shopping_lists")
           .select("*, shopping_list_items(*)")
           .order("occurred_on", { ascending: false })
           .range(from, to),
-      ),
+      )).filter((l: any) => showArchived || !l.archived),
   });
 
 
@@ -65,6 +66,7 @@ function ShoppingPage() {
           <p className="mt-1 text-xs text-muted-foreground">Devise verrouillée en <strong>MGA</strong>. Cochez les produits achetés puis envoyez la liste vers vos transactions.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Masquer" : "Voir"} archivées</Button>
           <DefaultsDialog profile={profile.data} wallets={wallets.data ?? []} nodes={nodes.data ?? []} tags={tags.data ?? []} onDone={() => qc.invalidateQueries({ queryKey: ["profile"] })} />
           <AddListDialog
             profile={profile.data}
@@ -105,14 +107,14 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
   const isClosed = !!list.transaction_id;
   const [items, setItems] = useState<Item[]>(
     (list.shopping_list_items ?? []).map((it: any) => ({
-      id: it.id, product_name: it.product_name, unit: it.unit ?? "",
+      id: it.id, product_id: it.product_id ?? null, product_name: it.product_name, unit: it.unit ?? "",
       quantity: String(it.quantity), unit_price: String(it.unit_price),
       checked: !!it.checked,
     }))
   );
   useEffect(() => {
     setItems((list.shopping_list_items ?? []).map((it: any) => ({
-      id: it.id, product_name: it.product_name, unit: it.unit ?? "",
+      id: it.id, product_id: it.product_id ?? null, product_name: it.product_name, unit: it.unit ?? "",
       quantity: String(it.quantity), unit_price: String(it.unit_price),
       checked: !!it.checked,
     })));
@@ -137,6 +139,15 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Liste supprimée"); onChange(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveList = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("shopping_lists").update({ archived: !list.archived }).eq("id", list.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success(list.archived ? "Liste restaurée" : "Liste archivée"); onChange(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -206,6 +217,7 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
           <span className="font-medium">{list.title || list.store || "Liste"}</span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{fmtDate(list.occurred_on)}</span>
           {isClosed && <span className="rounded-sm bg-positive/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-positive">envoyé</span>}
+          {list.archived && <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">archivé</span>}
         </div>
       }
       action={
@@ -250,11 +262,23 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
 
         {!isClosed && (
           <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="ghost" onClick={() => archiveList.mutate()} disabled={archiveList.isPending}>
+              {list.archived ? <ArchiveRestore className="mr-1 h-3.5 w-3.5" /> : <Archive className="mr-1 h-3.5 w-3.5" />}
+              {list.archived ? "Restaurer" : "Archiver"}
+            </Button>
             <Button size="sm" variant="ghost" className="text-negative" onClick={() => confirm("Supprimer cette liste ?") && removeList.mutate()}>
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Supprimer
             </Button>
             <Button size="sm" onClick={() => commit.mutate()} disabled={commit.isPending || items.filter((i) => i.checked).length === 0}>
               <Save className="mr-1 h-3.5 w-3.5" /> Enregistrer vers transactions
+            </Button>
+          </div>
+        )}
+        {isClosed && (
+          <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="ghost" onClick={() => archiveList.mutate()} disabled={archiveList.isPending}>
+              {list.archived ? <ArchiveRestore className="mr-1 h-3.5 w-3.5" /> : <Archive className="mr-1 h-3.5 w-3.5" />}
+              {list.archived ? "Restaurer" : "Archiver"}
             </Button>
           </div>
         )}
@@ -381,9 +405,9 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
   const [walletId, setWalletId] = useState<string>(profile?.shopping_default_wallet_id ?? "");
   const [nodeId, setNodeId] = useState<string | null>(profile?.shopping_default_node_id ?? null);
   const [tagIds, setTagIds] = useState<string[]>(profile?.shopping_default_tag_ids ?? []);
-  const [items, setItems] = useState<Item[]>([{ product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }]);
+  const [items, setItems] = useState<Item[]>([{ product_id: null, product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }]);
 
-  // Product suggestions with last known unit + price
+  // Suggestions issues du catalogue + PU moyen de l'historique produits.
   const productSuggest = useQuery({
     queryKey: ["product_suggest"],
     enabled: open,
@@ -392,17 +416,34 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
         supabase.from("products").select("id,name,unit,archived").order("name").range(from, to),
       );
       const prices = await fetchAllRows<any>((from, to) =>
-        supabase.from("product_prices").select("product_id,unit_price,observed_on").order("observed_on", { ascending: false }).range(from, to),
+        supabase.from("product_prices").select("product_id,unit_price,currency").eq("currency", "MGA").range(from, to),
       );
-      const lastPrice = new Map<string, number>();
-      for (const p of prices) if (!lastPrice.has(p.product_id)) lastPrice.set(p.product_id, Number(p.unit_price));
-      return products.filter((p) => !p.archived).map((p) => ({ name: p.name, unit: p.unit ?? "", lastPrice: lastPrice.get(p.id) ?? null }));
+      const priceStats = new Map<string, { total: number; count: number }>();
+      for (const p of prices) {
+        const unitPrice = Number(p.unit_price);
+        if (!p.product_id || !Number.isFinite(unitPrice) || unitPrice <= 0) continue;
+        const row = priceStats.get(p.product_id) ?? { total: 0, count: 0 };
+        row.total += unitPrice;
+        row.count += 1;
+        priceStats.set(p.product_id, row);
+      }
+      return products
+        .filter((p) => !p.archived)
+        .map((p) => {
+          const avg = priceStats.get(p.id);
+          return {
+            id: p.id,
+            name: p.name,
+            unit: p.unit ?? "",
+            avgPrice: avg?.count ? avg.total / avg.count : null,
+            observations: avg?.count ?? 0,
+          };
+        });
     },
   });
-  const suggestListId = useMemo(() => `prod-suggest-${Math.random().toString(36).slice(2, 8)}`, []);
   const suggestByName = useMemo(() => {
-    const m = new Map<string, { unit: string; lastPrice: number | null }>();
-    for (const p of productSuggest.data ?? []) m.set(p.name.toLowerCase(), { unit: p.unit, lastPrice: p.lastPrice });
+    const m = new Map<string, Suggestion>();
+    for (const p of productSuggest.data ?? []) m.set(p.name.toLowerCase(), p);
     return m;
   }, [productSuggest.data]);
 
@@ -423,16 +464,17 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
       if (idx !== i) return it;
       const match = suggestByName.get(name.trim().toLowerCase());
       const prevMatch = suggestByName.get(it.product_name.trim().toLowerCase());
-      // Autofill only when transitioning to a new matched product
+      // Remplit U. + PU moyen dès que le nom correspond au catalogue.
       if (match && (!prevMatch || prevMatch !== match)) {
         return {
           ...it,
+          product_id: match.id,
           product_name: name,
           unit: match.unit || it.unit,
-          unit_price: match.lastPrice != null ? String(match.lastPrice) : it.unit_price,
+          unit_price: match.avgPrice != null ? String(Math.round(match.avgPrice)) : it.unit_price,
         };
       }
-      return { ...it, product_name: name };
+      return { ...it, product_id: match?.id ?? null, product_name: name };
     }));
   }
 
@@ -446,7 +488,9 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
       const productIds: Record<string, string> = {};
       for (const it of items) {
         if (!it.product_name.trim()) continue;
-        const { data: existing } = await supabase.from("products").select("id").eq("name", it.product_name).maybeSingle();
+        const suggestion = suggestByName.get(it.product_name.trim().toLowerCase());
+        if (suggestion?.id) { productIds[it.product_name] = suggestion.id; continue; }
+        const { data: existing } = await supabase.from("products").select("id,name").ilike("name", it.product_name.trim()).limit(1).maybeSingle();
         if (existing?.id) { productIds[it.product_name] = existing.id; continue; }
         const { data: created, error } = await supabase.from("products").insert({ user_id: uid, name: it.product_name, unit: it.unit || null }).select("id").single();
         if (error) throw error;
@@ -467,7 +511,7 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
       if (lerr) throw lerr;
 
       const itemsRows = items.filter((it) => it.product_name.trim()).map((it) => ({
-        user_id: uid, list_id: list.id, product_id: productIds[it.product_name],
+        user_id: uid, list_id: list.id, product_id: it.product_id || productIds[it.product_name],
         product_name: it.product_name, unit: it.unit || null,
         quantity: Number(it.quantity || 0),
         unit_price: Number(it.unit_price || 0),
@@ -483,7 +527,7 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
       toast.success("Liste créée");
       setOpen(false);
       setTitle(""); setStore("");
-      setItems([{ product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }]);
+      setItems([{ product_id: null, product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }]);
       onDone();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -530,8 +574,8 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
                   <ProductAutocomplete
                     value={it.product_name}
                     suggestions={productSuggest.data ?? []}
-                    onChange={(name) => updateItem(i, { product_name: name })}
-                    onPick={(s) => updateItem(i, { product_name: s.name, unit: s.unit || it.unit, unit_price: s.lastPrice != null ? String(s.lastPrice) : it.unit_price })}
+                    onChange={(name) => onProductNameChange(i, name)}
+                    onPick={(s) => updateItem(i, { product_id: s.id, product_name: s.name, unit: s.unit || it.unit, unit_price: s.avgPrice != null ? String(Math.round(s.avgPrice)) : it.unit_price })}
                   />
                 </div>
                 <Input className="col-span-1" placeholder="kg" value={it.unit} onChange={(e) => updateItem(i, { unit: e.target.value })} />
@@ -542,7 +586,7 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
                 </button>
               </div>
             ))}
-            <Button type="button" variant="secondary" size="sm" onClick={() => setItems((s) => [...s, { product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }])}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setItems((s) => [...s, { product_id: null, product_name: "", unit: "", quantity: "1", unit_price: "0", checked: false }])}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Ligne
             </Button>
           </div>
@@ -563,7 +607,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{label}</Label>{children}</div>;
 }
 
-type Suggestion = { name: string; unit: string; lastPrice: number | null };
+type Suggestion = { id: string; name: string; unit: string; avgPrice: number | null; observations: number };
 function ProductAutocomplete({
   value, suggestions, onChange, onPick,
 }: {
@@ -612,7 +656,7 @@ function ProductAutocomplete({
               className={`flex cursor-pointer items-center justify-between px-2 py-1.5 text-sm ${idx === hover ? "bg-muted" : ""}`}
             >
               <span className="truncate">{s.name}{s.unit ? <span className="ml-1 text-xs text-muted-foreground">/ {s.unit}</span> : null}</span>
-              {s.lastPrice != null && <span className="ml-2 font-mono text-[10px] text-muted-foreground">{s.lastPrice.toLocaleString()} MGA</span>}
+              {s.avgPrice != null && <span className="ml-2 font-mono text-[10px] text-muted-foreground">moy. {Math.round(s.avgPrice).toLocaleString()} MGA</span>}
             </li>
           ))}
         </ul>
