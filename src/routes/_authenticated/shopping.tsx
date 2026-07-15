@@ -12,7 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Settings, Save, Pencil, Check, Archive, ArchiveRestore } from "lucide-react";
 import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
@@ -23,13 +23,14 @@ export const Route = createFileRoute("/_authenticated/shopping")({
   component: ShoppingPage,
 });
 
-type Item = { id?: string; product_name: string; unit: string; quantity: string; unit_price: string; checked: boolean };
+type Item = { id?: string; product_id?: string | null; product_name: string; unit: string; quantity: string; unit_price: string; checked: boolean };
 
 function ShoppingPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
   const profile = useQuery(profileQO);
   const nodes = useQuery(budgetNodesQO);
+  const [showArchived, setShowArchived] = useState(false);
   const tags = useQuery({
     queryKey: ["analytical_tags"],
     queryFn: async () =>
@@ -44,15 +45,15 @@ function ShoppingPage() {
   }, [nodes.data]);
 
   const lists = useQuery({
-    queryKey: ["shopping_lists"],
+    queryKey: ["shopping_lists", showArchived],
     queryFn: async () =>
-      await fetchAllRows<any>((from, to) =>
+      (await fetchAllRows<any>((from, to) =>
         supabase
           .from("shopping_lists")
           .select("*, shopping_list_items(*)")
           .order("occurred_on", { ascending: false })
           .range(from, to),
-      ),
+      )).filter((l: any) => showArchived || !l.archived),
   });
 
 
@@ -65,6 +66,7 @@ function ShoppingPage() {
           <p className="mt-1 text-xs text-muted-foreground">Devise verrouillée en <strong>MGA</strong>. Cochez les produits achetés puis envoyez la liste vers vos transactions.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Masquer" : "Voir"} archivées</Button>
           <DefaultsDialog profile={profile.data} wallets={wallets.data ?? []} nodes={nodes.data ?? []} tags={tags.data ?? []} onDone={() => qc.invalidateQueries({ queryKey: ["profile"] })} />
           <AddListDialog
             profile={profile.data}
@@ -105,14 +107,14 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
   const isClosed = !!list.transaction_id;
   const [items, setItems] = useState<Item[]>(
     (list.shopping_list_items ?? []).map((it: any) => ({
-      id: it.id, product_name: it.product_name, unit: it.unit ?? "",
+      id: it.id, product_id: it.product_id ?? null, product_name: it.product_name, unit: it.unit ?? "",
       quantity: String(it.quantity), unit_price: String(it.unit_price),
       checked: !!it.checked,
     }))
   );
   useEffect(() => {
     setItems((list.shopping_list_items ?? []).map((it: any) => ({
-      id: it.id, product_name: it.product_name, unit: it.unit ?? "",
+      id: it.id, product_id: it.product_id ?? null, product_name: it.product_name, unit: it.unit ?? "",
       quantity: String(it.quantity), unit_price: String(it.unit_price),
       checked: !!it.checked,
     })));
@@ -137,6 +139,15 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
       if (error) throw error;
     },
     onSuccess: () => { toast.success("Liste supprimée"); onChange(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archiveList = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).from("shopping_lists").update({ archived: !list.archived }).eq("id", list.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success(list.archived ? "Liste restaurée" : "Liste archivée"); onChange(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -206,6 +217,7 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
           <span className="font-medium">{list.title || list.store || "Liste"}</span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{fmtDate(list.occurred_on)}</span>
           {isClosed && <span className="rounded-sm bg-positive/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-positive">envoyé</span>}
+          {list.archived && <span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">archivé</span>}
         </div>
       }
       action={
@@ -250,11 +262,23 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
 
         {!isClosed && (
           <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="ghost" onClick={() => archiveList.mutate()} disabled={archiveList.isPending}>
+              {list.archived ? <ArchiveRestore className="mr-1 h-3.5 w-3.5" /> : <Archive className="mr-1 h-3.5 w-3.5" />}
+              {list.archived ? "Restaurer" : "Archiver"}
+            </Button>
             <Button size="sm" variant="ghost" className="text-negative" onClick={() => confirm("Supprimer cette liste ?") && removeList.mutate()}>
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Supprimer
             </Button>
             <Button size="sm" onClick={() => commit.mutate()} disabled={commit.isPending || items.filter((i) => i.checked).length === 0}>
               <Save className="mr-1 h-3.5 w-3.5" /> Enregistrer vers transactions
+            </Button>
+          </div>
+        )}
+        {isClosed && (
+          <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="ghost" onClick={() => archiveList.mutate()} disabled={archiveList.isPending}>
+              {list.archived ? <ArchiveRestore className="mr-1 h-3.5 w-3.5" /> : <Archive className="mr-1 h-3.5 w-3.5" />}
+              {list.archived ? "Restaurer" : "Archiver"}
             </Button>
           </div>
         )}
