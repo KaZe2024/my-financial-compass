@@ -28,6 +28,7 @@ const NAV = [
     { to: "/budgets", label: "Budgets", icon: PieChart },
     { to: "/projects", label: "Projets", icon: Sparkles },
     { to: "/goals", label: "Objectifs", icon: Target },
+    { to: "/fridge", label: "Gestion frigo", icon: Refrigerator },
   ]},
   { group: "Patrimoine", items: [
     { to: "/assets", label: "Actifs", icon: Landmark },
