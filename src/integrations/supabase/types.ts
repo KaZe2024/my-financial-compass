@@ -880,6 +880,48 @@ export type Database = {
           },
         ]
       }
+      fridge_items: {
+        Row: {
+          added_on: string
+          archived: boolean
+          created_at: string
+          expires_on: string | null
+          id: string
+          name: string
+          notes: string | null
+          quantity: number | null
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          added_on?: string
+          archived?: boolean
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          quantity?: number | null
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          added_on?: string
+          archived?: boolean
+          created_at?: string
+          expires_on?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          quantity?: number | null
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       income_sources: {
         Row: {
           active: boolean
@@ -1086,6 +1128,53 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "currencies"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      meal_plan_entries: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          fridge_item_id: string | null
+          id: string
+          label: string
+          slot: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          fridge_item_id?: string | null
+          id?: string
+          label?: string
+          slot?: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          fridge_item_id?: string | null
+          id?: string
+          label?: string
+          slot?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meal_plan_entries_fridge_item_id_fkey"
+            columns: ["fridge_item_id"]
+            isOneToOne: false
+            referencedRelation: "fridge_items"
+            referencedColumns: ["id"]
           },
         ]
       }
