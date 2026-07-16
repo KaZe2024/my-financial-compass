@@ -134,7 +134,14 @@ function AssetsPage() {
               {visible.map((a: any) => {
                 const value = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
                 const amo = computeAmortization(a);
-                const resaleGain = value.marketValue - value.bookValue;
+                const saleEv = (assetEvents.data ?? []).find((e: any) => e.asset_id === a.id && e.event_type === "sale");
+                let resaleGain: number;
+                if (saleEv) {
+                  const atSale = computeAssetValue(a, assetEvents.data ?? [], { through: saleEv.event_date, transactions: assetTx.data ?? [] });
+                  resaleGain = Number(saleEv.amount ?? 0) - atSale.bookValue;
+                } else {
+                  resaleGain = value.marketValue - value.bookValue;
+                }
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
