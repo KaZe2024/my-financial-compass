@@ -164,7 +164,7 @@ function FridgePage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-        <Panel title="Contenu du frigo" actions={
+        <Panel title="Contenu du frigo" action={
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => setShowArchived(v => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
             <FridgeItemDialog onDone={() => qc.invalidateQueries({ queryKey: ["fridge_items"] })} />
