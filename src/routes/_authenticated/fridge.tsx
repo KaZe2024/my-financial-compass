@@ -298,6 +298,32 @@ function FridgePage() {
           </DialogContent>
         </Dialog>
       )}
+      {pendingDrop && (
+        <Dialog open onOpenChange={(v) => { if (!v) { setPendingDrop(null); setDropQty(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter au {DAYS[pendingDrop.day]} — {pendingDrop.item.name}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={(e) => { e.preventDefault(); confirmDrop(); }} className="space-y-3">
+              <div className="text-xs text-muted-foreground">
+                {pendingDrop.item.quantity != null
+                  ? <>Disponible dans le frigo : <span className="font-mono text-foreground">{pendingDrop.item.quantity} {pendingDrop.item.unit ?? ""}</span></>
+                  : <>Aucune quantité renseignée sur l'item — la déduction sera ignorée.</>}
+              </div>
+              {pendingDrop.item.quantity != null && (
+                <div className="space-y-1">
+                  <Label>Quantité utilisée{pendingDrop.item.unit ? ` (${pendingDrop.item.unit})` : ""}</Label>
+                  <Input type="number" step="any" min="0" max={pendingDrop.item.quantity} value={dropQty} onChange={(e) => setDropQty(e.target.value)} autoFocus required />
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="ghost" type="button" onClick={() => { setPendingDrop(null); setDropQty(""); }}>Annuler</Button>
+                <Button type="submit">Confirmer</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
