@@ -137,12 +137,37 @@ function FridgePage() {
     if (payload.kind === "fridge") {
       const item = (items.data ?? []).find((i) => i.id === payload.id);
       if (!item) return;
-      addEntry.mutate({ day, label: item.name, fridge_item_id: item.id });
+      // Ouvrir la fenêtre quantité avant d'ajouter et de déduire.
+      setPendingDrop({ day, item });
+      setDropQty(item.quantity != null ? "1" : "");
     } else if (payload.kind === "entry") {
       moveEntry.mutate({ id: payload.id, day });
     }
     setDragItem(null);
   }
+
+  async function confirmDrop() {
+    if (!pendingDrop) return;
+    const { day, item } = pendingDrop;
+    const qty = dropQty ? Number(dropQty) : null;
+    const available = item.quantity != null ? Number(item.quantity) : null;
+    if (qty != null && available != null && qty > available) {
+      toast.error(`Quantité disponible : ${available} ${item.unit ?? ""}`);
+      return;
+    }
+    const unit = item.unit ? ` ${item.unit}` : "";
+    const label = qty != null ? `${qty}${unit} · ${item.name}` : item.name;
+    await addEntry.mutateAsync({ day, label, fridge_item_id: item.id });
+    if (qty != null && available != null) {
+      const remaining = Math.max(0, available - qty);
+      const { error } = await (supabase as any).from("fridge_items").update({ quantity: remaining }).eq("id", item.id);
+      if (error) toast.error(error.message);
+      qc.invalidateQueries({ queryKey: ["fridge_items"] });
+    }
+    setPendingDrop(null);
+    setDropQty("");
+  }
+
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
