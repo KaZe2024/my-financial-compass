@@ -17,6 +17,7 @@ export function HistoryDialog({
   column,
   sourceKind,
   entityId,
+  balanceMode,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -24,7 +25,10 @@ export function HistoryDialog({
   column: "asset_id" | "debt_id" | "receivable_id" | "counterparty_id";
   sourceKind?: "asset" | "debt" | "receivable" | "counterparty" | "provision" | "subscription";
   entityId: string;
+  balanceMode?: "asset";
 }) {
+  // Force asset balance mode when auditing an asset (default expectation).
+  const mode: "asset" | "default" = balanceMode ?? (column === "asset_id" ? "asset" : "default");
   const q = useQuery({
     queryKey: ["history", column, entityId, sourceKind ?? ""],
     enabled: open && !!entityId,
@@ -43,15 +47,50 @@ export function HistoryDialog({
   });
 
   const rows = q.data ?? [];
+  const isAmortRow = (r: any) => {
+    const marker = `${r.description ?? ""} ${r.notes ?? ""}`.toLowerCase();
+    return marker.includes("amort");
+  };
   const cashSign = (type: string, mga: number) => {
     if (type === "transfer") return 0;
     if (["income","asset_sale","adjustment","enveloppe_emprunt","dette"].includes(type)) return mga;
     return -mga;
   };
-  const totalMga = rows.reduce((s: number, r: any) => {
-    const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
-    return s + cashSign(r.type, mga);
-  }, 0);
+  const rowSign = (r: any, mga: number) => {
+    if (mode === "asset") {
+      // Convention actif : achat +, amortissement −, vente +.
+      if (r.type === "asset_purchase") return mga;
+      if (r.type === "asset_sale") return mga;
+      if (r.type === "expense" && isAmortRow(r)) return -mga;
+      return cashSign(r.type, mga);
+    }
+    return cashSign(r.type, mga);
+  };
+  let balanceLabel = "Net";
+  let totalMga = 0;
+  if (mode === "asset") {
+    let purchases = 0, deps = 0, sales = 0;
+    let sold = false;
+    for (const r of rows) {
+      const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
+      if (r.type === "asset_purchase") purchases += Math.abs(mga);
+      else if (r.type === "asset_sale") { sales += Math.abs(mga); sold = true; }
+      else if (r.type === "expense" && isAmortRow(r)) deps += Math.abs(mga);
+    }
+    if (sold) {
+      totalMga = sales - (purchases - deps); // PV/MV de revente
+      balanceLabel = "Solde (PV/MV revente)";
+    } else {
+      totalMga = purchases - deps; // VNC
+      balanceLabel = "Solde (VNC)";
+    }
+  } else {
+    totalMga = rows.reduce((s: number, r: any) => {
+      const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
+      return s + cashSign(r.type, mga);
+    }, 0);
+  }
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
