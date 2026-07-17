@@ -199,22 +199,29 @@ function FridgePage() {
         }>
           <div className="space-y-1.5 max-h-[600px] overflow-y-auto scroll-thin">
             {visibleItems.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">Aucun item</p>}
-            {visibleItems.map((it) => (
+            {visibleItems.map((it) => {
+              const outOfStock = it.quantity != null && Number(it.quantity) <= 0;
+              return (
               <div
                 key={it.id}
-                draggable={!it.archived}
+                draggable={!it.archived && !outOfStock}
                 onDragStart={(e) => {
                   e.dataTransfer.setData("application/json", JSON.stringify({ kind: "fridge", id: it.id }));
                   setDragItem(it);
                 }}
                 onDragEnd={() => setDragItem(null)}
-                className={`group flex items-center gap-2 rounded-sm border border-border bg-card px-2 py-1.5 text-sm ${it.archived ? "opacity-50" : "cursor-grab hover:border-primary/40"} ${dragItem?.id === it.id ? "opacity-40" : ""}`}
+                className={`group flex items-center gap-2 rounded-sm border border-border bg-card px-2 py-1.5 text-sm ${it.archived || outOfStock ? "opacity-60" : "cursor-grab hover:border-primary/40"} ${dragItem?.id === it.id ? "opacity-40" : ""}`}
               >
                 <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate">{it.name}</div>
+                  <div className="truncate flex items-center gap-1.5">
+                    <span className="truncate">{it.name}</span>
+                    {outOfStock && !it.archived && (
+                      <span className="rounded-sm bg-negative/15 text-negative px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider">Stock épuisé</span>
+                    )}
+                  </div>
                   <div className="font-mono text-[10px] text-muted-foreground">
-                    {it.quantity ? `${it.quantity} ${it.unit ?? ""}` : ""}
+                    {it.quantity != null ? `${it.quantity} ${it.unit ?? ""}` : ""}
                     {it.expires_on ? ` · exp. ${fmtDate(it.expires_on)}` : ""}
                   </div>
                 </div>
@@ -226,7 +233,8 @@ function FridgePage() {
                   <button title="Supprimer" onClick={() => { if (confirm(`Supprimer « ${it.name} » ?`)) deleteItem(it.id, qc); }} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
 
