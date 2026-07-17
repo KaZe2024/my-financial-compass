@@ -117,7 +117,7 @@ export function HistoryDialog({
               <tbody>
                 {rows.map((r: any) => {
                   const mga = Number(r.base_amount ?? Number(r.amount) * Number(r.exchange_rate ?? 1));
-                  const signed = cashSign(r.type, mga);
+                  const signed = rowSign(r, mga);
                   const isIn = signed > 0;
                   return (
                     <tr key={r.id} className="border-t border-border/60">
@@ -134,7 +134,7 @@ export function HistoryDialog({
               </tbody>
               <tfoot>
                 <tr className="border-t border-border">
-                  <td colSpan={4} className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Net</td>
+                  <td colSpan={4} className="px-2 py-2 text-right font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{balanceLabel}</td>
                   <td className={`num px-2 py-2 text-right font-semibold ${totalMga >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(totalMga, "MGA", { sign: true })}</td>
                 </tr>
               </tfoot>
