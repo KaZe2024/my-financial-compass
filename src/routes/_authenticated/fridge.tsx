@@ -34,6 +34,8 @@ function FridgePage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [entryEdit, setEntryEdit] = useState<any | null>(null);
   const [dragItem, setDragItem] = useState<any | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ day: number; item: any } | null>(null);
+  const [dropQty, setDropQty] = useState<string>("");
 
   const weekIso = toISODate(weekStart);
 
