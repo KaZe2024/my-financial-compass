@@ -229,11 +229,12 @@ export function directNodeSpendFromTransactions(txs: TransactionLike[], from: st
   return out;
 }
 
-export function assetDepreciationFromTransactions(asset: AssetLike, transactions: TransactionLike[] = [], opts: { through?: string } = {}) {
+export function assetDepreciationFromTransactions(asset: AssetLike, transactions: TransactionLike[] = [], opts: { through?: string; from?: string } = {}) {
   return transactions
     .filter((t) => linkedToAsset(t, asset.id))
     .filter((t) => t.type === "expense")
     .filter((t) => !opts.through || !t.occurred_on || t.occurred_on <= opts.through!)
+    .filter((t) => !opts.from || !t.occurred_on || t.occurred_on >= opts.from!)
     .filter((t) => {
       const marker = `${t.description ?? ""} ${t.notes ?? ""}`.toLowerCase();
       return marker.includes("amort");
@@ -241,41 +242,43 @@ export function assetDepreciationFromTransactions(asset: AssetLike, transactions
     .reduce((s, t) => s + Math.abs(baseAmount(t)), 0);
 }
 
-function assetDepreciationFromEvents(asset: AssetLike, events: AssetEventLike[], opts: { through?: string } = {}) {
+function assetDepreciationFromEvents(asset: AssetLike, events: AssetEventLike[], opts: { through?: string; from?: string } = {}) {
   return events
     .filter((e) => e.asset_id === asset.id)
     .filter((e) => e.event_type === "depreciation")
     .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!)
+    .filter((e) => !opts.from || !eventDate(e) || eventDate(e)! >= opts.from!)
     .reduce((s, e) => s + Math.abs(num(e.amount)), 0);
 }
 
 /**
  * Valorisation d'un actif :
- * - depreciation = somme des dotations aux amortissements enregistrées.
- * - bookValue (VNC) = Coût − Amortissement cumulé.
- * - marketValue (Valeur) = current_value si saisi (>0, réévaluation), sinon VNC.
- * - variation = marketValue − Coût.
- * bookValue reste rétro-compatible pour les anciens appels.
+ * - Sans réévaluation : base = coût d'acquisition, VNC = Coût − Amort. cumulé.
+ * - Avec réévaluation à la date D : base = Nouvelle valeur, VNC = Nouvelle valeur − Amort. cumulé depuis D.
+ * - marketValue = VNC (la réévaluation redéfinit la base).
  */
 export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
   const relevant = events
     .filter((e) => e.asset_id === asset.id)
     .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!);
-  const depreciation = opts.transactions
-    ? assetDepreciationFromTransactions(asset, opts.transactions, opts)
-    : assetDepreciationFromEvents(asset, events, opts);
   const sold = relevant.some((e) => e.event_type === "sale") || (!opts.through && (asset.status ?? "owned") === "sold");
   const cost = num(asset.purchase_value);
-  const latestValuation = relevant
+  const latestReval = relevant
     .filter((e) => e.event_type === "revaluation" || e.event_type === "impairment")
     .sort((a, b) => String(eventDate(a) ?? "").localeCompare(String(eventDate(b) ?? "")))
     .at(-1);
-  const stored = opts.through ? num(latestValuation?.amount) : num(asset.current_value);
-  const vnc = Math.max(0, cost - depreciation);
+  const revalDate = latestReval ? (eventDate(latestReval) ?? undefined) : undefined;
+  const revalAmount = latestReval ? num(latestReval.amount) : 0;
+  const basis = latestReval && revalAmount > 0 ? revalAmount : cost;
+  const depOpts = { through: opts.through, from: revalDate };
+  const depreciation = opts.transactions
+    ? assetDepreciationFromTransactions(asset, opts.transactions, depOpts)
+    : assetDepreciationFromEvents(asset, events, depOpts);
+  const vnc = Math.max(0, basis - depreciation);
   const bookValue = sold ? 0 : vnc;
-  const marketValue = sold ? 0 : (stored > 0 ? stored : vnc);
+  const marketValue = sold ? 0 : vnc;
   const variation = marketValue - cost;
-  return { cost, depreciation, bookValue, marketValue, variation, sold };
+  return { cost, depreciation, bookValue, marketValue, variation, sold, basis, revaluedOn: revalDate ?? null };
 }
 
 export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {

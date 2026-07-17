@@ -34,6 +34,8 @@ function FridgePage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [entryEdit, setEntryEdit] = useState<any | null>(null);
   const [dragItem, setDragItem] = useState<any | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ day: number; item: any } | null>(null);
+  const [dropQty, setDropQty] = useState<string>("");
 
   const weekIso = toISODate(weekStart);
 
@@ -135,12 +137,37 @@ function FridgePage() {
     if (payload.kind === "fridge") {
       const item = (items.data ?? []).find((i) => i.id === payload.id);
       if (!item) return;
-      addEntry.mutate({ day, label: item.name, fridge_item_id: item.id });
+      // Ouvrir la fenêtre quantité avant d'ajouter et de déduire.
+      setPendingDrop({ day, item });
+      setDropQty(item.quantity != null ? "1" : "");
     } else if (payload.kind === "entry") {
       moveEntry.mutate({ id: payload.id, day });
     }
     setDragItem(null);
   }
+
+  async function confirmDrop() {
+    if (!pendingDrop) return;
+    const { day, item } = pendingDrop;
+    const qty = dropQty ? Number(dropQty) : null;
+    const available = item.quantity != null ? Number(item.quantity) : null;
+    if (qty != null && available != null && qty > available) {
+      toast.error(`Quantité disponible : ${available} ${item.unit ?? ""}`);
+      return;
+    }
+    const unit = item.unit ? ` ${item.unit}` : "";
+    const label = qty != null ? `${qty}${unit} · ${item.name}` : item.name;
+    await addEntry.mutateAsync({ day, label, fridge_item_id: item.id });
+    if (qty != null && available != null) {
+      const remaining = Math.max(0, available - qty);
+      const { error } = await (supabase as any).from("fridge_items").update({ quantity: remaining }).eq("id", item.id);
+      if (error) toast.error(error.message);
+      qc.invalidateQueries({ queryKey: ["fridge_items"] });
+    }
+    setPendingDrop(null);
+    setDropQty("");
+  }
+
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -172,22 +199,29 @@ function FridgePage() {
         }>
           <div className="space-y-1.5 max-h-[600px] overflow-y-auto scroll-thin">
             {visibleItems.length === 0 && <p className="py-6 text-center text-xs text-muted-foreground">Aucun item</p>}
-            {visibleItems.map((it) => (
+            {visibleItems.map((it) => {
+              const outOfStock = it.quantity != null && Number(it.quantity) <= 0;
+              return (
               <div
                 key={it.id}
-                draggable={!it.archived}
+                draggable={!it.archived && !outOfStock}
                 onDragStart={(e) => {
                   e.dataTransfer.setData("application/json", JSON.stringify({ kind: "fridge", id: it.id }));
                   setDragItem(it);
                 }}
                 onDragEnd={() => setDragItem(null)}
-                className={`group flex items-center gap-2 rounded-sm border border-border bg-card px-2 py-1.5 text-sm ${it.archived ? "opacity-50" : "cursor-grab hover:border-primary/40"} ${dragItem?.id === it.id ? "opacity-40" : ""}`}
+                className={`group flex items-center gap-2 rounded-sm border border-border bg-card px-2 py-1.5 text-sm ${it.archived || outOfStock ? "opacity-60" : "cursor-grab hover:border-primary/40"} ${dragItem?.id === it.id ? "opacity-40" : ""}`}
               >
                 <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate">{it.name}</div>
+                  <div className="truncate flex items-center gap-1.5">
+                    <span className="truncate">{it.name}</span>
+                    {outOfStock && !it.archived && (
+                      <span className="rounded-sm bg-negative/15 text-negative px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider">Stock épuisé</span>
+                    )}
+                  </div>
                   <div className="font-mono text-[10px] text-muted-foreground">
-                    {it.quantity ? `${it.quantity} ${it.unit ?? ""}` : ""}
+                    {it.quantity != null ? `${it.quantity} ${it.unit ?? ""}` : ""}
                     {it.expires_on ? ` · exp. ${fmtDate(it.expires_on)}` : ""}
                   </div>
                 </div>
@@ -199,7 +233,8 @@ function FridgePage() {
                   <button title="Supprimer" onClick={() => { if (confirm(`Supprimer « ${it.name} » ?`)) deleteItem(it.id, qc); }} className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-negative"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
 
@@ -259,6 +294,32 @@ function FridgePage() {
             <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); updateEntry.mutate({ id: entryEdit.id, label: String(f.get("label") ?? "") }); }}>
               <Input name="label" defaultValue={entryEdit.label} autoFocus />
               <DialogFooter className="mt-3"><Button type="submit">Enregistrer</Button></DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+      {pendingDrop && (
+        <Dialog open onOpenChange={(v) => { if (!v) { setPendingDrop(null); setDropQty(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ajouter au {DAYS[pendingDrop.day]} — {pendingDrop.item.name}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={(e) => { e.preventDefault(); confirmDrop(); }} className="space-y-3">
+              <div className="text-xs text-muted-foreground">
+                {pendingDrop.item.quantity != null
+                  ? <>Disponible dans le frigo : <span className="font-mono text-foreground">{pendingDrop.item.quantity} {pendingDrop.item.unit ?? ""}</span></>
+                  : <>Aucune quantité renseignée sur l'item — la déduction sera ignorée.</>}
+              </div>
+              {pendingDrop.item.quantity != null && (
+                <div className="space-y-1">
+                  <Label>Quantité utilisée{pendingDrop.item.unit ? ` (${pendingDrop.item.unit})` : ""}</Label>
+                  <Input type="number" step="any" min="0" max={pendingDrop.item.quantity} value={dropQty} onChange={(e) => setDropQty(e.target.value)} autoFocus required />
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="ghost" type="button" onClick={() => { setPendingDrop(null); setDropQty(""); }}>Annuler</Button>
+                <Button type="submit">Confirmer</Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
