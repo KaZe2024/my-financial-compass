@@ -199,7 +199,7 @@ function BudgetsPage() {
   }, [tree, plannedRollupByNode, spentRollupByNode]);
 
   const totalPct = totals.plannedExp > 0 ? (totals.realExp / totals.plannedExp) * 100 : 0;
-  const variance = totals.planned - totals.real;
+  const variance = totals.real - totals.planned;
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
@@ -344,7 +344,7 @@ function BudgetsPage() {
         <Stat label="Planifié (Revenus − Dépenses)" value={fmtMoney(totals.planned, cur)} tone={totals.planned >= 0 ? "positive" : "negative"} />
         <Stat label="Réel (Revenus − Dépenses)" value={fmtMoney(totals.real, cur)} tone={totals.real >= 0 ? "positive" : "negative"} />
         <Stat label="Consommation dépenses" value={fmtPct(totalPct)} tone={totalPct > 100 ? "negative" : totalPct > 75 ? "warning" : "positive"} />
-        <Stat label="Écart net (Plan − Réel)" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
+        <Stat label="Écart net (Réel − Plan)" value={fmtMoney(variance, cur)} tone={variance >= 0 ? "positive" : "negative"} />
       </section>
 
       <Panel

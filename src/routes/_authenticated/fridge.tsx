@@ -96,11 +96,11 @@ function FridgePage() {
   });
 
   const moveEntry = useMutation({
-    mutationFn: async ({ id, day }: { id: string; day: number }) => {
-      const { error } = await (supabase as any).from("meal_plan_entries").update({ day_of_week: day }).eq("id", id);
+    mutationFn: async ({ id, day, week }: { id: string; day: number; week: string }) => {
+      const { error } = await (supabase as any).from("meal_plan_entries").update({ day_of_week: day, week_start: week }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries", weekIso] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries"] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -141,7 +141,7 @@ function FridgePage() {
       setPendingDrop({ day, item });
       setDropQty(item.quantity != null ? "1" : "");
     } else if (payload.kind === "entry") {
-      moveEntry.mutate({ id: payload.id, day });
+      moveEntry.mutate({ id: payload.id, day, week: weekIso });
     }
     setDragItem(null);
   }
@@ -156,7 +156,7 @@ function FridgePage() {
       return;
     }
     const unit = item.unit ? ` ${item.unit}` : "";
-    const label = qty != null ? `${qty}${unit} · ${item.name}` : item.name;
+    const label = qty != null ? `${item.name} (${qty}${unit})` : item.name;
     await addEntry.mutateAsync({ day, label, fridge_item_id: item.id });
     if (qty != null && available != null) {
       const remaining = Math.max(0, available - qty);
@@ -181,11 +181,11 @@ function FridgePage() {
           <p className="text-xs text-muted-foreground">Glissez les items du frigo vers les jours de la semaine.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => shiftWeek(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => shiftWeek(-1)} onDragEnter={(e) => { e.preventDefault(); shiftWeek(-1); }} onDragOver={(e) => e.preventDefault()}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="font-mono text-xs text-muted-foreground min-w-[180px] text-center">
             {fmtDate(toISODate(weekStart))} → {fmtDate(toISODate(weekEnd))}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => shiftWeek(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => shiftWeek(1)} onDragEnter={(e) => { e.preventDefault(); shiftWeek(1); }} onDragOver={(e) => e.preventDefault()}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="ghost" size="sm" onClick={() => setWeekStart(mondayOf(new Date()))}>Cette semaine</Button>
         </div>
       </header>
