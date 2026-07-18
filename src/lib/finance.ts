@@ -252,33 +252,43 @@ function assetDepreciationFromEvents(asset: AssetLike, events: AssetEventLike[],
 }
 
 /**
- * Valorisation d'un actif :
- * - Sans réévaluation : base = coût d'acquisition, VNC = Coût − Amort. cumulé.
- * - Avec réévaluation à la date D : base = Nouvelle valeur, VNC = Nouvelle valeur − Amort. cumulé depuis D.
- * - marketValue = VNC (la réévaluation redéfinit la base).
+ * Valorisation d'un actif — aligné sur l'historique (HistoryDialog) :
+ *   VNC = Coût − Amort. cumulé (toujours), sauf s'il existe une réévaluation POSITIVE
+ *   à la date D : alors VNC = Nouvelle valeur − Amort. cumulé depuis D.
+ * `depreciation` renvoyé = somme des dotations d'amortissement de tous les temps
+ * (colonne « Amort. cumulé » du tableau). Les impairment (amount ≤ 0) ne changent
+ * pas la base et ne coupent pas la période d'amortissement.
  */
 export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
   const relevant = events
     .filter((e) => e.asset_id === asset.id)
     .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!);
-  const sold = relevant.some((e) => e.event_type === "sale") || (!opts.through && (asset.status ?? "owned") === "sold");
+  const soldEvent = relevant.find((e) => e.event_type === "sale");
+  const sold = !!soldEvent || (!opts.through && (asset.status ?? "owned") === "sold");
+  const saleAmount = soldEvent ? num(soldEvent.amount) : 0;
   const cost = num(asset.purchase_value);
-  const latestReval = relevant
-    .filter((e) => e.event_type === "revaluation" || e.event_type === "impairment")
+  const positiveReval = relevant
+    .filter((e) => e.event_type === "revaluation" && num(e.amount) > 0)
     .sort((a, b) => String(eventDate(a) ?? "").localeCompare(String(eventDate(b) ?? "")))
     .at(-1);
-  const revalDate = latestReval ? (eventDate(latestReval) ?? undefined) : undefined;
-  const revalAmount = latestReval ? num(latestReval.amount) : 0;
-  const basis = latestReval && revalAmount > 0 ? revalAmount : cost;
-  const depOpts = { through: opts.through, from: revalDate };
+  const revalDate = positiveReval ? (eventDate(positiveReval) ?? undefined) : undefined;
+  const revalAmount = positiveReval ? num(positiveReval.amount) : 0;
+  const basis = positiveReval ? revalAmount : cost;
   const depreciation = opts.transactions
-    ? assetDepreciationFromTransactions(asset, opts.transactions, depOpts)
-    : assetDepreciationFromEvents(asset, events, depOpts);
-  const vnc = Math.max(0, basis - depreciation);
+    ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through })
+    : assetDepreciationFromEvents(asset, events, { through: opts.through });
+  const depForVnc = positiveReval
+    ? (opts.transactions
+        ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through, from: revalDate })
+        : assetDepreciationFromEvents(asset, events, { through: opts.through, from: revalDate }))
+    : depreciation;
+  const vnc = Math.max(0, basis - depForVnc);
   const bookValue = sold ? 0 : vnc;
   const marketValue = sold ? 0 : vnc;
   const variation = marketValue - cost;
-  return { cost, depreciation, bookValue, marketValue, variation, sold, basis, revaluedOn: revalDate ?? null };
+  // PV/MV de revente aligné sur HistoryDialog : SalePrice − (Coût − Amort. cumulé).
+  const resaleGain = sold ? saleAmount - Math.max(0, cost - depreciation) : 0;
+  return { cost, depreciation, bookValue, marketValue, variation, sold, basis, revaluedOn: revalDate ?? null, saleAmount, resaleGain };
 }
 
 export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
