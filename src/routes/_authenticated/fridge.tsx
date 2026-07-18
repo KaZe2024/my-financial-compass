@@ -96,11 +96,11 @@ function FridgePage() {
   });
 
   const moveEntry = useMutation({
-    mutationFn: async ({ id, day }: { id: string; day: number }) => {
-      const { error } = await (supabase as any).from("meal_plan_entries").update({ day_of_week: day }).eq("id", id);
+    mutationFn: async ({ id, day, week }: { id: string; day: number; week: string }) => {
+      const { error } = await (supabase as any).from("meal_plan_entries").update({ day_of_week: day, week_start: week }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries", weekIso] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries"] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
