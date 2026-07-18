@@ -141,7 +141,7 @@ function FridgePage() {
       setPendingDrop({ day, item });
       setDropQty(item.quantity != null ? "1" : "");
     } else if (payload.kind === "entry") {
-      moveEntry.mutate({ id: payload.id, day });
+      moveEntry.mutate({ id: payload.id, day, week: weekIso });
     }
     setDragItem(null);
   }
