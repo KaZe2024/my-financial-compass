@@ -181,11 +181,11 @@ function FridgePage() {
           <p className="text-xs text-muted-foreground">Glissez les items du frigo vers les jours de la semaine.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => shiftWeek(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => shiftWeek(-1)} onDragEnter={(e) => { e.preventDefault(); shiftWeek(-1); }} onDragOver={(e) => e.preventDefault()}><ChevronLeft className="h-4 w-4" /></Button>
           <div className="font-mono text-xs text-muted-foreground min-w-[180px] text-center">
             {fmtDate(toISODate(weekStart))} → {fmtDate(toISODate(weekEnd))}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => shiftWeek(1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => shiftWeek(1)} onDragEnter={(e) => { e.preventDefault(); shiftWeek(1); }} onDragOver={(e) => e.preventDefault()}><ChevronRight className="h-4 w-4" /></Button>
           <Button variant="ghost" size="sm" onClick={() => setWeekStart(mondayOf(new Date()))}>Cette semaine</Button>
         </div>
       </header>
