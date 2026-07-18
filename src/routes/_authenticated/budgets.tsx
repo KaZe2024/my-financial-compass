@@ -199,7 +199,7 @@ function BudgetsPage() {
   }, [tree, plannedRollupByNode, spentRollupByNode]);
 
   const totalPct = totals.plannedExp > 0 ? (totals.realExp / totals.plannedExp) * 100 : 0;
-  const variance = totals.planned - totals.real;
+  const variance = totals.real - totals.planned;
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
