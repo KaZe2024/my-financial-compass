@@ -156,7 +156,7 @@ function FridgePage() {
       return;
     }
     const unit = item.unit ? ` ${item.unit}` : "";
-    const label = qty != null ? `${qty}${unit} · ${item.name}` : item.name;
+    const label = qty != null ? `${item.name} (${qty}${unit})` : item.name;
     await addEntry.mutateAsync({ day, label, fridge_item_id: item.id });
     if (qty != null && available != null) {
       const remaining = Math.max(0, available - qty);
