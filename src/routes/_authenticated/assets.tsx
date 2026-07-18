@@ -134,14 +134,7 @@ function AssetsPage() {
               {visible.map((a: any) => {
                 const value = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
                 const amo = computeAmortization(a);
-                const saleEv = (assetEvents.data ?? []).find((e: any) => e.asset_id === a.id && e.event_type === "sale");
-                let resaleGain: number;
-                if (saleEv) {
-                  const atSale = computeAssetValue(a, assetEvents.data ?? [], { through: saleEv.event_date, transactions: assetTx.data ?? [] });
-                  resaleGain = Number(saleEv.amount ?? 0) - atSale.bookValue;
-                } else {
-                  resaleGain = value.marketValue - value.bookValue;
-                }
+                const resaleGain = value.resaleGain;
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
@@ -153,8 +146,8 @@ function AssetsPage() {
                     </td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
                     <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.marketValue, a.currency)}</td>
-                    <td className={`num px-4 py-2 text-right font-semibold ${resaleGain >= 0 ? "text-positive" : "text-negative"}`} title="Valeur de revente estimée moins VNC">
-                      {fmtMoney(resaleGain, a.currency, { sign: true })}
+                    <td className={`num px-4 py-2 text-right font-semibold ${value.sold ? (resaleGain >= 0 ? "text-positive" : "text-negative") : "text-muted-foreground"}`} title="Prix de vente − VNC à la date de vente">
+                      {value.sold ? fmtMoney(resaleGain, a.currency, { sign: true }) : "—"}
                     </td>
                     <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
