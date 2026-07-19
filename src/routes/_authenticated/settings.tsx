@@ -72,6 +72,11 @@ function SettingsPage() {
         </form>
       </Panel>
 
+      <Panel title="Apparence · Thème">
+        <p className="mb-3 text-sm text-muted-foreground">Choisissez le thème qui offre la meilleure lisibilité pour vous. La sélection est enregistrée sur cet appareil.</p>
+        <ThemePicker />
+      </Panel>
+
       <Panel title="Traçabilité">
         <p className="text-sm text-muted-foreground">Toutes les créations, modifications, suppressions et archivages importants (transactions, actifs, dettes, créances, projets, objectifs, produits) sont enregistrés.</p>
         <a href="/audit" className="mt-3 inline-flex items-center gap-2 rounded-sm border border-border bg-muted/30 px-3 py-1.5 text-sm hover:bg-muted">
