@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { profileQO } from "@/lib/queries";
 import { toast } from "sonner";
+import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Paramètres — Personal CFO" }] }),
@@ -70,6 +72,11 @@ function SettingsPage() {
         </form>
       </Panel>
 
+      <Panel title="Apparence · Thème">
+        <p className="mb-3 text-sm text-muted-foreground">Choisissez le thème qui offre la meilleure lisibilité pour vous. La sélection est enregistrée sur cet appareil.</p>
+        <ThemePicker />
+      </Panel>
+
       <Panel title="Traçabilité">
         <p className="text-sm text-muted-foreground">Toutes les créations, modifications, suppressions et archivages importants (transactions, actifs, dettes, créances, projets, objectifs, produits) sont enregistrés.</p>
         <a href="/audit" className="mt-3 inline-flex items-center gap-2 rounded-sm border border-border bg-muted/30 px-3 py-1.5 text-sm hover:bg-muted">
@@ -80,6 +87,37 @@ function SettingsPage() {
       <Panel title="Modules disponibles">
         <p className="text-sm text-muted-foreground">Cette version inclut : Dashboard, Portefeuilles, Transactions, Budgets, Listes d'achat, Prix produits, Dettes, Créances, Projets, Actifs, Objectifs, Snapshots, Journal d'audit.</p>
       </Panel>
+    </div>
+  );
+}
+
+function ThemePicker() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {AVAILABLE_THEMES.map((t) => {
+        const active = theme === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTheme(t.id)}
+            className={cn(
+              "flex items-start justify-between gap-3 rounded-md border p-3 text-left transition-colors",
+              active ? "border-primary bg-primary/10" : "border-border bg-surface hover:bg-surface-2"
+            )}
+          >
+            <div>
+              <div className="text-sm font-semibold text-foreground">{t.label}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{t.description}</div>
+            </div>
+            <span className={cn(
+              "mt-0.5 h-4 w-4 shrink-0 rounded-full border-2",
+              active ? "border-primary bg-primary" : "border-border"
+            )} />
+          </button>
+        );
+      })}
     </div>
   );
 }

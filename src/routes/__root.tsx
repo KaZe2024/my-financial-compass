@@ -12,6 +12,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -76,9 +77,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className="dark">
+    <html lang="fr" className="dark theme-bloomberg">
       <head><HeadContent /></head>
-      <body className="dark min-h-screen bg-background text-foreground antialiased">
+      <body className="min-h-screen bg-background text-foreground antialiased">
         {children}
         <Scripts />
       </body>
@@ -99,8 +100,10 @@ function RootComponent() {
   }, [router, queryClient]);
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster theme="dark" richColors position="top-right" />
+      <ThemeProvider>
+        <Outlet />
+        <Toaster richColors position="top-right" />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

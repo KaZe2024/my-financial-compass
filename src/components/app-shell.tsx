@@ -3,12 +3,16 @@ import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
-  Bell, CalendarDays, Repeat, Wallet2, Refrigerator,
+  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const NAV = [
   { group: "Vue d'ensemble", items: [
@@ -136,7 +140,33 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
           {now.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
         </div>
       </div>
-      <CalendarRange className="hidden h-4 w-4 text-muted-foreground md:block" />
+      <div className="flex items-center gap-2">
+        <ThemeMenu />
+        <CalendarRange className="hidden h-4 w-4 text-muted-foreground md:block" />
+      </div>
     </header>
+  );
+}
+
+function ThemeMenu() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="grid h-8 w-8 place-items-center rounded-sm border border-border text-muted-foreground hover:bg-surface-2 hover:text-foreground" aria-label="Changer de thème">
+        <Palette className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Thème</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {AVAILABLE_THEMES.map((t) => (
+          <DropdownMenuItem key={t.id} onSelect={() => setTheme(t.id)} className={cn(theme === t.id && "bg-primary/10 text-foreground")}>
+            <div className="flex flex-col">
+              <span className="text-sm">{t.label}</span>
+              <span className="text-[10px] text-muted-foreground">{t.description}</span>
+            </div>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
