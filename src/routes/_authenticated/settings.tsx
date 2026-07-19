@@ -90,3 +90,34 @@ function SettingsPage() {
     </div>
   );
 }
+
+function ThemePicker() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {AVAILABLE_THEMES.map((t) => {
+        const active = theme === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTheme(t.id)}
+            className={cn(
+              "flex items-start justify-between gap-3 rounded-md border p-3 text-left transition-colors",
+              active ? "border-primary bg-primary/10" : "border-border bg-surface hover:bg-surface-2"
+            )}
+          >
+            <div>
+              <div className="text-sm font-semibold text-foreground">{t.label}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{t.description}</div>
+            </div>
+            <span className={cn(
+              "mt-0.5 h-4 w-4 shrink-0 rounded-full border-2",
+              active ? "border-primary bg-primary" : "border-border"
+            )} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
