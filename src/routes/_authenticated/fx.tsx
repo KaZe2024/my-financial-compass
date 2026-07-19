@@ -140,16 +140,55 @@ function FxPage() {
         {series.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Aucune observation. Saisis des transactions en {currency} pour alimenter les courbes.</p>
         ) : (
-          <div className="h-72 w-full">
+          <div className="h-80 w-full">
             <ResponsiveContainer>
-              <LineChart data={series} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} domain={["dataMin", "dataMax"]} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", fontSize: 12 }} formatter={(v: any) => v == null ? "—" : Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="buy" name="Achat (dépenses)" stroke="hsl(var(--negative, 0 84% 60%))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
-                <Line type="monotone" dataKey="sell" name="Vente (revenus)" stroke="hsl(var(--positive, 142 71% 45%))" strokeWidth={2} dot={{ r: 2 }} connectNulls />
+              <LineChart data={series} margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
+                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  tickFormatter={(v: string) => new Date(v).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                  minTickGap={32}
+                />
+                <YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  width={64}
+                  domain={[(min: number) => Math.floor(min * 0.995), (max: number) => Math.ceil(max * 1.005)]}
+                  tickFormatter={(v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 0 })}
+                />
+                <Tooltip
+                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, boxShadow: "0 8px 24px -12px rgba(0,0,0,0.25)" }}
+                  labelFormatter={(l: string) => fmtDate(l)}
+                  formatter={(v: any, name: string) => [v == null ? "—" : `${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} MGA`, name]}
+                />
+                <Legend verticalAlign="top" height={32} iconType="circle" wrapperStyle={{ fontSize: 11, paddingBottom: 8 }} />
+                <Line
+                  type="monotone"
+                  dataKey="buy"
+                  name="Achat (dépenses)"
+                  stroke="hsl(var(--negative, 0 84% 60%))"
+                  strokeWidth={2.25}
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="sell"
+                  name="Vente (revenus)"
+                  stroke="hsl(var(--positive, 142 71% 45%))"
+                  strokeWidth={2.25}
+                  strokeDasharray="6 4"
+                  dot={false}
+                  activeDot={{ r: 4, strokeWidth: 0 }}
+                  connectNulls
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
