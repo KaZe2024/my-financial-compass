@@ -108,6 +108,115 @@
   --sidebar-ring: oklch(0.74 0.18 155 / 50%);
 }
 
+/* Neutral dark — better raw text contrast than Bloomberg */
+:root.theme-dark {
+  --background: oklch(0.17 0 0);
+  --foreground: oklch(0.98 0 0);
+  --surface:    oklch(0.22 0 0);
+  --surface-2:  oklch(0.27 0 0);
+  --card:       oklch(0.22 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --popover:    oklch(0.22 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary:    oklch(0.72 0.17 220);
+  --primary-foreground: oklch(0.16 0 0);
+  --secondary:  oklch(0.28 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted:      oklch(0.26 0 0);
+  --muted-foreground: oklch(0.78 0 0);
+  --accent:     oklch(0.79 0.16 75);
+  --accent-foreground: oklch(0.16 0 0);
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --positive:   oklch(0.74 0.18 155);
+  --negative:   oklch(0.68 0.22 25);
+  --warning:    oklch(0.79 0.16 75);
+  --border:     oklch(0.38 0 0 / 70%);
+  --input:      oklch(0.32 0 0);
+  --ring:       oklch(0.72 0.17 220 / 50%);
+  --sidebar: oklch(0.14 0 0);
+  --sidebar-foreground: oklch(0.94 0 0);
+  --sidebar-primary: oklch(0.72 0.17 220);
+  --sidebar-primary-foreground: oklch(0.16 0 0);
+  --sidebar-accent: oklch(0.25 0 0);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(0.32 0 0 / 70%);
+  --sidebar-ring: oklch(0.72 0.17 220 / 50%);
+}
+
+/* Light — daytime reading */
+:root.theme-light {
+  color-scheme: light;
+  --background: oklch(0.99 0.003 250);
+  --foreground: oklch(0.18 0.02 256);
+  --surface:    oklch(1 0 0);
+  --surface-2:  oklch(0.96 0.005 250);
+  --card:       oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 256);
+  --popover:    oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 256);
+  --primary:    oklch(0.55 0.18 155);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary:  oklch(0.94 0.005 250);
+  --secondary-foreground: oklch(0.20 0.02 256);
+  --muted:      oklch(0.95 0.005 250);
+  --muted-foreground: oklch(0.42 0.012 256);
+  --accent:     oklch(0.75 0.16 75);
+  --accent-foreground: oklch(0.20 0.02 256);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --positive:   oklch(0.52 0.18 155);
+  --negative:   oklch(0.55 0.22 25);
+  --warning:    oklch(0.65 0.16 75);
+  --border:     oklch(0.85 0.008 250);
+  --input:      oklch(0.90 0.008 250);
+  --ring:       oklch(0.55 0.18 155 / 40%);
+  --sidebar: oklch(0.97 0.005 250);
+  --sidebar-foreground: oklch(0.20 0.02 256);
+  --sidebar-primary: oklch(0.55 0.18 155);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.92 0.008 250);
+  --sidebar-accent-foreground: oklch(0.18 0.02 256);
+  --sidebar-border: oklch(0.85 0.008 250);
+  --sidebar-ring: oklch(0.55 0.18 155 / 40%);
+}
+
+/* High contrast — near black/white */
+:root.theme-contrast {
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(1 0 0);
+  --surface:    oklch(0.14 0 0);
+  --surface-2:  oklch(0.20 0 0);
+  --card:       oklch(0.12 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover:    oklch(0.12 0 0);
+  --popover-foreground: oklch(1 0 0);
+  --primary:    oklch(0.88 0.19 105);
+  --primary-foreground: oklch(0.08 0 0);
+  --secondary:  oklch(0.22 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted:      oklch(0.18 0 0);
+  --muted-foreground: oklch(0.90 0 0);
+  --accent:     oklch(0.85 0.19 75);
+  --accent-foreground: oklch(0.08 0 0);
+  --destructive: oklch(0.72 0.24 25);
+  --destructive-foreground: oklch(0.08 0 0);
+  --positive:   oklch(0.85 0.20 145);
+  --negative:   oklch(0.72 0.24 25);
+  --warning:    oklch(0.88 0.19 90);
+  --border:     oklch(0.60 0 0);
+  --input:      oklch(0.28 0 0);
+  --ring:       oklch(0.88 0.19 105 / 60%);
+  --sidebar: oklch(0.06 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.88 0.19 105);
+  --sidebar-primary-foreground: oklch(0.06 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.55 0 0);
+  --sidebar-ring: oklch(0.88 0.19 105 / 60%);
+}
+
 @layer base {
   * { border-color: var(--color-border); }
   html, body, #root { height: 100%; }
