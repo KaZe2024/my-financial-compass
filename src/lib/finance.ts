@@ -251,54 +251,48 @@ function assetDepreciationFromEvents(asset: AssetLike, events: AssetEventLike[],
     .reduce((s, e) => s + Math.abs(num(e.amount)), 0);
 }
 
+function assetHistoryAmounts(asset: AssetLike, transactions: TransactionLike[] = [], through?: string) {
+  let purchases = 0;
+  let depreciation = 0;
+  let sales = 0;
+  for (const t of transactions) {
+    if (!linkedToAsset(t, asset.id)) continue;
+    if (through && t.occurred_on && t.occurred_on > through) continue;
+    const amount = Math.abs(baseAmount(t));
+    if (t.type === "asset_purchase") purchases += amount;
+    else if (t.type === "asset_sale") sales += amount;
+    else if (t.type === "expense") {
+      const marker = `${t.description ?? ""} ${t.notes ?? ""}`.toLowerCase();
+      if (marker.includes("amort")) depreciation += amount;
+    }
+  }
+  return { purchases, depreciation, sales, vnc: purchases - depreciation };
+}
+
 /**
- * Valorisation d'un actif — aligné sur l'historique (HistoryDialog) :
- *   VNC = Coût − Amort. cumulé (toujours), sauf s'il existe une réévaluation POSITIVE
- *   à la date D : alors VNC = Nouvelle valeur − Amort. cumulé depuis D.
- * `depreciation` renvoyé = somme des dotations d'amortissement de tous les temps
- * (colonne « Amort. cumulé » du tableau). Les impairment (amount ≤ 0) ne changent
- * pas la base et ne coupent pas la période d'amortissement.
+ * Valorisation d'un actif — strictement alignée sur l'historique :
+ *   - actif non vendu : VNC = Solde (VNC) = achats liés − amortissements liés
+ *   - actif vendu : PV/MV = ventes liées − Solde (VNC)
+ * Les réévaluations / impairments d'asset_events ne modifient jamais la VNC du tableau.
  */
 export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
   const relevant = events
     .filter((e) => e.asset_id === asset.id)
     .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!);
   const soldEvent = relevant.find((e) => e.event_type === "sale");
-  const sold = !!soldEvent || (!opts.through && (asset.status ?? "owned") === "sold");
-  const saleAmount = soldEvent ? num(soldEvent.amount) : 0;
   const cost = num(asset.purchase_value);
-  const positiveReval = relevant
-    .filter((e) => e.event_type === "revaluation" && num(e.amount) > 0)
-    .sort((a, b) => String(eventDate(a) ?? "").localeCompare(String(eventDate(b) ?? "")))
-    .at(-1);
-  const revalDate = positiveReval ? (eventDate(positiveReval) ?? undefined) : undefined;
-  const revalAmount = positiveReval ? num(positiveReval.amount) : 0;
-  const basis = positiveReval ? revalAmount : cost;
-  const depreciation = opts.transactions
-    ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through })
-    : assetDepreciationFromEvents(asset, events, { through: opts.through });
-  // Somme des achats (asset_purchase) liés à l'actif — aligné sur HistoryDialog.
-  const purchasesSum = opts.transactions
-    ? opts.transactions
-        .filter((t) => linkedToAsset(t, asset.id))
-        .filter((t) => t.type === "asset_purchase")
-        .filter((t) => !opts.through || !t.occurred_on || t.occurred_on <= opts.through!)
-        .reduce((s, t) => s + Math.abs(baseAmount(t)), 0)
-    : 0;
-  const purchasesBase = purchasesSum > 0 ? purchasesSum : num(asset.purchase_value);
-  // VNC identique à Solde (VNC) de l'historique : purchases − amort.
-  // Sauf réévaluation positive : Nouvelle valeur − Amort. depuis la réévaluation.
-  const vnc = positiveReval
-    ? basis - (opts.transactions
-        ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through, from: revalDate })
-        : assetDepreciationFromEvents(asset, events, { through: opts.through, from: revalDate }))
-    : purchasesBase - depreciation;
+  const history = opts.transactions
+    ? assetHistoryAmounts(asset, opts.transactions, opts.through)
+    : { purchases: cost, depreciation: assetDepreciationFromEvents(asset, events, { through: opts.through }), sales: soldEvent ? Math.abs(num(soldEvent.amount)) : 0, vnc: cost - assetDepreciationFromEvents(asset, events, { through: opts.through }) };
+  const sold = history.sales > 0 || !!soldEvent || (!opts.through && (asset.status ?? "owned") === "sold");
+  const saleAmount = history.sales || (soldEvent ? Math.abs(num(soldEvent.amount)) : 0);
+  const depreciation = history.depreciation;
+  const vnc = history.vnc;
   const bookValue = sold ? 0 : vnc;
   const marketValue = sold ? 0 : vnc;
   const variation = marketValue - cost;
-  // PV/MV revente = SalePrice − (purchases − amort), aligné sur HistoryDialog.
-  const resaleGain = sold ? saleAmount - (purchasesBase - depreciation) : 0;
-  return { cost, depreciation, bookValue, marketValue, variation, sold, basis, revaluedOn: revalDate ?? null, saleAmount, resaleGain };
+  const resaleGain = sold ? saleAmount - vnc : 0;
+  return { cost, depreciation, bookValue, marketValue, variation, sold, basis: history.purchases || cost, revaluedOn: null, saleAmount, resaleGain };
 }
 
 export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {
