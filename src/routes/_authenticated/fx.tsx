@@ -11,7 +11,7 @@ import { fmtDate } from "@/lib/format";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/fx")({
   head: () => ({ meta: [{ title: "Taux de change — Personal CFO" }] }),
@@ -21,6 +21,29 @@ export const Route = createFileRoute("/_authenticated/fx")({
 const COMMON = ["EUR","USD","GBP","CHF","CAD","AUD","JPY","CNY"];
 const BUY_TYPES = new Set(["expense"]);
 const SELL_TYPES = new Set(["income"]);
+
+function completeDailySeries(points: Array<{ date: string; buy: number | null; sell: number | null }>, from: Date, to: Date) {
+  if (!points.length) return [];
+  const byDate = new Map(points.map((p) => [p.date, p]));
+  const buyKnown = points.filter((p) => p.buy != null).map((p) => p.buy as number);
+  const sellKnown = points.filter((p) => p.sell != null).map((p) => p.sell as number);
+  let lastBuy: number | null = buyKnown[0] ?? null;
+  let lastSell: number | null = sellKnown[0] ?? null;
+  const out: Array<{ date: string; buy: number | null; sell: number | null; buyObserved: boolean; sellObserved: boolean }> = [];
+  const cur = new Date(from);
+  cur.setHours(12, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(12, 0, 0, 0);
+  while (cur <= end) {
+    const date = cur.toISOString().slice(0, 10);
+    const p = byDate.get(date);
+    if (p?.buy != null) lastBuy = p.buy;
+    if (p?.sell != null) lastSell = p.sell;
+    out.push({ date, buy: lastBuy, sell: lastSell, buyObserved: p?.buy != null, sellObserved: p?.sell != null });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
 
 function FxPage() {
   const qc = useQueryClient();
@@ -63,8 +86,10 @@ function FxPage() {
       sell: v.sellN ? v.sellSum / v.sellN : null,
     }));
     arr.sort((a, b) => a.date.localeCompare(b.date));
-    return arr;
-  }, [txs.data]);
+    return completeDailySeries(arr, period.from, period.to);
+  }, [txs.data, period.from, period.to]);
+
+  const observations = useMemo(() => series.filter((s) => s.buyObserved || s.sellObserved), [series]);
 
   const stats = useMemo(() => {
     const buys = series.map((s) => s.buy).filter((v): v is number => v != null);
@@ -137,24 +162,34 @@ function FxPage() {
       </div>
 
       <Panel title={`1 ${currency} → MGA · ${fmtDate(period.from)} → ${fmtDate(period.to)}`}>
-        {series.length === 0 ? (
+        {observations.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Aucune observation. Saisis des transactions en {currency} pour alimenter les courbes.</p>
         ) : (
-          <div className="h-80 w-full">
+          <div className="h-96 w-full">
             <ResponsiveContainer>
-              <LineChart data={series} margin={{ top: 16, right: 24, bottom: 8, left: 8 }}>
-                <CartesianGrid strokeDasharray="2 4" stroke="hsl(var(--border))" vertical={false} />
+              <LineChart data={series} margin={{ top: 18, right: 28, bottom: 8, left: 8 }}>
+                <defs>
+                  <linearGradient id="fxBuy" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="var(--negative)" stopOpacity={0.72} />
+                    <stop offset="100%" stopColor="var(--negative)" stopOpacity={1} />
+                  </linearGradient>
+                  <linearGradient id="fxSell" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="var(--positive)" stopOpacity={0.72} />
+                    <stop offset="100%" stopColor="var(--positive)" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={11}
                   tickLine={false}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
+                  axisLine={{ stroke: "var(--border)" }}
                   tickFormatter={(v: string) => new Date(v).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
                   minTickGap={32}
                 />
                 <YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   fontSize={11}
                   tickLine={false}
                   axisLine={false}
@@ -162,8 +197,10 @@ function FxPage() {
                   domain={[(min: number) => Math.floor(min * 0.995), (max: number) => Math.ceil(max * 1.005)]}
                   tickFormatter={(v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 0 })}
                 />
+                {stats.buy?.avg ? <ReferenceLine y={stats.buy.avg} stroke="var(--negative)" strokeOpacity={0.26} strokeDasharray="3 5" /> : null}
+                {stats.sell?.avg ? <ReferenceLine y={stats.sell.avg} stroke="var(--positive)" strokeOpacity={0.26} strokeDasharray="3 5" /> : null}
                 <Tooltip
-                  contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12, boxShadow: "0 8px 24px -12px rgba(0,0,0,0.25)" }}
+                  contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, boxShadow: "0 12px 32px -18px rgba(0,0,0,0.45)" }}
                   labelFormatter={(l: string) => fmtDate(l)}
                   formatter={(v: any, name: string) => [v == null ? "—" : `${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} MGA`, name]}
                 />
@@ -172,22 +209,23 @@ function FxPage() {
                   type="monotone"
                   dataKey="buy"
                   name="Achat (dépenses)"
-                  stroke="hsl(var(--negative, 0 84% 60%))"
-                  strokeWidth={2.25}
+                  stroke="url(#fxBuy)"
+                  strokeWidth={3}
                   dot={false}
-                  activeDot={{ r: 4, strokeWidth: 0 }}
+                  activeDot={{ r: 4, strokeWidth: 0, fill: "var(--negative)" }}
                   connectNulls
+                  isAnimationActive={false}
                 />
                 <Line
                   type="monotone"
                   dataKey="sell"
                   name="Vente (revenus)"
-                  stroke="hsl(var(--positive, 142 71% 45%))"
-                  strokeWidth={2.25}
-                  strokeDasharray="6 4"
+                  stroke="url(#fxSell)"
+                  strokeWidth={3}
                   dot={false}
-                  activeDot={{ r: 4, strokeWidth: 0 }}
+                  activeDot={{ r: 4, strokeWidth: 0, fill: "var(--positive)" }}
                   connectNulls
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -195,7 +233,7 @@ function FxPage() {
         )}
       </Panel>
 
-      <Panel title={`${series.length} jours d'observations`}>
+      <Panel title={`${observations.length} jours d'observations`}>
         <div className="scroll-thin max-h-96 overflow-y-auto -mx-4">
           <table className="w-full min-w-[520px] text-sm">
             <thead className="sticky top-0 bg-card text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -207,7 +245,7 @@ function FxPage() {
               </tr>
             </thead>
             <tbody>
-              {series.slice().reverse().map((s) => (
+              {observations.slice().reverse().map((s) => (
                 <tr key={s.date} className="border-t border-border/60">
                   <td className="num px-4 py-1.5 text-muted-foreground">{fmtDate(s.date)}</td>
                   <td className="num px-4 py-1.5 text-right text-negative">{s.buy != null ? s.buy.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) : "—"}</td>
