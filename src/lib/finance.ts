@@ -277,17 +277,27 @@ export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], op
   const depreciation = opts.transactions
     ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through })
     : assetDepreciationFromEvents(asset, events, { through: opts.through });
-  const depForVnc = positiveReval
-    ? (opts.transactions
+  // Somme des achats (asset_purchase) liés à l'actif — aligné sur HistoryDialog.
+  const purchasesSum = opts.transactions
+    ? opts.transactions
+        .filter((t) => linkedToAsset(t, asset.id))
+        .filter((t) => t.type === "asset_purchase")
+        .filter((t) => !opts.through || !t.occurred_on || t.occurred_on <= opts.through!)
+        .reduce((s, t) => s + Math.abs(baseAmount(t)), 0)
+    : 0;
+  const purchasesBase = purchasesSum > 0 ? purchasesSum : num(asset.purchase_value);
+  // VNC identique à Solde (VNC) de l'historique : purchases − amort.
+  // Sauf réévaluation positive : Nouvelle valeur − Amort. depuis la réévaluation.
+  const vnc = positiveReval
+    ? basis - (opts.transactions
         ? assetDepreciationFromTransactions(asset, opts.transactions, { through: opts.through, from: revalDate })
         : assetDepreciationFromEvents(asset, events, { through: opts.through, from: revalDate }))
-    : depreciation;
-  const vnc = Math.max(0, basis - depForVnc);
+    : purchasesBase - depreciation;
   const bookValue = sold ? 0 : vnc;
   const marketValue = sold ? 0 : vnc;
   const variation = marketValue - cost;
-  // PV/MV de revente aligné sur HistoryDialog : SalePrice − (Coût − Amort. cumulé).
-  const resaleGain = sold ? saleAmount - Math.max(0, cost - depreciation) : 0;
+  // PV/MV revente = SalePrice − (purchases − amort), aligné sur HistoryDialog.
+  const resaleGain = sold ? saleAmount - (purchasesBase - depreciation) : 0;
   return { cost, depreciation, bookValue, marketValue, variation, sold, basis, revaluedOn: revalDate ?? null, saleAmount, resaleGain };
 }
 
