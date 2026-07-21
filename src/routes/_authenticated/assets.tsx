@@ -147,6 +147,32 @@ function AssetsPage() {
       </header>
       {manageTypes && <AssetTypesDialog onClose={() => setManageTypes(false)} />}
 
+      <Panel title="Filtres">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Nom</Label>
+            <Input value={filters.name} onChange={(e) => setFilters({ ...filters, name: e.target.value })} placeholder="Contient…" /></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Type</Label>
+            <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+              <option value="all">Tous</option>
+              {(assetTypes.data ?? []).map((t: any) => <option key={t.id} value={t.name}>{t.name}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Statut</Label>
+            <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+              <option value="all">Tous</option>
+              {assetStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Devise</Label>
+            <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={filters.currency} onChange={(e) => setFilters({ ...filters, currency: e.target.value })}>
+              <option value="all">Toutes</option>
+              {assetCurrencies.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Achat ≥</Label>
+            <Input type="date" value={filters.purchaseFrom} onChange={(e) => setFilters({ ...filters, purchaseFrom: e.target.value })} /></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Achat ≤</Label>
+            <Input type="date" value={filters.purchaseTo} onChange={(e) => setFilters({ ...filters, purchaseTo: e.target.value })} /></div>
+        </div>
+      </Panel>
+
       <Panel title={`${visible.length} actifs`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
           <table className="w-full min-w-[1120px] text-sm">
@@ -202,6 +228,22 @@ function AssetsPage() {
               })}
               {visible.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun actif</td></tr>}
             </tbody>
+            {subtotalsByCurrency.length > 0 && (
+              <tfoot>
+                {subtotalsByCurrency.map(([cur, t]) => (
+                  <tr key={cur} className="border-t-2 border-border bg-muted/30 font-semibold">
+                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total {cur} ({t.count})</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.cost, cur)}</td>
+                    <td className="num px-4 py-2 text-right text-muted-foreground">{fmtMoney(t.depreciation, cur)}</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.bookValue, cur)}</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.marketValue, cur)}</td>
+                    <td className={`num px-4 py-2 text-right ${t.resaleGain >= 0 ? "text-positive" : "text-negative"}`}>{t.resaleGain ? fmtMoney(t.resaleGain, cur, { sign: true }) : "—"}</td>
+                    <td className={`num px-4 py-2 text-right ${t.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(t.variation, cur, { sign: true })}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                ))}
+              </tfoot>
+            )}
           </table>
         </div>
       </Panel>
