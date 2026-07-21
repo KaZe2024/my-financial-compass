@@ -85,11 +85,42 @@ function AssetsPage() {
       ),
   });
 
-  const visible = (assets.data ?? []).filter((a: any) => showArchived || !a.archived);
+  const allAssets = (assets.data ?? []) as any[];
+  const [filters, setFilters] = useState({ name: "", type: "all", status: "all", currency: "all", purchaseFrom: "", purchaseTo: "" });
+  const assetCurrencies = useMemo(() => Array.from(new Set(allAssets.map((a) => a.currency).filter(Boolean))) as string[], [allAssets]);
+  const assetStatuses = useMemo(() => Array.from(new Set(allAssets.map((a) => a.status).filter(Boolean))) as string[], [allAssets]);
+  const visible = allAssets.filter((a: any) => {
+    if (!showArchived && a.archived) return false;
+    if (filters.name && !String(a.name ?? "").toLowerCase().includes(filters.name.toLowerCase())) return false;
+    if (filters.type !== "all" && a.type !== filters.type) return false;
+    if (filters.status !== "all" && a.status !== filters.status) return false;
+    if (filters.currency !== "all" && a.currency !== filters.currency) return false;
+    if (filters.purchaseFrom && (!a.purchase_date || a.purchase_date < filters.purchaseFrom)) return false;
+    if (filters.purchaseTo && (!a.purchase_date || a.purchase_date > filters.purchaseTo)) return false;
+    return true;
+  });
   const totalAssetValues = computeAssetTotals(visible, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
   const totalCur = totalAssetValues.marketValue;
   const totalPurchase = totalAssetValues.cost;
   const gain = totalCur - totalPurchase;
+
+  const subtotalsByCurrency = useMemo(() => {
+    const m = new Map<string, { count: number; cost: number; depreciation: number; bookValue: number; marketValue: number; resaleGain: number; variation: number }>();
+    for (const a of visible) {
+      const v = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
+      const cur = a.currency ?? "MGA";
+      const t = m.get(cur) ?? { count: 0, cost: 0, depreciation: 0, bookValue: 0, marketValue: 0, resaleGain: 0, variation: 0 };
+      t.count += 1;
+      t.cost += v.cost;
+      t.depreciation += v.depreciation;
+      t.bookValue += v.bookValue;
+      t.marketValue += v.marketValue;
+      t.resaleGain += v.sold ? v.resaleGain : 0;
+      t.variation += v.variation;
+      m.set(cur, t);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [visible, assetEvents.data, assetTx.data]);
 
   const [editing, setEditing] = useState<any | null>(null);
   const [amortizing, setAmortizing] = useState<any | null>(null);
