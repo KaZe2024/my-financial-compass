@@ -32,13 +32,40 @@ export function ObligationsPage(props: {
 }) {
   const qc = useQueryClient();
   const [showArchived, setShowArchived] = useState(false);
+  const [filters, setFilters] = useState({ party: "", description: "", status: "all", currency: "all", dueFrom: "", dueTo: "", hasOutstanding: false });
   const wallets = useQuery(walletsQO);
   const data = useQuery({
     queryKey: [props.table],
     queryFn: async () => (await supabase.from(props.table).select("*").order("due_date", { nullsFirst: false })).data ?? [],
   });
-  const visible = (data.data ?? []).filter((r: any) => showArchived || !r.archived);
-  const total = visible.filter((r: any) => r.status !== "settled" && r.status !== "cancelled").reduce((s: number, r: any) => s + Number(r.outstanding), 0);
+  const rows = (data.data ?? []) as any[];
+  const currencies = useMemo(() => Array.from(new Set(rows.map((r) => r.currency).filter(Boolean))) as string[], [rows]);
+  const statuses = useMemo(() => Array.from(new Set(rows.map((r) => r.status).filter(Boolean))) as string[], [rows]);
+  const visible = rows.filter((r: any) => {
+    if (!showArchived && r.archived) return false;
+    if (filters.party && !String(r[props.partyField] ?? "").toLowerCase().includes(filters.party.toLowerCase())) return false;
+    if (filters.description && !String(r.description ?? "").toLowerCase().includes(filters.description.toLowerCase())) return false;
+    if (filters.status !== "all" && r.status !== filters.status) return false;
+    if (filters.currency !== "all" && r.currency !== filters.currency) return false;
+    if (filters.dueFrom && (!r.due_date || r.due_date < filters.dueFrom)) return false;
+    if (filters.dueTo && (!r.due_date || r.due_date > filters.dueTo)) return false;
+    if (filters.hasOutstanding && !(Number(r.outstanding) > 0)) return false;
+    return true;
+  });
+  const totalsByCur = useMemo(() => {
+    const m = new Map<string, { original: number; outstanding: number; count: number }>();
+    for (const r of visible) {
+      if (r.status === "cancelled") continue;
+      const cur = r.currency ?? "MGA";
+      const t = m.get(cur) ?? { original: 0, outstanding: 0, count: 0 };
+      t.original += Number(r.original_amount) || 0;
+      t.outstanding += Number(r.outstanding) || 0;
+      t.count += 1;
+      m.set(cur, t);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [visible]);
+  const total = totalsByCur.reduce((s, [, t]) => s + t.outstanding, 0); // legacy header total (MGA-ish)
 
   const [editing, setEditing] = useState<any | null>(null);
   const [historyOf, setHistoryOf] = useState<any | null>(null);
@@ -60,6 +87,30 @@ export function ObligationsPage(props: {
       <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
         Astuce : saisissez les mouvements depuis <strong>Transactions</strong> avec le type <code>{props.tone === "negative" ? "dette" : "creance"}</code>. Un montant positif augmente l'encours, un montant négatif le diminue. L'encours se met à jour automatiquement.
       </div>
+
+      <Panel title="Filtres">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-7">
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{props.partyLabel}</Label>
+            <Input value={filters.party} onChange={(e) => setFilters({ ...filters, party: e.target.value })} placeholder="Contient…" /></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Description</Label>
+            <Input value={filters.description} onChange={(e) => setFilters({ ...filters, description: e.target.value })} placeholder="Contient…" /></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Statut</Label>
+            <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+              <option value="all">Tous</option>
+              {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Devise</Label>
+            <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={filters.currency} onChange={(e) => setFilters({ ...filters, currency: e.target.value })}>
+              <option value="all">Toutes</option>
+              {currencies.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Échéance ≥</Label>
+            <DatePicker value={filters.dueFrom} onChange={(v) => setFilters({ ...filters, dueFrom: v })} /></div>
+          <div className="space-y-1"><Label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Échéance ≤</Label>
+            <DatePicker value={filters.dueTo} onChange={(v) => setFilters({ ...filters, dueTo: v })} /></div>
+          <div className="flex items-end"><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={filters.hasOutstanding} onChange={(e) => setFilters({ ...filters, hasOutstanding: e.target.checked })} /> Encours &gt; 0</label></div>
+        </div>
+      </Panel>
 
       <Panel title={`${visible.length} entrées`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
@@ -92,6 +143,18 @@ export function ObligationsPage(props: {
               })}
               {visible.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune entrée</td></tr>}
             </tbody>
+            {totalsByCur.length > 0 && (
+              <tfoot>
+                {totalsByCur.map(([cur, t]) => (
+                  <tr key={cur} className="border-t-2 border-border bg-muted/30 font-semibold">
+                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={2}>Sous-total {cur} ({t.count})</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.original, cur)}</td>
+                    <td className={`num px-4 py-2 text-right ${props.tone === "negative" ? "text-warning" : "text-positive"}`}>{fmtMoney(t.outstanding, cur)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                ))}
+              </tfoot>
+            )}
           </table>
         </div>
       </Panel>
