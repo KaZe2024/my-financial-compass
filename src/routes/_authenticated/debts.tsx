@@ -125,7 +125,7 @@ export function ObligationsPage(props: {
             {totalsByCur.length > 0 && (
               <tbody className="border-b-2 border-border bg-muted/30">
                 {totalsByCur.map(([cur, t]) => (
-                  <tr key={cur} className="font-semibold">
+                  <tr key={cur} className="sticky top-0 z-10 font-semibold bg-muted/95 shadow-sm">
                     <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={2}>Sous-total {cur} ({t.count})</td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(t.original, cur)}</td>
                     <td className={`num px-4 py-2 text-right ${props.tone === "negative" ? "text-warning" : "text-positive"}`}>{fmtMoney(t.outstanding, cur)}</td>

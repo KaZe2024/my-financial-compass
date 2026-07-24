@@ -152,7 +152,7 @@ function CounterpartiesPage() {
                   }, { in: 0, out: 0, count: 0 });
                   const net = tot.in - tot.out;
                   return (
-                    <tr className="font-semibold">
+                    <tr className="sticky top-0 z-10 font-semibold bg-muted/95 shadow-sm">
                       <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total ({visible.length})</td>
                       <td className="num px-4 py-2 text-right text-positive">{fmtMoney(tot.in)}</td>
                       <td className="num px-4 py-2 text-right text-negative">{fmtMoney(tot.out)}</td>
