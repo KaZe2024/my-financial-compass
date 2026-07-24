@@ -142,19 +142,19 @@ export function ObligationsPage(props: {
                 );
               })}
               {visible.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune entrée</td></tr>}
-            </tbody>
             {totalsByCur.length > 0 && (
-              <tfoot>
+              <tbody className="border-b-2 border-border bg-muted/30">
                 {totalsByCur.map(([cur, t]) => (
-                  <tr key={cur} className="border-t-2 border-border bg-muted/30 font-semibold">
+                  <tr key={cur} className="font-semibold">
                     <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={2}>Sous-total {cur} ({t.count})</td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(t.original, cur)}</td>
                     <td className={`num px-4 py-2 text-right ${props.tone === "negative" ? "text-warning" : "text-positive"}`}>{fmtMoney(t.outstanding, cur)}</td>
                     <td colSpan={2}></td>
                   </tr>
                 ))}
-              </tfoot>
+              </tbody>
             )}
+            </tbody>
           </table>
         </div>
       </Panel>

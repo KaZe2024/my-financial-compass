@@ -227,11 +227,10 @@ function AssetsPage() {
                 );
               })}
               {visible.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun actif</td></tr>}
-            </tbody>
             {subtotalsByCurrency.length > 0 && (
-              <tfoot>
+              <tbody className="border-b-2 border-border bg-muted/30">
                 {subtotalsByCurrency.map(([cur, t]) => (
-                  <tr key={cur} className="border-t-2 border-border bg-muted/30 font-semibold">
+                  <tr key={cur} className="font-semibold">
                     <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total {cur} ({t.count})</td>
                     <td className="num px-4 py-2 text-right">{fmtMoney(t.cost, cur)}</td>
                     <td className="num px-4 py-2 text-right text-muted-foreground">{fmtMoney(t.depreciation, cur)}</td>
@@ -242,8 +241,9 @@ function AssetsPage() {
                     <td colSpan={2}></td>
                   </tr>
                 ))}
-              </tfoot>
+              </tbody>
             )}
+            </tbody>
           </table>
         </div>
       </Panel>
