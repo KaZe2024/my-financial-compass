@@ -187,6 +187,22 @@ function AssetsPage() {
                 <th className="px-4 py-2 text-right">Δ coût</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 w-28"></th>
               </tr>
             </thead>
+            {subtotalsByCurrency.length > 0 && (
+              <tbody className="border-b-2 border-border bg-muted/30">
+                {subtotalsByCurrency.map(([cur, t]) => (
+                  <tr key={cur} className="font-semibold">
+                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total {cur} ({t.count})</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.cost, cur)}</td>
+                    <td className="num px-4 py-2 text-right text-muted-foreground">{fmtMoney(t.depreciation, cur)}</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.bookValue, cur)}</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.marketValue, cur)}</td>
+                    <td className={`num px-4 py-2 text-right ${t.resaleGain >= 0 ? "text-positive" : "text-negative"}`}>{t.resaleGain ? fmtMoney(t.resaleGain, cur, { sign: true }) : "—"}</td>
+                    <td className={`num px-4 py-2 text-right ${t.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(t.variation, cur, { sign: true })}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                ))}
+              </tbody>
+            )}
             <tbody>
               {visible.map((a: any) => {
                 const value = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
@@ -227,22 +243,6 @@ function AssetsPage() {
                 );
               })}
               {visible.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun actif</td></tr>}
-            {subtotalsByCurrency.length > 0 && (
-              <tbody className="border-b-2 border-border bg-muted/30">
-                {subtotalsByCurrency.map(([cur, t]) => (
-                  <tr key={cur} className="font-semibold">
-                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total {cur} ({t.count})</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(t.cost, cur)}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground">{fmtMoney(t.depreciation, cur)}</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(t.bookValue, cur)}</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(t.marketValue, cur)}</td>
-                    <td className={`num px-4 py-2 text-right ${t.resaleGain >= 0 ? "text-positive" : "text-negative"}`}>{t.resaleGain ? fmtMoney(t.resaleGain, cur, { sign: true }) : "—"}</td>
-                    <td className={`num px-4 py-2 text-right ${t.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(t.variation, cur, { sign: true })}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                ))}
-              </tbody>
-            )}
             </tbody>
           </table>
         </div>
