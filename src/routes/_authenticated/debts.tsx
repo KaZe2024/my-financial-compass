@@ -122,6 +122,18 @@ export function ObligationsPage(props: {
                 <th className="px-4 py-2">Statut</th><th className="px-4 py-2 w-24"></th>
               </tr>
             </thead>
+            {totalsByCur.length > 0 && (
+              <tbody className="border-b-2 border-border bg-muted/30">
+                {totalsByCur.map(([cur, t]) => (
+                  <tr key={cur} className="font-semibold">
+                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={2}>Sous-total {cur} ({t.count})</td>
+                    <td className="num px-4 py-2 text-right">{fmtMoney(t.original, cur)}</td>
+                    <td className={`num px-4 py-2 text-right ${props.tone === "negative" ? "text-warning" : "text-positive"}`}>{fmtMoney(t.outstanding, cur)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                ))}
+              </tbody>
+            )}
             <tbody>
               {visible.map((r: any) => {
                 const late = r.due_date && new Date(r.due_date) < new Date() && r.status !== "settled" && r.status !== "cancelled";
@@ -143,18 +155,6 @@ export function ObligationsPage(props: {
               })}
               {visible.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune entrée</td></tr>}
             </tbody>
-            {totalsByCur.length > 0 && (
-              <tfoot>
-                {totalsByCur.map(([cur, t]) => (
-                  <tr key={cur} className="border-t-2 border-border bg-muted/30 font-semibold">
-                    <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={2}>Sous-total {cur} ({t.count})</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(t.original, cur)}</td>
-                    <td className={`num px-4 py-2 text-right ${props.tone === "negative" ? "text-warning" : "text-positive"}`}>{fmtMoney(t.outstanding, cur)}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                ))}
-              </tfoot>
-            )}
           </table>
         </div>
       </Panel>
