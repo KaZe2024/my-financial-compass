@@ -168,17 +168,16 @@ function CounterpartiesPage() {
                 );
               })}
               {visible.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun tiers</td></tr>}
-            </tbody>
-            {visible.length > 0 && (() => {
+            {(() => {
               const tot = visible.reduce((acc: { in: number; out: number; count: number }, c: any) => {
                 const s = stats.get(c.id) ?? { in: 0, out: 0, count: 0 };
                 acc.in += s.in; acc.out += s.out; acc.count += s.count;
                 return acc;
               }, { in: 0, out: 0, count: 0 });
               const net = tot.in - tot.out;
-              return (
-                <tfoot>
-                  <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+              return visible.length > 0 ? (
+                <tbody className="border-b-2 border-border bg-muted/30">
+                  <tr className="font-semibold">
                     <td className="px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground" colSpan={3}>Sous-total ({visible.length})</td>
                     <td className="num px-4 py-2 text-right text-positive">{fmtMoney(tot.in)}</td>
                     <td className="num px-4 py-2 text-right text-negative">{fmtMoney(tot.out)}</td>
@@ -186,9 +185,10 @@ function CounterpartiesPage() {
                     <td className="num px-4 py-2 text-right text-muted-foreground">{tot.count}</td>
                     <td colSpan={2}></td>
                   </tr>
-                </tfoot>
-              );
+                </tbody>
+              ) : null;
             })()}
+            </tbody>
           </table>
         </div>
       </Panel>
