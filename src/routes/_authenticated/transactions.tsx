@@ -213,11 +213,10 @@ function TxPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("transaction_tags").delete().eq("transaction_id", id);
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("transactions", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
       const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", id, "delete");
+      if (!res.queued) await logAudit("transaction", id, "delete");
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
     onError: (e: Error) => toast.error(e.message),
