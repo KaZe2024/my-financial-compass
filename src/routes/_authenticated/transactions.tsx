@@ -252,25 +252,13 @@ function TxPage() {
 
   const bulkEdit = useMutation({
     mutationFn: async ({ ids, patch, tagIdsSet }: { ids: string[]; patch: Record<string, any>; tagIdsSet: string[] | null }) => {
-      if (Object.keys(patch).length) {
-        for (const c of chunk(ids)) {
-          const { error } = await supabase.from("transactions").update(patch as any).in("id", c);
-          if (error) throw error;
+      for (const id of ids) {
+        if (Object.keys(patch).length) {
+          const res = await offlineUpdate("transactions", id, patch);
+          if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
         }
-      }
-      if (tagIdsSet !== null) {
-        const { data: u, error: uErr } = await supabase.auth.getUser();
-        if (uErr || !u.user) throw uErr ?? new Error("Utilisateur non authentifié");
-        const tagIds = Array.from(new Set(tagIdsSet));
-        if (!tagIds.length) return;
-        for (const c of chunk(ids)) {
-          const rows = c.flatMap((tid) => tagIds.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
-          for (const rc of chunk(rows, 500)) {
-            const { error: iErr } = await supabase
-              .from("transaction_tags")
-              .upsert(rc, { onConflict: "transaction_id,tag_id", ignoreDuplicates: true });
-            if (iErr) throw iErr;
-          }
+        if (tagIdsSet !== null) {
+          await syncTagsOffline(id, tagIdsSet);
         }
       }
     },
