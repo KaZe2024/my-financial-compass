@@ -186,12 +186,9 @@ function AddWalletDialog({ defaultCur, onDone }: { defaultCur: string; onDone: (
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
       const ob = Number(opening || 0);
-      const { error } = await supabase.from("wallets").insert({
-        user_id: u.user!.id, name, type, currency, opening_balance: ob, current_balance: ob,
-      });
-      if (error) throw error;
+      const res = await offlineInsert("wallets", { name, type, currency, opening_balance: ob, current_balance: ob });
+      if (!res.ok) throw new Error(res.error ?? "Erreur création");
     },
     onSuccess: () => { toast.success("Portefeuille créé"); setOpen(false); setName(""); setOpening("0"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
