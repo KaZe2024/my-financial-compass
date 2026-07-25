@@ -241,9 +241,9 @@ function TxPage() {
 
   const bulkArchive = useMutation({
     mutationFn: async ({ ids, archived }: { ids: string[]; archived: boolean }) => {
-      for (const c of chunk(ids)) {
-        const { error } = await supabase.from("transactions").update({ archived } as any).in("id", c);
-        if (error) throw error;
+      for (const id of ids) {
+        const res = await offlineUpdate("transactions", id, { archived });
+        if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
       }
     },
     onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
