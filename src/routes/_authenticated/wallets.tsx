@@ -235,8 +235,8 @@ function EditWalletDialog({ wallet, onClose, onDone }: { wallet: any; onClose: (
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("wallets").update({ name, type, currency, status, notes: notes || null }).eq("id", wallet.id);
-      if (error) throw error;
+      const res = await offlineUpdate("wallets", wallet.id, { name, type, currency, status, notes: notes || null });
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
     },
     onSuccess: () => { toast.success("Portefeuille modifié"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
