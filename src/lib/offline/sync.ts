@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 import {
   offlineDb,
-  syncedDataDb,
   type SyncedTable,
   SYNCED_TABLES,
   setLastSyncAt,
@@ -14,9 +14,16 @@ import {
 } from "./db";
 import { v4 as uuidv4 } from "uuid";
 
+export type SyncPullRow = {
+  id: string;
+  data: Record<string, Json>;
+  updatedAt: string;
+  deleted: boolean;
+};
+
 export type SyncPullResult = {
   at: string;
-  tables: Partial<Record<SyncedTable, { id: string; data: Record<string, unknown>; updatedAt: string; deleted: boolean }[]>>;
+  tables: Record<string, SyncPullRow[]>;
 };
 
 export type SyncPushResult = {
@@ -28,7 +35,9 @@ export type SyncPushResult = {
 export const pullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => {
-    if (typeof input !== "object" || input === null) throw new Error("Invalid input");
+    if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      throw new Error("Invalid input");
+    }
     const { lastSyncAt } = input as { lastSyncAt?: string | null };
     return { lastSyncAt: lastSyncAt ?? null };
   })
@@ -36,12 +45,12 @@ export const pullSync = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const since = data.lastSyncAt ? new Date(data.lastSyncAt).toISOString() : "1970-01-01T00:00:00.000Z";
     const now = new Date().toISOString();
-    const result: SyncPullResult["tables"] = {};
+    const result: Record<string, SyncPullRow[]> = {};
 
     await Promise.all(
       SYNCED_TABLES.map(async (table) => {
         try {
-          const q = supabase
+          const q = (supabase as any)
             .from(table as string)
             .select("*")
             .eq("user_id", userId)
@@ -53,9 +62,9 @@ export const pullSync = createServerFn({ method: "POST" })
           }
           result[table] = (rows ?? []).map((r: any) => ({
             id: r.id as string,
-            data: r as Record<string, unknown>,
+            data: r as Record<string, Json>,
             updatedAt: r.updated_at as string,
-            deleted: r.deleted_at ? true : false,
+            deleted: !!(r as any).deleted_at,
           }));
         } catch (e) {
           console.error(`[offline pull] ${table} exception:`, e);
@@ -81,21 +90,22 @@ export const pushSync = createServerFn({ method: "POST" })
     for (const mutation of data) {
       try {
         const payload = { ...mutation.payload, user_id: userId, updated_at: new Date().toISOString() };
+        const table = mutation.table as string;
         if (mutation.op === "insert") {
-          const { error } = await supabase.from(mutation.table).insert(payload);
+          const { error } = await (supabase as any).from(table).insert(payload);
           if (error) throw error;
           applied++;
         } else if (mutation.op === "update") {
           const id = payload.id;
           if (!id) throw new Error("Missing id for update");
           delete payload.id;
-          const { error } = await supabase.from(mutation.table).update(payload).eq("id", id);
+          const { error } = await (supabase as any).from(table).update(payload).eq("id", id);
           if (error) throw error;
           applied++;
         } else if (mutation.op === "delete") {
           const id = payload.id;
           if (!id) throw new Error("Missing id for delete");
-          const { error } = await supabase.from(mutation.table).delete().eq("id", id);
+          const { error } = await (supabase as any).from(table).delete().eq("id", id);
           if (error) throw error;
           applied++;
         } else {
@@ -150,11 +160,9 @@ export async function flushPendingMutations(): Promise<SyncPushResult> {
 
   const result = await pushSync({ data: mutations });
 
-  // Remove successfully applied mutations; keep failed ones for retry
   const appliedIds = mutations.slice(0, result.applied).map((m) => m.id);
   await offlineDb.pendingMutations.bulkDelete(appliedIds);
 
-  // Update retry count / error for failed ones
   for (const error of result.errors) {
     const mutationId = error.split(":")[0]?.trim();
     if (!mutationId) continue;
