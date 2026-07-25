@@ -694,29 +694,41 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       const isProjType = PROJECT_TYPES.has(form.type);
       const isDebtType = DEBT_TYPES.has(form.type);
       const isRecType = RECEIVABLE_TYPES.has(form.type);
-      // Auto-create debt/receivable on _incur / _grant when none selected
       let debtId: string | null = form.debt_id || null;
       let recId: string | null = form.receivable_id || null;
       if (form.type === "dette" && !debtId) {
-        const { data: d, error: dErr } = await supabase.from("debts").insert({
-          user_id: u.user!.id, creditor: form.counterparty.trim() || form.description || "Créancier",
+        const debtRow = {
+          creditor: form.counterparty.trim() || form.description || "Créancier",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
-        } as any).select().single();
-        if (dErr) throw dErr;
-        debtId = d?.id ?? null;
+        };
+        const res = await offlineInsert("debts", debtRow);
+        if (!res.ok) throw new Error(res.error ?? "Erreur création dette");
+        debtId = res.queued ? (debtRow as any).id : null;
+        // Online path still uses the server-returned id if needed; queued path uses generated id.
+        if (res.queued) debtId = debtRow.id as string;
+        else {
+          const { data: d, error: dErr } = await supabase.from("debts").insert({ ...debtRow, user_id: u.user!.id } as any).select().single();
+          if (dErr) throw dErr;
+          debtId = d?.id ?? null;
+        }
       }
       if (form.type === "creance" && !recId) {
-        const { data: r, error: rErr } = await supabase.from("receivables").insert({
-          user_id: u.user!.id, debtor: form.counterparty.trim() || form.description || "Débiteur",
+        const recRow = {
+          debtor: form.counterparty.trim() || form.description || "Débiteur",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
-        } as any).select().single();
-        if (rErr) throw rErr;
-        recId = r?.id ?? null;
+        };
+        const res = await offlineInsert("receivables", recRow);
+        if (!res.ok) throw new Error(res.error ?? "Erreur création créance");
+        if (res.queued) recId = recRow.id as string;
+        else {
+          const { data: r, error: rErr } = await supabase.from("receivables").insert({ ...recRow, user_id: u.user!.id } as any).select().single();
+          if (rErr) throw rErr;
+          recId = r?.id ?? null;
+        }
       }
-      const { data: ins, error } = await supabase.from("transactions").insert({
-        user_id: u.user!.id,
+      const txRow = {
         type: form.type,
         occurred_on: form.occurred_on,
         description: form.description,
@@ -733,11 +745,19 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         notes: form.notes || null,
         debt_id: isDebtType ? debtId : null,
         receivable_id: isRecType ? recId : null,
-      } as any).select().single();
-      if (error) throw error;
-      if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
-      const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
+      };
+      const txRes = await offlineInsert("transactions", txRow);
+      if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
+      const txId = txRes.queued ? (txRow as any).id : null;
+      if (txRes.queued) {
+        if (form.tag_ids.length) await syncTags(txRow.id as string, u.user!.id, form.tag_ids);
+      } else {
+        const { data: ins, error } = await supabase.from("transactions").insert({ ...txRow, user_id: u.user!.id } as any).select().single();
+        if (error) throw error;
+        if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
+      }
     },
     onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
     onError: (e: Error) => toast.error(e.message),
