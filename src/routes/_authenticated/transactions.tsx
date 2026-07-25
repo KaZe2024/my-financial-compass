@@ -697,15 +697,13 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       let debtId: string | null = form.debt_id || null;
       let recId: string | null = form.receivable_id || null;
       if (form.type === "dette" && !debtId) {
-        const debtRow = {
+        const debtRow: any = {
           creditor: form.counterparty.trim() || form.description || "Créancier",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
         };
         const res = await offlineInsert("debts", debtRow);
         if (!res.ok) throw new Error(res.error ?? "Erreur création dette");
-        debtId = res.queued ? (debtRow as any).id : null;
-        // Online path still uses the server-returned id if needed; queued path uses generated id.
         if (res.queued) debtId = debtRow.id as string;
         else {
           const { data: d, error: dErr } = await supabase.from("debts").insert({ ...debtRow, user_id: u.user!.id } as any).select().single();
@@ -714,7 +712,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         }
       }
       if (form.type === "creance" && !recId) {
-        const recRow = {
+        const recRow: any = {
           debtor: form.counterparty.trim() || form.description || "Débiteur",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
@@ -728,7 +726,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
           recId = r?.id ?? null;
         }
       }
-      const txRow = {
+      const txRow: any = {
         type: form.type,
         occurred_on: form.occurred_on,
         description: form.description,
@@ -748,7 +746,6 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       };
       const txRes = await offlineInsert("transactions", txRow);
       if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
-      const txId = txRes.queued ? (txRow as any).id : null;
       if (txRes.queued) {
         if (form.tag_ids.length) await syncTags(txRow.id as string, u.user!.id, form.tag_ids);
       } else {
