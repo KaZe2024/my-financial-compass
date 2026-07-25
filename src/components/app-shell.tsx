@@ -13,6 +13,7 @@ import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OfflineIndicator } from "@/components/offline-indicator";
 
 const NAV = [
   { group: "Vue d'ensemble", items: [
