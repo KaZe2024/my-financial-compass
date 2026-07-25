@@ -629,25 +629,7 @@ function TxPage() {
 }
 
 async function syncTags(txId: string, userId: string, newIds: string[]) {
-  const nextIds = Array.from(new Set(newIds));
-  const { data: existing, error: readError } = await supabase
-    .from("transaction_tags")
-    .select("tag_id")
-    .eq("transaction_id", txId);
-  if (readError) throw readError;
-  const oldIds = (existing ?? []).map((r) => r.tag_id);
-  const toAdd = nextIds.filter((x) => !oldIds.includes(x));
-  const toRemove = oldIds.filter((x) => !nextIds.includes(x));
-  if (toRemove.length) {
-    const { error } = await supabase.from("transaction_tags").delete().eq("transaction_id", txId).in("tag_id", toRemove);
-    if (error) throw error;
-  }
-  if (toAdd.length) {
-    const { error } = await supabase
-      .from("transaction_tags")
-      .insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
-    if (error) throw error;
-  }
+  await syncTagsOffline(txId, newIds);
 }
 
 type FormState = {
