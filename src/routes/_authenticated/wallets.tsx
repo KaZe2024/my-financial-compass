@@ -287,15 +287,14 @@ function TransferDialog({ wallets, onDone }: { wallets: any[]; onDone: () => voi
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
       const w = wallets.find(x => x.id === from);
       const amt = Number(amount);
-      const { error } = await supabase.from("transactions").insert({
-        user_id: u.user!.id, type: "transfer", occurred_on: toISODate(new Date()),
+      const res = await offlineInsert("transactions", {
+        type: "transfer", occurred_on: toISODate(new Date()),
         description: desc, wallet_id: from, to_wallet_id: to, amount: amt, currency: w?.currency ?? "MGA",
         exchange_rate: 1, base_amount: amt,
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(res.error ?? "Erreur transfert");
     },
     onSuccess: () => { toast.success("Transfert enregistré"); setOpen(false); setAmount(""); onDone(); },
     onError: (e: Error) => toast.error(e.message),
