@@ -160,6 +160,40 @@ export async function getSyncedRowById(table: SyncedTable, id: string): Promise<
   return row.data;
 }
 
+export async function applyLocalMutation(table: SyncedTable, op: PendingMutation["op"], payload: Record<string, unknown>) {
+  if (op === "delete") {
+    const existing = await syncedDataDb.rows.get([table, payload.id as string]);
+    if (existing) {
+      existing.deleted = true;
+      existing.updatedAt = new Date().toISOString();
+      await syncedDataDb.rows.put(existing);
+    }
+  } else if (op === "insert") {
+    await syncedDataDb.rows.put({
+      table,
+      id: payload.id as string,
+      data: payload,
+      updatedAt: new Date().toISOString(),
+      deleted: false,
+    });
+  } else if (op === "update") {
+    const existing = await syncedDataDb.rows.get([table, payload.id as string]);
+    if (existing) {
+      existing.data = { ...existing.data, ...payload };
+      existing.updatedAt = new Date().toISOString();
+      await syncedDataDb.rows.put(existing);
+    } else {
+      await syncedDataDb.rows.put({
+        table,
+        id: payload.id as string,
+        data: payload,
+        updatedAt: new Date().toISOString(),
+        deleted: false,
+      });
+    }
+  }
+}
+
 export async function clearSyncedTable(table: SyncedTable) {
   await syncedDataDb.rows.where("table").equals(table).delete();
 }
