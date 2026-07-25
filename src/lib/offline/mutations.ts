@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { checkOnlineWithHeartbeat } from "./network-status";
-import { queueMutation, applyLocalMutation, flushPendingMutations, type SyncedTable } from "./db";
+import { applyLocalMutation, type SyncedTable } from "./db";
+import { queueMutation, flushPendingMutations } from "./sync";
 import { v4 as uuidv4 } from "uuid";
 
 export type MutationResult = {
