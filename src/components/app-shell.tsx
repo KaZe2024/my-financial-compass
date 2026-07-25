@@ -142,6 +142,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <OfflineIndicator />
         <ThemeMenu />
         <CalendarRange className="hidden h-4 w-4 text-muted-foreground md:block" />
       </div>
