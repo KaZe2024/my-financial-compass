@@ -13,6 +13,7 @@ import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { OfflineIndicator } from "@/components/offline-indicator";
 
 const NAV = [
   { group: "Vue d'ensemble", items: [
@@ -141,6 +142,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <OfflineIndicator />
         <ThemeMenu />
         <CalendarRange className="hidden h-4 w-4 text-muted-foreground md:block" />
       </div>

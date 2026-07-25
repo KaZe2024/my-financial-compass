@@ -24,6 +24,7 @@ export type Database = {
           meta: Json | null
           severity: string
           title: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           meta?: Json | null
           severity?: string
           title: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           meta?: Json | null
           severity?: string
           title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -56,6 +59,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -63,6 +67,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -70,6 +75,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -85,6 +91,7 @@ export type Database = {
           id: string
           notes: string | null
           transaction_id: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -97,6 +104,7 @@ export type Database = {
           id?: string
           notes?: string | null
           transaction_id?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -109,6 +117,7 @@ export type Database = {
           id?: string
           notes?: string | null
           transaction_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -162,6 +171,7 @@ export type Database = {
           id: string
           note: string | null
           observed_on: string
+          updated_at: string
           user_id: string
           value: number
         }
@@ -171,6 +181,7 @@ export type Database = {
           id?: string
           note?: string | null
           observed_on: string
+          updated_at?: string
           user_id: string
           value: number
         }
@@ -180,6 +191,7 @@ export type Database = {
           id?: string
           note?: string | null
           observed_on?: string
+          updated_at?: string
           user_id?: string
           value?: number
         }
@@ -274,6 +286,7 @@ export type Database = {
           id: string
           mime_type: string | null
           size_bytes: number | null
+          updated_at: string
           uploaded_at: string
           user_id: string
         }
@@ -285,6 +298,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           size_bytes?: number | null
+          updated_at?: string
           uploaded_at?: string
           user_id: string
         }
@@ -296,6 +310,7 @@ export type Database = {
           id?: string
           mime_type?: string | null
           size_bytes?: number | null
+          updated_at?: string
           uploaded_at?: string
           user_id?: string
         }
@@ -309,6 +324,7 @@ export type Database = {
           entity_type: string | null
           id: string
           payload: Json | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -318,6 +334,7 @@ export type Database = {
           entity_type?: string | null
           id?: string
           payload?: Json | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -327,6 +344,7 @@ export type Database = {
           entity_type?: string | null
           id?: string
           payload?: Json | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -342,6 +360,7 @@ export type Database = {
           is_income: boolean
           name: string
           planned_monthly: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -354,6 +373,7 @@ export type Database = {
           is_income?: boolean
           name: string
           planned_monthly?: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -366,6 +386,7 @@ export type Database = {
           is_income?: boolean
           name?: string
           planned_monthly?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -386,6 +407,7 @@ export type Database = {
           id: string
           name: string
           sort_order: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -395,6 +417,7 @@ export type Database = {
           id?: string
           name: string
           sort_order?: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -404,6 +427,7 @@ export type Database = {
           id?: string
           name?: string
           sort_order?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -517,6 +541,7 @@ export type Database = {
           period_month: string
           planned: number
           revised: number | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -527,6 +552,7 @@ export type Database = {
           period_month: string
           planned?: number
           revised?: number | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -537,6 +563,7 @@ export type Database = {
           period_month?: string
           planned?: number
           revised?: number | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -583,6 +610,7 @@ export type Database = {
           created_at: string
           id: string
           role: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -591,6 +619,7 @@ export type Database = {
           created_at?: string
           id?: string
           role: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -599,6 +628,7 @@ export type Database = {
           created_at?: string
           id?: string
           role?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -655,16 +685,19 @@ export type Database = {
           code: string
           name: string
           symbol: string | null
+          updated_at: string
         }
         Insert: {
           code: string
           name: string
           symbol?: string | null
+          updated_at?: string
         }
         Update: {
           code?: string
           name?: string
           symbol?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -753,6 +786,7 @@ export type Database = {
           rate: number
           rate_date: string
           to_code: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -763,6 +797,7 @@ export type Database = {
           rate: number
           rate_date?: string
           to_code: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -773,6 +808,7 @@ export type Database = {
           rate?: number
           rate_date?: string
           to_code?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -935,6 +971,7 @@ export type Database = {
           next_date: string | null
           notes: string | null
           recurring: boolean
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -949,6 +986,7 @@ export type Database = {
           next_date?: string | null
           notes?: string | null
           recurring?: boolean
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -963,6 +1001,7 @@ export type Database = {
           next_date?: string | null
           notes?: string | null
           recurring?: boolean
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -989,6 +1028,7 @@ export type Database = {
           paid_amount: number
           paid_on: string | null
           status: Database["public"]["Enums"]["invoice_status"]
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1004,6 +1044,7 @@ export type Database = {
           paid_amount?: number
           paid_on?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1019,6 +1060,7 @@ export type Database = {
           paid_amount?: number
           paid_on?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1041,6 +1083,7 @@ export type Database = {
           payment_date: string
           period_no: number
           principal_amount: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1052,6 +1095,7 @@ export type Database = {
           payment_date: string
           period_no: number
           principal_amount: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1063,6 +1107,7 @@ export type Database = {
           payment_date?: string
           period_no?: number
           principal_amount?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1089,6 +1134,7 @@ export type Database = {
           outstanding: number
           principal: number
           start_date: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1104,6 +1150,7 @@ export type Database = {
           outstanding: number
           principal: number
           start_date: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1119,6 +1166,7 @@ export type Database = {
           outstanding?: number
           principal?: number
           start_date?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1191,6 +1239,7 @@ export type Database = {
           total_debt: number
           total_investments: number
           total_receivables: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1205,6 +1254,7 @@ export type Database = {
           total_debt?: number
           total_investments?: number
           total_receivables?: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1219,6 +1269,7 @@ export type Database = {
           total_debt?: number
           total_investments?: number
           total_receivables?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1234,6 +1285,7 @@ export type Database = {
           source_item_id: string | null
           supplier: string | null
           unit_price: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1246,6 +1298,7 @@ export type Database = {
           source_item_id?: string | null
           supplier?: string | null
           unit_price: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1258,6 +1311,7 @@ export type Database = {
           source_item_id?: string | null
           supplier?: string | null
           unit_price?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1293,6 +1347,7 @@ export type Database = {
           name: string
           notes: string | null
           unit: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1303,6 +1358,7 @@ export type Database = {
           name: string
           notes?: string | null
           unit?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1313,6 +1369,7 @@ export type Database = {
           name?: string
           notes?: string | null
           unit?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1499,6 +1556,7 @@ export type Database = {
           settled_at: string | null
           status: Database["public"]["Enums"]["provision_status"]
           subscription_id: string | null
+          updated_at: string
           user_id: string
           wallet_id: string | null
         }
@@ -1524,6 +1582,7 @@ export type Database = {
           settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
           subscription_id?: string | null
+          updated_at?: string
           user_id: string
           wallet_id?: string | null
         }
@@ -1549,6 +1608,7 @@ export type Database = {
           settled_at?: string | null
           status?: Database["public"]["Enums"]["provision_status"]
           subscription_id?: string | null
+          updated_at?: string
           user_id?: string
           wallet_id?: string | null
         }
@@ -1689,6 +1749,7 @@ export type Database = {
           net_amount: number
           notes: string | null
           period_month: string
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1702,6 +1763,7 @@ export type Database = {
           net_amount?: number
           notes?: string | null
           period_month: string
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1715,6 +1777,7 @@ export type Database = {
           net_amount?: number
           notes?: string | null
           period_month?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1735,6 +1798,7 @@ export type Database = {
           name: string
           notes: string | null
           type: Database["public"]["Enums"]["scenario_type"]
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1744,6 +1808,7 @@ export type Database = {
           name: string
           notes?: string | null
           type?: Database["public"]["Enums"]["scenario_type"]
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1753,6 +1818,7 @@ export type Database = {
           name?: string
           notes?: string | null
           type?: Database["public"]["Enums"]["scenario_type"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1769,6 +1835,7 @@ export type Database = {
           total: number
           unit: string | null
           unit_price: number
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -1782,6 +1849,7 @@ export type Database = {
           total?: number
           unit?: string | null
           unit_price?: number
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -1795,6 +1863,7 @@ export type Database = {
           total?: number
           unit?: string | null
           unit_price?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1828,6 +1897,7 @@ export type Database = {
           title: string | null
           total: number
           transaction_id: string | null
+          updated_at: string
           user_id: string
           wallet_id: string | null
         }
@@ -1844,6 +1914,7 @@ export type Database = {
           title?: string | null
           total?: number
           transaction_id?: string | null
+          updated_at?: string
           user_id: string
           wallet_id?: string | null
         }
@@ -1860,6 +1931,7 @@ export type Database = {
           title?: string | null
           total?: number
           transaction_id?: string | null
+          updated_at?: string
           user_id?: string
           wallet_id?: string | null
         }
@@ -1911,6 +1983,7 @@ export type Database = {
           name: string
           next_billing_date: string | null
           notes: string | null
+          updated_at: string
           user_id: string
           wallet_id: string | null
         }
@@ -1930,6 +2003,7 @@ export type Database = {
           name: string
           next_billing_date?: string | null
           notes?: string | null
+          updated_at?: string
           user_id: string
           wallet_id?: string | null
         }
@@ -1949,6 +2023,7 @@ export type Database = {
           name?: string
           next_billing_date?: string | null
           notes?: string | null
+          updated_at?: string
           user_id?: string
           wallet_id?: string | null
         }
@@ -1987,16 +2062,19 @@ export type Database = {
         Row: {
           tag_id: string
           transaction_id: string
+          updated_at: string
           user_id: string
         }
         Insert: {
           tag_id: string
           transaction_id: string
+          updated_at?: string
           user_id: string
         }
         Update: {
           tag_id?: string
           transaction_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -2190,6 +2268,7 @@ export type Database = {
           period_start: string
           previous_reading: number
           type: Database["public"]["Enums"]["utility_type"]
+          updated_at: string
           user_id: string
         }
         Insert: {
@@ -2204,6 +2283,7 @@ export type Database = {
           period_start: string
           previous_reading?: number
           type: Database["public"]["Enums"]["utility_type"]
+          updated_at?: string
           user_id: string
         }
         Update: {
@@ -2218,6 +2298,7 @@ export type Database = {
           period_start?: string
           previous_reading?: number
           type?: Database["public"]["Enums"]["utility_type"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: [

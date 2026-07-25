@@ -19,6 +19,9 @@ import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMonth, fmtMoney, toISODate } from "@/lib/format";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
+import { syncTagsOffline } from "@/lib/offline/tags";
+import { useOnlineStatus } from "@/lib/offline/hooks";
 
 import { toast } from "sonner";
 
@@ -210,11 +213,10 @@ function TxPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("transaction_tags").delete().eq("transaction_id", id);
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("transactions", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
       const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", id, "delete");
+      if (!res.queued) await logAudit("transaction", id, "delete");
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
     onError: (e: Error) => toast.error(e.message),
@@ -228,11 +230,9 @@ function TxPage() {
 
   const bulkDel = useMutation({
     mutationFn: async (ids: string[]) => {
-      for (const c of chunk(ids)) {
-        const { error: e1 } = await supabase.from("transaction_tags").delete().in("transaction_id", c);
-        if (e1) throw e1;
-        const { error } = await supabase.from("transactions").delete().in("id", c);
-        if (error) throw error;
+      for (const id of ids) {
+        const res = await offlineDelete("transactions", id);
+        if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
       }
     },
     onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
@@ -241,9 +241,9 @@ function TxPage() {
 
   const bulkArchive = useMutation({
     mutationFn: async ({ ids, archived }: { ids: string[]; archived: boolean }) => {
-      for (const c of chunk(ids)) {
-        const { error } = await supabase.from("transactions").update({ archived } as any).in("id", c);
-        if (error) throw error;
+      for (const id of ids) {
+        const res = await offlineUpdate("transactions", id, { archived });
+        if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
       }
     },
     onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
@@ -252,25 +252,13 @@ function TxPage() {
 
   const bulkEdit = useMutation({
     mutationFn: async ({ ids, patch, tagIdsSet }: { ids: string[]; patch: Record<string, any>; tagIdsSet: string[] | null }) => {
-      if (Object.keys(patch).length) {
-        for (const c of chunk(ids)) {
-          const { error } = await supabase.from("transactions").update(patch as any).in("id", c);
-          if (error) throw error;
+      for (const id of ids) {
+        if (Object.keys(patch).length) {
+          const res = await offlineUpdate("transactions", id, patch);
+          if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
         }
-      }
-      if (tagIdsSet !== null) {
-        const { data: u, error: uErr } = await supabase.auth.getUser();
-        if (uErr || !u.user) throw uErr ?? new Error("Utilisateur non authentifié");
-        const tagIds = Array.from(new Set(tagIdsSet));
-        if (!tagIds.length) return;
-        for (const c of chunk(ids)) {
-          const rows = c.flatMap((tid) => tagIds.map((tag_id) => ({ transaction_id: tid, tag_id, user_id: u.user!.id })));
-          for (const rc of chunk(rows, 500)) {
-            const { error: iErr } = await supabase
-              .from("transaction_tags")
-              .upsert(rc, { onConflict: "transaction_id,tag_id", ignoreDuplicates: true });
-            if (iErr) throw iErr;
-          }
+        if (tagIdsSet !== null) {
+          await syncTagsOffline(id, tagIdsSet);
         }
       }
     },
@@ -641,25 +629,7 @@ function TxPage() {
 }
 
 async function syncTags(txId: string, userId: string, newIds: string[]) {
-  const nextIds = Array.from(new Set(newIds));
-  const { data: existing, error: readError } = await supabase
-    .from("transaction_tags")
-    .select("tag_id")
-    .eq("transaction_id", txId);
-  if (readError) throw readError;
-  const oldIds = (existing ?? []).map((r) => r.tag_id);
-  const toAdd = nextIds.filter((x) => !oldIds.includes(x));
-  const toRemove = oldIds.filter((x) => !nextIds.includes(x));
-  if (toRemove.length) {
-    const { error } = await supabase.from("transaction_tags").delete().eq("transaction_id", txId).in("tag_id", toRemove);
-    if (error) throw error;
-  }
-  if (toAdd.length) {
-    const { error } = await supabase
-      .from("transaction_tags")
-      .insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
-    if (error) throw error;
-  }
+  await syncTagsOffline(txId, newIds);
 }
 
 type FormState = {
@@ -724,29 +694,39 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       const isProjType = PROJECT_TYPES.has(form.type);
       const isDebtType = DEBT_TYPES.has(form.type);
       const isRecType = RECEIVABLE_TYPES.has(form.type);
-      // Auto-create debt/receivable on _incur / _grant when none selected
       let debtId: string | null = form.debt_id || null;
       let recId: string | null = form.receivable_id || null;
       if (form.type === "dette" && !debtId) {
-        const { data: d, error: dErr } = await supabase.from("debts").insert({
-          user_id: u.user!.id, creditor: form.counterparty.trim() || form.description || "Créancier",
+        const debtRow: any = {
+          creditor: form.counterparty.trim() || form.description || "Créancier",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
-        } as any).select().single();
-        if (dErr) throw dErr;
-        debtId = d?.id ?? null;
+        };
+        const res = await offlineInsert("debts", debtRow);
+        if (!res.ok) throw new Error(res.error ?? "Erreur création dette");
+        if (res.queued) debtId = debtRow.id as string;
+        else {
+          const { data: d, error: dErr } = await supabase.from("debts").insert({ ...debtRow, user_id: u.user!.id } as any).select().single();
+          if (dErr) throw dErr;
+          debtId = d?.id ?? null;
+        }
       }
       if (form.type === "creance" && !recId) {
-        const { data: r, error: rErr } = await supabase.from("receivables").insert({
-          user_id: u.user!.id, debtor: form.counterparty.trim() || form.description || "Débiteur",
+        const recRow: any = {
+          debtor: form.counterparty.trim() || form.description || "Débiteur",
           description: form.description || null, original_amount: amt, outstanding: 0,
           currency: form.currency, status: "outstanding",
-        } as any).select().single();
-        if (rErr) throw rErr;
-        recId = r?.id ?? null;
+        };
+        const res = await offlineInsert("receivables", recRow);
+        if (!res.ok) throw new Error(res.error ?? "Erreur création créance");
+        if (res.queued) recId = recRow.id as string;
+        else {
+          const { data: r, error: rErr } = await supabase.from("receivables").insert({ ...recRow, user_id: u.user!.id } as any).select().single();
+          if (rErr) throw rErr;
+          recId = r?.id ?? null;
+        }
       }
-      const { data: ins, error } = await supabase.from("transactions").insert({
-        user_id: u.user!.id,
+      const txRow: any = {
         type: form.type,
         occurred_on: form.occurred_on,
         description: form.description,
@@ -763,11 +743,18 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         notes: form.notes || null,
         debt_id: isDebtType ? debtId : null,
         receivable_id: isRecType ? recId : null,
-      } as any).select().single();
-      if (error) throw error;
-      if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
-      const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
+      };
+      const txRes = await offlineInsert("transactions", txRow);
+      if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
+      if (txRes.queued) {
+        if (form.tag_ids.length) await syncTags(txRow.id as string, u.user!.id, form.tag_ids);
+      } else {
+        const { data: ins, error } = await supabase.from("transactions").insert({ ...txRow, user_id: u.user!.id } as any).select().single();
+        if (error) throw error;
+        if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
+      }
     },
     onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -821,7 +808,7 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
       const isProjType = PROJECT_TYPES.has(form.type);
       const isDebtType = DEBT_TYPES.has(form.type);
       const isRecType = RECEIVABLE_TYPES.has(form.type);
-      const { error } = await supabase.from("transactions").update({
+      const patch = {
         type: form.type,
         occurred_on: form.occurred_on,
         description: form.description,
@@ -838,11 +825,14 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
         notes: form.notes || null,
         debt_id: isDebtType ? (form.debt_id || null) : null,
         receivable_id: isRecType ? (form.receivable_id || null) : null,
-      } as any).eq("id", tx.id);
-      if (error) throw error;
+      };
+      const res = await offlineUpdate("transactions", tx.id, patch);
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
       await syncTags(tx.id, u.user!.id, form.tag_ids);
-      const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
+      if (!res.queued) {
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
+      }
     },
     onSuccess: () => { toast.success("Transaction mise à jour"); onDone(); },
     onError: (e: Error) => toast.error(e.message),

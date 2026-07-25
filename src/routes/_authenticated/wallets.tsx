@@ -13,6 +13,7 @@ import { Plus, Wallet as WalletIcon, ArrowLeftRight, Pencil, Archive, ArchiveRes
 import { fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
 
 export const Route = createFileRoute("/_authenticated/wallets")({
   head: () => ({ meta: [{ title: "Portefeuilles — Personal CFO" }] }),
@@ -81,16 +82,16 @@ function WalletsPage() {
 
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
-      const { error } = await supabase.from("wallets").update(patch).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("wallets", id, patch);
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("wallets").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("wallets", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); toast.success("Portefeuille supprimé"); },
     onError: (e: Error) => toast.error(e.message),
@@ -185,12 +186,9 @@ function AddWalletDialog({ defaultCur, onDone }: { defaultCur: string; onDone: (
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
       const ob = Number(opening || 0);
-      const { error } = await supabase.from("wallets").insert({
-        user_id: u.user!.id, name, type, currency, opening_balance: ob, current_balance: ob,
-      });
-      if (error) throw error;
+      const res = await offlineInsert("wallets", { name, type, currency, opening_balance: ob, current_balance: ob });
+      if (!res.ok) throw new Error(res.error ?? "Erreur création");
     },
     onSuccess: () => { toast.success("Portefeuille créé"); setOpen(false); setName(""); setOpening("0"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -237,8 +235,8 @@ function EditWalletDialog({ wallet, onClose, onDone }: { wallet: any; onClose: (
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("wallets").update({ name, type, currency, status, notes: notes || null }).eq("id", wallet.id);
-      if (error) throw error;
+      const res = await offlineUpdate("wallets", wallet.id, { name, type, currency, status, notes: notes || null });
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
     },
     onSuccess: () => { toast.success("Portefeuille modifié"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -289,15 +287,14 @@ function TransferDialog({ wallets, onDone }: { wallets: any[]; onDone: () => voi
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
       const w = wallets.find(x => x.id === from);
       const amt = Number(amount);
-      const { error } = await supabase.from("transactions").insert({
-        user_id: u.user!.id, type: "transfer", occurred_on: toISODate(new Date()),
+      const res = await offlineInsert("transactions", {
+        type: "transfer", occurred_on: toISODate(new Date()),
         description: desc, wallet_id: from, to_wallet_id: to, amount: amt, currency: w?.currency ?? "MGA",
         exchange_rate: 1, base_amount: amt,
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(res.error ?? "Erreur transfert");
     },
     onSuccess: () => { toast.success("Transfert enregistré"); setOpen(false); setAmount(""); onDone(); },
     onError: (e: Error) => toast.error(e.message),
