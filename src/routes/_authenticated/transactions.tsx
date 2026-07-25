@@ -230,11 +230,9 @@ function TxPage() {
 
   const bulkDel = useMutation({
     mutationFn: async (ids: string[]) => {
-      for (const c of chunk(ids)) {
-        const { error: e1 } = await supabase.from("transaction_tags").delete().in("transaction_id", c);
-        if (e1) throw e1;
-        const { error } = await supabase.from("transactions").delete().in("id", c);
-        if (error) throw error;
+      for (const id of ids) {
+        const res = await offlineDelete("transactions", id);
+        if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
       }
     },
     onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
