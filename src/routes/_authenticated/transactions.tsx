@@ -19,6 +19,9 @@ import { Plus, Pencil, Trash2, X, CheckSquare, Square, Copy } from "lucide-react
 import { Checkbox } from "@/components/ui/checkbox";
 import { fmtDate, fmtMonth, fmtMoney, toISODate } from "@/lib/format";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
+import { syncTagsOffline } from "@/lib/offline/tags";
+import { useOnlineStatus } from "@/lib/offline/hooks";
 
 import { toast } from "sonner";
 
