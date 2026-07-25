@@ -89,7 +89,7 @@ export const pushSync = createServerFn({ method: "POST" })
 
     for (const mutation of data) {
       try {
-        const payload = { ...mutation.payload, user_id: userId, updated_at: new Date().toISOString() };
+        const payload = { ...mutation.payload, user_id: userId, updated_at: new Date().toISOString() } as any;
         const table = mutation.table as string;
         if (mutation.op === "insert") {
           const { error } = await (supabase as any).from(table).insert(payload);
