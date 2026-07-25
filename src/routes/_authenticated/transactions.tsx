@@ -808,7 +808,7 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
       const isProjType = PROJECT_TYPES.has(form.type);
       const isDebtType = DEBT_TYPES.has(form.type);
       const isRecType = RECEIVABLE_TYPES.has(form.type);
-      const { error } = await supabase.from("transactions").update({
+      const patch = {
         type: form.type,
         occurred_on: form.occurred_on,
         description: form.description,
@@ -825,11 +825,14 @@ function EditTxDialog({ tx, wallets, nodes, tags, cps, projects, currentTagIds, 
         notes: form.notes || null,
         debt_id: isDebtType ? (form.debt_id || null) : null,
         receivable_id: isRecType ? (form.receivable_id || null) : null,
-      } as any).eq("id", tx.id);
-      if (error) throw error;
+      };
+      const res = await offlineUpdate("transactions", tx.id, patch);
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
       await syncTags(tx.id, u.user!.id, form.tag_ids);
-      const { logAudit } = await import("@/lib/audit");
-      await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
+      if (!res.queued) {
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit("transaction", tx.id, "update", { type: form.type, amount: amt });
+      }
     },
     onSuccess: () => { toast.success("Transaction mise à jour"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
