@@ -82,16 +82,16 @@ function WalletsPage() {
 
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: any }) => {
-      const { error } = await supabase.from("wallets").update(patch).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("wallets", id, patch);
+      if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("wallets").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("wallets", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["wallets"] }); toast.success("Portefeuille supprimé"); },
     onError: (e: Error) => toast.error(e.message),
