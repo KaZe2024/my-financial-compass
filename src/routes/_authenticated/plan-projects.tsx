@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
@@ -187,7 +187,7 @@ function ProjectDialog({ open, onOpenChange, project }: { open: boolean; onOpenC
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  useMemo(() => {
+  useEffect(() => {
     if (!open) return;
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
