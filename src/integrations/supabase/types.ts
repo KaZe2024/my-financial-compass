@@ -1289,7 +1289,7 @@ export type Database = {
           item_id: string
           tag_id: string
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           created_at?: string
@@ -1373,7 +1373,7 @@ export type Database = {
           type_id?: string | null
           updated_at?: string
           urgent?: boolean
-          user_id: string
+          user_id?: string
         }
         Update: {
           all_day?: boolean
@@ -1455,7 +1455,7 @@ export type Database = {
           start_date?: string | null
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           archived?: boolean
@@ -1488,7 +1488,7 @@ export type Database = {
           id?: string
           name: string
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           color?: string
@@ -1523,7 +1523,7 @@ export type Database = {
           name: string
           sort_order?: number
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           archived?: boolean
