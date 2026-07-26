@@ -25,6 +25,7 @@ import { Route as AuthenticatedProvisionsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPlanningRouteImport } from './routes/_authenticated/planning'
+import { Route as AuthenticatedPlanProjectsRouteImport } from './routes/_authenticated/plan-projects'
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedFxRouteImport } from './routes/_authenticated/fx'
 import { Route as AuthenticatedFridgeRouteImport } from './routes/_authenticated/fridge'
@@ -126,6 +127,12 @@ const AuthenticatedPlanningRoute = AuthenticatedPlanningRouteImport.update({
   path: '/planning',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPlanProjectsRoute =
+  AuthenticatedPlanProjectsRouteImport.update({
+    id: '/plan-projects',
+    path: '/plan-projects',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
   id: '/goals',
   path: '/goals',
@@ -241,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
+  '/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/planning': typeof AuthenticatedPlanningRoute
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -276,6 +284,7 @@ export interface FileRoutesByTo {
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
+  '/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/planning': typeof AuthenticatedPlanningRoute
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -313,6 +322,7 @@ export interface FileRoutesById {
   '/_authenticated/fridge': typeof AuthenticatedFridgeRoute
   '/_authenticated/fx': typeof AuthenticatedFxRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
+  '/_authenticated/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/_authenticated/planning': typeof AuthenticatedPlanningRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
@@ -350,6 +360,7 @@ export interface FileRouteTypes {
     | '/fridge'
     | '/fx'
     | '/goals'
+    | '/plan-projects'
     | '/planning'
     | '/products'
     | '/projects'
@@ -385,6 +396,7 @@ export interface FileRouteTypes {
     | '/fridge'
     | '/fx'
     | '/goals'
+    | '/plan-projects'
     | '/planning'
     | '/products'
     | '/projects'
@@ -421,6 +433,7 @@ export interface FileRouteTypes {
     | '/_authenticated/fridge'
     | '/_authenticated/fx'
     | '/_authenticated/goals'
+    | '/_authenticated/plan-projects'
     | '/_authenticated/planning'
     | '/_authenticated/products'
     | '/_authenticated/projects'
@@ -562,6 +575,13 @@ declare module '@tanstack/react-router' {
       path: '/planning'
       fullPath: '/planning'
       preLoaderRoute: typeof AuthenticatedPlanningRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/plan-projects': {
+      id: '/_authenticated/plan-projects'
+      path: '/plan-projects'
+      fullPath: '/plan-projects'
+      preLoaderRoute: typeof AuthenticatedPlanProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/goals': {
@@ -707,6 +727,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFridgeRoute: typeof AuthenticatedFridgeRoute
   AuthenticatedFxRoute: typeof AuthenticatedFxRoute
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
+  AuthenticatedPlanProjectsRoute: typeof AuthenticatedPlanProjectsRoute
   AuthenticatedPlanningRoute: typeof AuthenticatedPlanningRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
@@ -734,6 +755,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFridgeRoute: AuthenticatedFridgeRoute,
   AuthenticatedFxRoute: AuthenticatedFxRoute,
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
+  AuthenticatedPlanProjectsRoute: AuthenticatedPlanProjectsRoute,
   AuthenticatedPlanningRoute: AuthenticatedPlanningRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
