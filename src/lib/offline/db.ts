@@ -60,6 +60,11 @@ export const SYNCED_TABLES = [
   "ai_insights",
   "chat_conversations",
   "chat_messages",
+  "plan_types",
+  "plan_tags",
+  "plan_projects",
+  "plan_items",
+  "plan_item_tags",
 ] as const;
 
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
