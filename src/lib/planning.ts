@@ -95,7 +95,7 @@ export const qkPlanTypes = ["plan_types"] as const;
 export const planTypesQO = queryOptions({
   queryKey: qkPlanTypes,
   queryFn: async () =>
-    (await fetchAllRows<PlanType>((from, to) =>
+    (await fetchAllRows<any>((from, to) =>
       supabase.from("plan_types").select("*").order("sort_order").order("name").range(from, to),
     )) as PlanType[],
 });
@@ -104,7 +104,7 @@ export const qkPlanTags = ["plan_tags"] as const;
 export const planTagsQO = queryOptions({
   queryKey: qkPlanTags,
   queryFn: async () =>
-    (await fetchAllRows<PlanTag>((from, to) =>
+    (await fetchAllRows<any>((from, to) =>
       supabase.from("plan_tags").select("*").order("name").range(from, to),
     )) as PlanTag[],
 });
@@ -113,7 +113,7 @@ export const qkPlanProjects = ["plan_projects"] as const;
 export const planProjectsQO = queryOptions({
   queryKey: qkPlanProjects,
   queryFn: async () =>
-    (await fetchAllRows<PlanProject>((from, to) =>
+    (await fetchAllRows<any>((from, to) =>
       supabase.from("plan_projects").select("*").order("created_at", { ascending: false }).range(from, to),
     )) as PlanProject[],
 });
@@ -122,7 +122,7 @@ export const qkPlanItems = ["plan_items"] as const;
 export const planItemsQO = queryOptions({
   queryKey: qkPlanItems,
   queryFn: async () =>
-    (await fetchAllRows<PlanItem>((from, to) =>
+    (await fetchAllRows<any>((from, to) =>
       supabase
         .from("plan_items")
         .select("*")
@@ -137,7 +137,7 @@ export const qkPlanItemTags = ["plan_item_tags"] as const;
 export const planItemTagsQO = queryOptions({
   queryKey: qkPlanItemTags,
   queryFn: async () =>
-    (await fetchAllRows<PlanItemTag>((from, to) =>
+    (await fetchAllRows<any>((from, to) =>
       supabase.from("plan_item_tags").select("*").range(from, to),
     )) as PlanItemTag[],
 });
