@@ -8,6 +8,7 @@ export type MutationResult = {
   ok: boolean;
   queued: boolean;
   error?: string;
+  id?: string;
 };
 
 export async function offlineInsert(table: SyncedTable, payload: Record<string, unknown>): Promise<MutationResult> {
@@ -17,7 +18,7 @@ export async function offlineInsert(table: SyncedTable, payload: Record<string, 
     if (online) {
       const { error } = await (supabase as any).from(table).insert(row);
       if (error) throw error;
-      return { ok: true, queued: false };
+      return { ok: true, queued: false, id: String(row.id) };
     }
   } catch (e: any) {
     // Fall through to offline queue on error
@@ -25,7 +26,7 @@ export async function offlineInsert(table: SyncedTable, payload: Record<string, 
   }
   await applyLocalMutation(table, "insert", row);
   await queueMutation(table, "insert", row);
-  return { ok: true, queued: true };
+  return { ok: true, queued: true, id: String(row.id) };
 }
 
 export async function offlineUpdate(table: SyncedTable, id: string, payload: Record<string, unknown>): Promise<MutationResult> {
