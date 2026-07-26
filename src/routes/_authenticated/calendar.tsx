@@ -8,7 +8,7 @@ import { fmtMoney } from "@/lib/format";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
-  head: () => ({ meta: [{ title: "Calendrier — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Calendrier — OPTIS" }] }),
   component: CalendarPage,
 });
 

@@ -18,7 +18,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { computeAssetTotals, computeObligationTotalAsOf, incomeExpenseForPeriod, sumAvailableCash } from "@/lib/finance";
 
 export const Route = createFileRoute("/_authenticated/snapshots")({
-  head: () => ({ meta: [{ title: "Clôture mensuelle — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Clôture mensuelle — OPTIS" }] }),
   component: SnapshotsPage,
 });
 

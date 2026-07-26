@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
-  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette,
+  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -28,6 +28,10 @@ const NAV = [
     { to: "/shopping", label: "Listes d'achat", icon: ShoppingCart },
     { to: "/subscriptions", label: "Abonnements", icon: Repeat },
     { to: "/provisions", label: "Provisions", icon: Wallet2 },
+  ]},
+  { group: "Organisation", items: [
+    { to: "/planning", label: "Planification", icon: ListChecks },
+    { to: "/plan-projects", label: "Projets planifiés", icon: KanbanSquare },
   ]},
   { group: "Planification", items: [
     { to: "/budgets", label: "Budgets", icon: PieChart },
@@ -82,8 +86,8 @@ function Sidebar({ onNav }: { onNav: () => void }) {
       <div className="flex items-center gap-2.5 border-b border-sidebar-border px-5 py-4">
         <div className="grid h-8 w-8 place-items-center rounded-sm bg-primary text-primary-foreground"><Activity className="h-4 w-4" /></div>
         <div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">PERSONAL</div>
-          <div className="text-sm font-semibold leading-none">CFO Terminal</div>
+          <div className="text-sm font-semibold leading-none tracking-[0.18em]">OPTIS</div>
+          <div className="font-mono text-[8px] uppercase leading-tight tracking-[0.12em] text-muted-foreground">Optimized Personal<br />Terminal Intelligent System</div>
         </div>
       </div>
       <nav className="scroll-thin flex-1 overflow-y-auto px-2 py-3">

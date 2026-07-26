@@ -12,7 +12,7 @@ import { Sparkles, Plus, Trash2, Send, Loader2, MessageSquare, Pencil } from "lu
 import { listConversations, getConversation, createConversation, deleteConversation, renameConversation, sendMessage } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/ai")({
-  head: () => ({ meta: [{ title: "Assistant CFO — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Assistant CFO — OPTIS" }] }),
   component: AiPage,
 });
 

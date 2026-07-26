@@ -19,7 +19,7 @@ import { budgetNodesQO, walletsQO } from "@/lib/queries";
 import { logAudit } from "@/lib/audit";
 
 export const Route = createFileRoute("/_authenticated/projects")({
-  head: () => ({ meta: [{ title: "Projets — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Projets — OPTIS" }] }),
   component: ProjectsPage,
 });
 

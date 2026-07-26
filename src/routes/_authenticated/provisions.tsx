@@ -18,7 +18,7 @@ import { Plus, Pencil, Trash2, Wallet, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/provisions")({
-  head: () => ({ meta: [{ title: "Provisions — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Provisions — OPTIS" }] }),
   component: ProvisionsPage,
 });
 

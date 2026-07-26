@@ -32,7 +32,7 @@ function computeAmortization(a: any, refDate = new Date()) {
 }
 
 export const Route = createFileRoute("/_authenticated/assets")({
-  head: () => ({ meta: [{ title: "Actifs — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Actifs — OPTIS" }] }),
   component: AssetsPage,
 });
 

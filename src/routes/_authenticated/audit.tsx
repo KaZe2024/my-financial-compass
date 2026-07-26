@@ -13,7 +13,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/audit")({
-  head: () => ({ meta: [{ title: "Journal d'audit — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Journal d'audit — OPTIS" }] }),
   component: AuditPage,
 });
 

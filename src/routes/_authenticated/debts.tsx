@@ -18,7 +18,7 @@ import { RowActions } from "./assets";
 import { HistoryDialog } from "@/components/history-dialog";
 
 export const Route = createFileRoute("/_authenticated/debts")({
-  head: () => ({ meta: [{ title: "Dettes — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Dettes — OPTIS" }] }),
   component: () => <ObligationsPage table="debts" partyLabel="Créancier" partyField="creditor" title="Dettes" subtitle="Tiers" tone="negative" />,
 });
 

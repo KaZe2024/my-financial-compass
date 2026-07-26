@@ -15,7 +15,7 @@ import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/products")({
-  head: () => ({ meta: [{ title: "Prix produits — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Prix produits — OPTIS" }] }),
   component: ProductsPage,
 });
 

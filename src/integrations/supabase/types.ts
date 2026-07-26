@@ -1274,6 +1274,271 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_item_tags: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          tag_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          tag_id: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          tag_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_item_tags_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_item_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "plan_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_items: {
+        Row: {
+          all_day: boolean
+          completed_at: string | null
+          counterparty_id: string | null
+          created_at: string
+          duration_minutes: number | null
+          end_on: string | null
+          end_time: string | null
+          id: string
+          important: boolean
+          location: string | null
+          no_fixed_time: boolean
+          notes: string | null
+          person_label: string | null
+          priority: string
+          project_id: string | null
+          recurrence: string
+          recurrence_until: string | null
+          reminder_minutes: number | null
+          scheduled_on: string
+          sort_order: number
+          start_time: string | null
+          status: string
+          title: string
+          type_id: string | null
+          updated_at: string
+          urgent: boolean
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          completed_at?: string | null
+          counterparty_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          end_on?: string | null
+          end_time?: string | null
+          id?: string
+          important?: boolean
+          location?: string | null
+          no_fixed_time?: boolean
+          notes?: string | null
+          person_label?: string | null
+          priority?: string
+          project_id?: string | null
+          recurrence?: string
+          recurrence_until?: string | null
+          reminder_minutes?: number | null
+          scheduled_on?: string
+          sort_order?: number
+          start_time?: string | null
+          status?: string
+          title: string
+          type_id?: string | null
+          updated_at?: string
+          urgent?: boolean
+          user_id?: string
+        }
+        Update: {
+          all_day?: boolean
+          completed_at?: string | null
+          counterparty_id?: string | null
+          created_at?: string
+          duration_minutes?: number | null
+          end_on?: string | null
+          end_time?: string | null
+          id?: string
+          important?: boolean
+          location?: string | null
+          no_fixed_time?: boolean
+          notes?: string | null
+          person_label?: string | null
+          priority?: string
+          project_id?: string | null
+          recurrence?: string
+          recurrence_until?: string | null
+          reminder_minutes?: number | null
+          scheduled_on?: string
+          sort_order?: number
+          start_time?: string | null
+          status?: string
+          title?: string
+          type_id?: string | null
+          updated_at?: string
+          urgent?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_items_counterparty_id_fkey"
+            columns: ["counterparty_id"]
+            isOneToOne: false
+            referencedRelation: "counterparties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "plan_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_items_type_id_fkey"
+            columns: ["type_id"]
+            isOneToOne: false
+            referencedRelation: "plan_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plan_projects: {
+        Row: {
+          archived: boolean
+          color: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          name: string
+          priority: string
+          start_date: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name: string
+          priority?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          name?: string
+          priority?: string
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plan_tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plan_types: {
+        Row: {
+          archived: boolean
+          color: string
+          created_at: string
+          icon: string | null
+          id: string
+          in_eisenhower: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          in_eisenhower?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          in_eisenhower?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       product_prices: {
         Row: {
           created_at: string

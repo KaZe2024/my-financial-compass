@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export const Route = createFileRoute("/_authenticated/fx")({
-  head: () => ({ meta: [{ title: "Taux de change — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Taux de change — OPTIS" }] }),
   component: FxPage,
 });
 

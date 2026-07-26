@@ -40,7 +40,7 @@ import {
 } from "@/lib/analytics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — OPTIS" }] }),
   component: Dashboard,
 });
 

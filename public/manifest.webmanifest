@@ -1,6 +1,6 @@
 {
-  "name": "Personal CFO",
-  "short_name": "PCFO",
+  "name": "OPTIS — Optimized Personal Terminal Intelligent System",
+  "short_name": "OPTIS",
   "description": "ERP financier personnel : trésorerie, budget, patrimoine, actifs, projets, investissements et dettes.",
   "start_url": "/",
   "display": "standalone",
