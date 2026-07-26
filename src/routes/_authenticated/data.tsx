@@ -14,7 +14,7 @@ import { toPng } from "html-to-image";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/data")({
-  head: () => ({ meta: [{ title: "Données — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Données — OPTIS" }] }),
   component: DataPage,
 });
 
@@ -192,7 +192,7 @@ function DataPage() {
             <Button variant="outline" onClick={async () => {
               try {
                 const pdf = new jsPDF();
-                pdf.setFontSize(16); pdf.text("Personal CFO — Récapitulatif", 14, 18);
+                pdf.setFontSize(16); pdf.text("OPTIS — Récapitulatif", 14, 18);
                 pdf.setFontSize(10); pdf.text(new Date().toLocaleString("fr-FR"), 14, 26);
                 let y = 38;
                 for (const t of TABLES) {

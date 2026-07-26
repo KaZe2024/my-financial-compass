@@ -18,7 +18,7 @@ import { HistoryDialog } from "@/components/history-dialog";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/counterparties")({
-  head: () => ({ meta: [{ title: "Tiers — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Tiers — OPTIS" }] }),
   component: CounterpartiesPage,
 });
 

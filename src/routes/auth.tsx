@@ -12,7 +12,7 @@ export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>) => ({
     next: typeof s.next === "string" ? s.next : undefined,
   }),
-  head: () => ({ meta: [{ title: "Connexion — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Connexion — OPTIS" }] }),
   component: AuthPage,
 });
 
@@ -83,7 +83,7 @@ function AuthPage() {
         <div className="mb-8 flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-sm bg-primary text-primary-foreground"><Activity className="h-5 w-5" /></div>
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Personal CFO</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">OPTIS</div>
             <div className="text-lg font-semibold">Terminal financier</div>
           </div>
         </div>

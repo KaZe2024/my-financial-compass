@@ -1,4 +1,4 @@
-// Pure analytical helpers for the Personal CFO.
+// Pure analytical helpers for the OPTIS.
 // Net Worth, Cash-Flow Forecast, Financial Health Score, Growth.
 
 export type RecurringCycle = "weekly" | "monthly" | "yearly" | "one_off" | string;

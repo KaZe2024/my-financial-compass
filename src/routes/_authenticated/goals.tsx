@@ -23,7 +23,7 @@ import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/goals")({
-  head: () => ({ meta: [{ title: "Objectifs — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Objectifs — OPTIS" }] }),
   component: GoalsPage,
 });
 

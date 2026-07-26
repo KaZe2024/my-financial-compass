@@ -16,7 +16,7 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
 
 export const Route = createFileRoute("/_authenticated/wallets")({
-  head: () => ({ meta: [{ title: "Portefeuilles — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Portefeuilles — OPTIS" }] }),
   component: WalletsPage,
 });
 

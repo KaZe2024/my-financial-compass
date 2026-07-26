@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { listInsights, dismissInsight, generateInsights } from "@/lib/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/alerts")({
-  head: () => ({ meta: [{ title: "Alertes — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Alertes — OPTIS" }] }),
   component: AlertsPage,
 });
 

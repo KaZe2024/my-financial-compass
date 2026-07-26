@@ -13,7 +13,7 @@ import { fmtDate, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/fridge")({
-  head: () => ({ meta: [{ title: "Gestion frigo — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Gestion frigo — OPTIS" }] }),
   component: FridgePage,
 });
 

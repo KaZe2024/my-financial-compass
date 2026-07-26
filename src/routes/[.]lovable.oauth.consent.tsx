@@ -72,7 +72,7 @@ function Consent() {
     <main className="mx-auto max-w-md p-8 space-y-4">
       <h1 className="text-2xl font-semibold">Connecter {clientName} à votre compte</h1>
       <p className="text-sm text-muted-foreground">
-        {clientName} pourra utiliser Personal CFO en votre nom : lire vos portefeuilles,
+        {clientName} pourra utiliser OPTIS en votre nom : lire vos portefeuilles,
         vos transactions, votre snapshot financier et créer des transactions.
       </p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

@@ -13,7 +13,7 @@ import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/settings")({
-  head: () => ({ meta: [{ title: "Paramètres — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Paramètres — OPTIS" }] }),
   component: SettingsPage,
 });
 

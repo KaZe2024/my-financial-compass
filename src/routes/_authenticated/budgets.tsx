@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/budgets")({
-  head: () => ({ meta: [{ title: "Budgets — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Budgets — OPTIS" }] }),
   component: BudgetsPage,
 });
 

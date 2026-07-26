@@ -26,7 +26,7 @@ import { useOnlineStatus } from "@/lib/offline/hooks";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/transactions")({
-  head: () => ({ meta: [{ title: "Transactions — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Transactions — OPTIS" }] }),
   component: TxPage,
 });
 

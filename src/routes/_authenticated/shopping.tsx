@@ -19,7 +19,7 @@ import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { fetchAllRows } from "@/lib/fetch-all";
 
 export const Route = createFileRoute("/_authenticated/shopping")({
-  head: () => ({ meta: [{ title: "Listes d'achat — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Listes d'achat — OPTIS" }] }),
   component: ShoppingPage,
 });
 

@@ -40,7 +40,7 @@ function nextBilling(current: string | null, cycle: string): string {
 }
 
 export const Route = createFileRoute("/_authenticated/subscriptions")({
-  head: () => ({ meta: [{ title: "Abonnements — Personal CFO" }] }),
+  head: () => ({ meta: [{ title: "Abonnements — OPTIS" }] }),
   component: SubscriptionsPage,
 });
 
