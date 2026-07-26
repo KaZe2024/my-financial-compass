@@ -339,7 +339,7 @@ function PlanningPage() {
       </Panel>
 
       {showEisenhower && (
-        <Panel title="Matrice d'Eisenhower" subtitle="Basée sur les types marqués « Eisenhower »">
+        <Panel title="Matrice d'Eisenhower — types marqués « Eisenhower »">
           <div className="grid gap-3 p-3 md:grid-cols-2">
             {([
               [true, true, "Urgent & Important — Faire maintenant", "border-red-500/40"],
