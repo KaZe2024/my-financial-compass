@@ -82,8 +82,8 @@ function Sidebar({ onNav }: { onNav: () => void }) {
       <div className="flex items-center gap-2.5 border-b border-sidebar-border px-5 py-4">
         <div className="grid h-8 w-8 place-items-center rounded-sm bg-primary text-primary-foreground"><Activity className="h-4 w-4" /></div>
         <div>
-          <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-foreground">PERSONAL</div>
-          <div className="text-sm font-semibold leading-none">CFO Terminal</div>
+          <div className="text-sm font-semibold leading-none tracking-[0.18em]">OPTIS</div>
+          <div className="font-mono text-[8px] uppercase leading-tight tracking-[0.12em] text-muted-foreground">Optimized Personal<br />Terminal Intelligent System</div>
         </div>
       </div>
       <nav className="scroll-thin flex-1 overflow-y-auto px-2 py-3">
