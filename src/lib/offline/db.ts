@@ -65,6 +65,8 @@ export const SYNCED_TABLES = [
   "plan_projects",
   "plan_items",
   "plan_item_tags",
+  "documents",
+  "document_events",
 ] as const;
 
 export type SyncedTable = (typeof SYNCED_TABLES)[number];

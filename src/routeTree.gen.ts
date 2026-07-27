@@ -29,6 +29,7 @@ import { Route as AuthenticatedPlanProjectsRouteImport } from './routes/_authent
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedFxRouteImport } from './routes/_authenticated/fx'
 import { Route as AuthenticatedFridgeRouteImport } from './routes/_authenticated/fridge'
+import { Route as AuthenticatedDocumentsRouteImport } from './routes/_authenticated/documents'
 import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/debts'
 import { Route as AuthenticatedDataRouteImport } from './routes/_authenticated/data'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -148,6 +149,11 @@ const AuthenticatedFridgeRoute = AuthenticatedFridgeRouteImport.update({
   path: '/fridge',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDocumentsRoute = AuthenticatedDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDebtsRoute = AuthenticatedDebtsRouteImport.update({
   id: '/debts',
   path: '/debts',
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data': typeof AuthenticatedDataRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/documents': typeof AuthenticatedDocumentsRoute
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
@@ -281,6 +288,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data': typeof AuthenticatedDataRoute
   '/debts': typeof AuthenticatedDebtsRoute
+  '/documents': typeof AuthenticatedDocumentsRoute
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
@@ -319,6 +327,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/data': typeof AuthenticatedDataRoute
   '/_authenticated/debts': typeof AuthenticatedDebtsRoute
+  '/_authenticated/documents': typeof AuthenticatedDocumentsRoute
   '/_authenticated/fridge': typeof AuthenticatedFridgeRoute
   '/_authenticated/fx': typeof AuthenticatedFxRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
@@ -357,6 +366,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/data'
     | '/debts'
+    | '/documents'
     | '/fridge'
     | '/fx'
     | '/goals'
@@ -393,6 +403,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/data'
     | '/debts'
+    | '/documents'
     | '/fridge'
     | '/fx'
     | '/goals'
@@ -430,6 +441,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/data'
     | '/_authenticated/debts'
+    | '/_authenticated/documents'
     | '/_authenticated/fridge'
     | '/_authenticated/fx'
     | '/_authenticated/goals'
@@ -605,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFridgeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/documents': {
+      id: '/_authenticated/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof AuthenticatedDocumentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/debts': {
       id: '/_authenticated/debts'
       path: '/debts'
@@ -724,6 +743,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDataRoute: typeof AuthenticatedDataRoute
   AuthenticatedDebtsRoute: typeof AuthenticatedDebtsRoute
+  AuthenticatedDocumentsRoute: typeof AuthenticatedDocumentsRoute
   AuthenticatedFridgeRoute: typeof AuthenticatedFridgeRoute
   AuthenticatedFxRoute: typeof AuthenticatedFxRoute
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
@@ -752,6 +772,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDataRoute: AuthenticatedDataRoute,
   AuthenticatedDebtsRoute: AuthenticatedDebtsRoute,
+  AuthenticatedDocumentsRoute: AuthenticatedDocumentsRoute,
   AuthenticatedFridgeRoute: AuthenticatedFridgeRoute,
   AuthenticatedFxRoute: AuthenticatedFxRoute,
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
