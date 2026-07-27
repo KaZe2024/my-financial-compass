@@ -777,6 +777,131 @@ export type Database = {
           },
         ]
       }
+      document_events: {
+        Row: {
+          author: string | null
+          created_at: string
+          description: string | null
+          document_id: string
+          event_type: string
+          id: string
+          location: string | null
+          notes: string | null
+          occurred_at: string
+          title: string
+          updated_at: string
+          user_id: string
+          version: string | null
+        }
+        Insert: {
+          author?: string | null
+          created_at?: string
+          description?: string | null
+          document_id: string
+          event_type?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          occurred_at?: string
+          title: string
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+        }
+        Update: {
+          author?: string | null
+          created_at?: string
+          description?: string | null
+          document_id?: string
+          event_type?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          occurred_at?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_events_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          archived: boolean
+          category: string
+          confidentiality: string
+          created_at: string
+          current_version: string | null
+          description: string | null
+          document_date: string | null
+          due_date: string | null
+          file_type: string | null
+          folder: string | null
+          id: string
+          name: string
+          notes: string | null
+          owner: string | null
+          path_or_link: string | null
+          reference: string | null
+          status: string
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          category?: string
+          confidentiality?: string
+          created_at?: string
+          current_version?: string | null
+          description?: string | null
+          document_date?: string | null
+          due_date?: string | null
+          file_type?: string | null
+          folder?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          owner?: string | null
+          path_or_link?: string | null
+          reference?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          archived?: boolean
+          category?: string
+          confidentiality?: string
+          created_at?: string
+          current_version?: string | null
+          description?: string | null
+          document_date?: string | null
+          due_date?: string | null
+          file_type?: string | null
+          folder?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          owner?: string | null
+          path_or_link?: string | null
+          reference?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           created_at: string
