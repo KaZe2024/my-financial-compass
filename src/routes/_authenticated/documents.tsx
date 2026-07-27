@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetch-all";
@@ -236,8 +236,8 @@ function DocumentsPage() {
                 const evts = eventsByDoc.get(d.id) ?? [];
                 const isOpen = expanded === d.id;
                 return (
-                  <>
-                    <tr key={d.id} className={cn("border-t border-border/60", d.archived && "opacity-60")}>
+                  <Fragment key={d.id}>
+                    <tr className={cn("border-t border-border/60", d.archived && "opacity-60")}>
                       <td className="px-2 py-1.5">
                         <button onClick={() => setExpanded(isOpen ? null : d.id)} aria-label="Historique">
                           {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -287,7 +287,7 @@ function DocumentsPage() {
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr key={`${d.id}-h`} className="border-t border-border/40 bg-muted/30">
+                      <tr className="border-t border-border/40 bg-muted/30">
                         <td />
                         <td colSpan={8} className="px-2 py-3">
                           {d.description && <p className="mb-2 text-xs text-muted-foreground">{d.description}</p>}
@@ -330,7 +330,7 @@ function DocumentsPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>

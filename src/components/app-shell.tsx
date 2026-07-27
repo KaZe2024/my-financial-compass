@@ -32,6 +32,7 @@ const NAV = [
   { group: "Organisation", items: [
     { to: "/planning", label: "Planification", icon: ListChecks },
     { to: "/plan-projects", label: "Projets planifiés", icon: KanbanSquare },
+    { to: "/documents", label: "Suivi documents", icon: FileText },
   ]},
   { group: "Planification", items: [
     { to: "/budgets", label: "Budgets", icon: PieChart },
