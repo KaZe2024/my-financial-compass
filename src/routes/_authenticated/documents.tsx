@@ -80,13 +80,21 @@ function DocumentsPage() {
   const qc = useQueryClient();
   const docs = useQuery({
     queryKey: qkDocs,
-    queryFn: () => fetchAllRows<Doc>((from, to) =>
-      supabase.from("documents").select("*").order("name").range(from, to) as any),
+    queryFn: async () =>
+      (await offlineSelect<any>(
+        "documents",
+        () => fetchAllRows<any>((from, to) => supabase.from("documents").select("*").range(from, to) as any),
+        { sort: byText("name") },
+      )) as Doc[],
   });
   const events = useQuery({
     queryKey: qkEvents,
-    queryFn: () => fetchAllRows<DocEvent>((from, to) =>
-      supabase.from("document_events").select("*").order("occurred_at", { ascending: false }).range(from, to) as any),
+    queryFn: async () =>
+      (await offlineSelect<any>(
+        "document_events",
+        () => fetchAllRows<any>((from, to) => supabase.from("document_events").select("*").range(from, to) as any),
+        { sort: byDateDesc("occurred_at") },
+      )) as DocEvent[],
   });
 
   const [search, setSearch] = useState("");
