@@ -89,15 +89,12 @@ function BudgetsPage() {
 
   const amounts = useQuery({
     queryKey: ["bna", monthStartISO, monthEndExclusive],
-    queryFn: async () =>
-      fetchAllRows((from, to) =>
-        supabase
-          .from("budget_node_amounts")
-          .select("*")
-          .gte("period_month", monthStartISO)
-          .lte("period_month", monthEndExclusive)
-          .range(from, to),
-      ),
+    queryFn: async () => {
+      const rows = await offlineSelect<any>("budget_node_amounts", () =>
+        fetchAllRows<any>((from, to) => supabase.from("budget_node_amounts").select("*").range(from, to)),
+      );
+      return rows.filter((r: any) => r.period_month >= monthStartISO && r.period_month <= monthEndExclusive);
+    },
   });
 
   const spend = useQuery({
