@@ -737,16 +737,15 @@ function AmountDialog({ open, onOpenChange, node, months, amounts, onDone, cur }
 
   const save = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const rows = months.map((m) => ({
-        user_id: u.user!.id,
+        user_id: uid,
         node_id: node!.id,
         period_month: m,
         planned: Number(vals[m]?.planned || 0),
         revised: vals[m]?.revised === "" ? null : Number(vals[m]!.revised),
       }));
-      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
-      if (error) throw error;
+      await upsertNodeAmounts(rows, amounts);
     },
     onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
     onError: (e: Error) => toast.error(e.message),
