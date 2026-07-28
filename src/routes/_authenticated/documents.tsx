@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
+import { offlineSelect, byText, byDateDesc } from "@/lib/offline/read";
 import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, FileText, History, Archive, ArchiveRestore } from "lucide-react";
 import { cn } from "@/lib/utils";
 
