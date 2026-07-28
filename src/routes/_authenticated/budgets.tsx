@@ -19,6 +19,19 @@ import { fetchAllRows } from "@/lib/fetch-all";
 import { offlineSelect } from "@/lib/offline/read";
 import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
 
+/** Upsert offline-safe sur (node_id, period_month) : update si la ligne existe, sinon insert. */
+async function upsertNodeAmounts(rows: any[], existing: any[]) {
+  for (const row of rows) {
+    const found = (existing ?? []).find(
+      (a: any) => a.node_id === row.node_id && a.period_month === row.period_month,
+    );
+    const res = found
+      ? await offlineUpdate("budget_node_amounts", found.id, { planned: row.planned, revised: row.revised })
+      : await offlineInsert("budget_node_amounts", row);
+    if (!res.ok) throw new Error(res.error ?? "Erreur enregistrement");
+  }
+}
+
 // Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
 // que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
 function toLocalISO(d: Date) {
