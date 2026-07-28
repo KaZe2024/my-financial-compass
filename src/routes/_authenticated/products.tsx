@@ -13,6 +13,8 @@ import { Pencil, Archive, ArchiveRestore, Trash2, StickyNote, Check, X } from "l
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineSelect, byText, byDateDesc } from "@/lib/offline/read";
+import { offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
 
 export const Route = createFileRoute("/_authenticated/products")({
   head: () => ({ meta: [{ title: "Prix produits — OPTIS" }] }),
@@ -30,12 +32,15 @@ function ProductsPage() {
   const products = useQuery({
     queryKey: ["products", search, showArchived],
     queryFn: async () => {
-      const rows = await fetchAllRows<any>((from, to) => {
-        let q = supabase.from("products").select("*").order("name").range(from, to);
-        if (search) q = q.ilike("name", `%${search}%`);
-        return q;
-      });
-      return rows.filter((p: any) => showArchived || !p.archived);
+      const rows = await offlineSelect<any>(
+        "products",
+        () => fetchAllRows<any>((from, to) => supabase.from("products").select("*").order("name").range(from, to)),
+        { sort: byText("name") },
+      );
+      return rows.filter((p: any) =>
+        (showArchived || !p.archived) &&
+        (!search || String(p.name ?? "").toLowerCase().includes(search.toLowerCase())),
+      );
     },
   });
 
@@ -43,10 +48,14 @@ function ProductsPage() {
   const prices = useQuery({
     queryKey: ["product_prices", selected],
     enabled: !!selected,
-    queryFn: async () =>
-      await fetchAllRows<any>((from, to) =>
-        supabase.from("product_prices").select("*").eq("product_id", selected!).order("observed_on", { ascending: false }).range(from, to),
-      ),
+    queryFn: async () => {
+      const rows = await offlineSelect<any>(
+        "product_prices",
+        () => fetchAllRows<any>((from, to) => supabase.from("product_prices").select("*").range(from, to)),
+        { sort: byDateDesc("observed_on") },
+      );
+      return rows.filter((p: any) => p.product_id === selected);
+    },
   });
 
 
@@ -58,8 +67,8 @@ function ProductsPage() {
 
   const arch = useMutation({
     mutationFn: async ({ id, on }: { id: string; on: boolean }) => {
-      const { error } = await (supabase as any).from("products").update({ archived: on }).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("products", id, { archived: on });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
       await logAudit("product", id, on ? "archive" : "restore");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Mis à jour"); },
@@ -67,9 +76,14 @@ function ProductsPage() {
   });
   const del = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("product_prices").delete().eq("product_id", id);
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
+      const allPrices = await offlineSelect<any>("product_prices", () =>
+        fetchAllRows<any>((from, to) => supabase.from("product_prices").select("*").range(from, to)),
+      );
+      for (const p of allPrices.filter((x: any) => x.product_id === id)) {
+        await offlineDelete("product_prices", p.id);
+      }
+      const res = await offlineDelete("products", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
       await logAudit("product", id, "delete");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Produit supprimé"); if (selected) setSelected(null); },
@@ -81,12 +95,22 @@ function ProductsPage() {
       const dedup = sourceIds.filter((id) => id !== targetId);
       if (dedup.length === 0) throw new Error("Sélectionnez au moins deux produits différents");
       // Réaffecter l'historique de prix et les items de listes vers le produit cible
-      const { error: e1 } = await (supabase as any).from("product_prices").update({ product_id: targetId }).in("product_id", dedup);
-      if (e1) throw e1;
-      const { error: e2 } = await (supabase as any).from("shopping_list_items").update({ product_id: targetId }).in("product_id", dedup);
-      if (e2) throw e2;
-      const { error: e3 } = await supabase.from("products").delete().in("id", dedup);
-      if (e3) throw e3;
+      const allPrices = await offlineSelect<any>("product_prices", () =>
+        fetchAllRows<any>((from, to) => supabase.from("product_prices").select("*").range(from, to)),
+      );
+      for (const p of allPrices.filter((x: any) => dedup.includes(x.product_id))) {
+        await offlineUpdate("product_prices", p.id, { product_id: targetId });
+      }
+      const allItems = await offlineSelect<any>("shopping_list_items", () =>
+        fetchAllRows<any>((from, to) => supabase.from("shopping_list_items").select("*").range(from, to)),
+      );
+      for (const it of allItems.filter((x: any) => dedup.includes(x.product_id))) {
+        await offlineUpdate("shopping_list_items", it.id, { product_id: targetId });
+      }
+      for (const id of dedup) {
+        const res = await offlineDelete("products", id);
+        if (!res.ok) throw new Error(res.error ?? "Erreur");
+      }
       for (const id of dedup) await logAudit("product", id, "delete", { merged_into: targetId });
     },
     onSuccess: () => {
@@ -98,6 +122,7 @@ function ProductsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   function toggleSelect(id: string) {
     setSelectedIds((s) => {
@@ -230,10 +255,10 @@ function EditProductDialog({ product, onClose, onDone }: { product: any; onClose
   const [form, setForm] = useState({ name: product.name ?? "", unit: product.unit ?? "", notes: product.notes ?? "" });
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("products").update({
+      const res = await offlineUpdate("products", product.id, {
         name: form.name, unit: form.unit || null, notes: form.notes || null,
-      } as any).eq("id", product.id);
-      if (error) throw error;
+      });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
       await logAudit("product", product.id, "update", { before: { name: product.name, unit: product.unit }, after: form });
     },
     onSuccess: () => { toast.success("Produit mis à jour"); onDone(); },
@@ -264,8 +289,8 @@ function PriceNoteCell({ priceId, initial, productId }: { priceId: string; initi
   const [value, setValue] = useState(initial);
   const save = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).from("product_prices").update({ notes: value || null }).eq("id", priceId);
-      if (error) throw error;
+      const res = await offlineUpdate("product_prices", priceId, { notes: value || null });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["product_prices", productId] }); toast.success("Note enregistrée"); setEditing(false); },
     onError: (e: Error) => toast.error(e.message),

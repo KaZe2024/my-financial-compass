@@ -16,6 +16,21 @@ import { profileQO, budgetNodesQO } from "@/lib/queries";
 import { buildTree, flattenTree, pathLabel, computeSubtotals, type TreeNode, type BudgetNode } from "@/lib/budget-nodes";
 import { fmtMoney, fmtPct, monthStart } from "@/lib/format";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineSelect } from "@/lib/offline/read";
+import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
+
+/** Upsert offline-safe sur (node_id, period_month) : update si la ligne existe, sinon insert. */
+async function upsertNodeAmounts(rows: any[], existing: any[]) {
+  for (const row of rows) {
+    const found = (existing ?? []).find(
+      (a: any) => a.node_id === row.node_id && a.period_month === row.period_month,
+    );
+    const res = found
+      ? await offlineUpdate("budget_node_amounts", found.id, { planned: row.planned, revised: row.revised })
+      : await offlineInsert("budget_node_amounts", row);
+    if (!res.ok) throw new Error(res.error ?? "Erreur enregistrement");
+  }
+}
 
 // Local (non-UTC) YYYY-MM-DD — évite les décalages de fuseau qui faisaient
 // que "Annuel 2026" commençait au 2025-12-31 sur UTC+3.
@@ -89,15 +104,12 @@ function BudgetsPage() {
 
   const amounts = useQuery({
     queryKey: ["bna", monthStartISO, monthEndExclusive],
-    queryFn: async () =>
-      fetchAllRows((from, to) =>
-        supabase
-          .from("budget_node_amounts")
-          .select("*")
-          .gte("period_month", monthStartISO)
-          .lte("period_month", monthEndExclusive)
-          .range(from, to),
-      ),
+    queryFn: async () => {
+      const rows = await offlineSelect<any>("budget_node_amounts", () =>
+        fetchAllRows<any>((from, to) => supabase.from("budget_node_amounts").select("*").range(from, to)),
+      );
+      return rows.filter((r: any) => r.period_month >= monthStartISO && r.period_month <= monthEndExclusive);
+    },
   });
 
   const spend = useQuery({
@@ -203,14 +215,14 @@ function BudgetsPage() {
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const siblings = (nodesQ.data ?? []).filter((n) => n.parent_id === input.parent_id);
       const sort_order = (siblings.reduce((max, n) => Math.max(max, n.sort_order), -1) + 1);
-      const { error } = await supabase.from("budget_nodes").insert({
-        user_id: u.user!.id, name: input.name.trim(), parent_id: input.parent_id,
+      const res = await offlineInsert("budget_nodes", {
+        user_id: uid, name: input.name.trim(), parent_id: input.parent_id,
         is_income: input.is_income, sort_order, kind: input.kind,
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Créé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); setCreatingUnder(null); },
     onError: (e: Error) => toast.error(e.message),
@@ -218,8 +230,8 @@ function BudgetsPage() {
 
   const updateNode = useMutation({
     mutationFn: async (input: { id: string; patch: Partial<BudgetNode> }) => {
-      const { error } = await supabase.from("budget_nodes").update(input.patch).eq("id", input.id);
-      if (error) throw error;
+      const res = await offlineUpdate("budget_nodes", input.id, input.patch as Record<string, unknown>);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
     onError: (e: Error) => toast.error(e.message),
@@ -227,8 +239,8 @@ function BudgetsPage() {
 
   const deleteNode = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("budget_nodes").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("budget_nodes", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Supprimé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); qc.invalidateQueries({ queryKey: ["bna"] }); },
     onError: (e: Error) => toast.error(e.message),
@@ -251,12 +263,12 @@ function BudgetsPage() {
         const wantSort = i * 10;
         if (n.id === moved.id) {
           if (moved.parent_id !== newParentId || moved.sort_order !== wantSort) {
-            const { error } = await supabase.from("budget_nodes").update({ parent_id: newParentId, sort_order: wantSort }).eq("id", n.id);
-            if (error) throw error;
+            const res = await offlineUpdate("budget_nodes", n.id, { parent_id: newParentId, sort_order: wantSort });
+            if (!res.ok) throw new Error(res.error ?? "Erreur");
           }
         } else if (n.sort_order !== wantSort) {
-          const { error } = await supabase.from("budget_nodes").update({ sort_order: wantSort }).eq("id", n.id);
-          if (error) throw error;
+          const res = await offlineUpdate("budget_nodes", n.id, { sort_order: wantSort });
+          if (!res.ok) throw new Error(res.error ?? "Erreur");
         }
       }
     },
@@ -738,16 +750,15 @@ function AmountDialog({ open, onOpenChange, node, months, amounts, onDone, cur }
 
   const save = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const rows = months.map((m) => ({
-        user_id: u.user!.id,
+        user_id: uid,
         node_id: node!.id,
         period_month: m,
         planned: Number(vals[m]?.planned || 0),
         revised: vals[m]?.revised === "" ? null : Number(vals[m]!.revised),
       }));
-      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
-      if (error) throw error;
+      await upsertNodeAmounts(rows, amounts);
     },
     onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -812,7 +823,7 @@ function BulkAmountDialog({ open, onOpenChange, nodes, months, amounts, onDone, 
 
   const save = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const rows: any[] = [];
       for (const n of nodes) {
         for (const m of months) {
@@ -821,13 +832,12 @@ function BulkAmountDialog({ open, onOpenChange, nodes, months, amounts, onDone, 
           if (raw === undefined) continue;
           const num = raw === "" ? 0 : Number(raw);
           if (Number.isNaN(num)) continue;
-          rows.push({ user_id: u.user!.id, node_id: n.id, period_month: m, planned: num, revised: null });
+          rows.push({ user_id: uid, node_id: n.id, period_month: m, planned: num, revised: null });
         }
       }
       if (!rows.length) return;
-      // Upsert replaces (no cumul) via unique key (node_id, period_month).
-      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
-      if (error) throw error;
+      // Remplacement (pas de cumul) sur la clé (node_id, period_month).
+      await upsertNodeAmounts(rows, amounts);
     },
     onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
     onError: (e: Error) => toast.error(e.message),

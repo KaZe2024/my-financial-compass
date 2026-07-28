@@ -17,6 +17,10 @@ import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { fetchAllRows } from "@/lib/fetch-all";
+import { offlineSelect, byText } from "@/lib/offline/read";
+import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
+import { addTagsOffline } from "@/lib/offline/tags";
+import { v4 as uuidv4 } from "uuid";
 
 export const Route = createFileRoute("/_authenticated/shopping")({
   head: () => ({ meta: [{ title: "Listes d'achat — OPTIS" }] }),
@@ -34,8 +38,10 @@ function ShoppingPage() {
   const tags = useQuery({
     queryKey: ["analytical_tags"],
     queryFn: async () =>
-      await fetchAllRows<any>((from, to) =>
-        supabase.from("analytical_tags").select("*").order("name").range(from, to),
+      await offlineSelect<any>(
+        "analytical_tags",
+        () => fetchAllRows<any>((from, to) => supabase.from("analytical_tags").select("*").order("name").range(from, to)),
+        { sort: byText("name") },
       ),
   });
 
@@ -46,15 +52,25 @@ function ShoppingPage() {
 
   const lists = useQuery({
     queryKey: ["shopping_lists", showArchived],
-    queryFn: async () =>
-      (await fetchAllRows<any>((from, to) =>
-        supabase
-          .from("shopping_lists")
-          .select("*, shopping_list_items(*)")
-          .order("occurred_on", { ascending: false })
-          .range(from, to),
-      )).filter((l: any) => showArchived || !l.archived),
+    queryFn: async () => {
+      const [rawLists, rawItems] = await Promise.all([
+        offlineSelect<any>("shopping_lists", () =>
+          fetchAllRows<any>((from, to) =>
+            supabase.from("shopping_lists").select("*").order("occurred_on", { ascending: false }).range(from, to),
+          ),
+        ),
+        offlineSelect<any>("shopping_list_items", () =>
+          fetchAllRows<any>((from, to) => supabase.from("shopping_list_items").select("*").range(from, to)),
+        ),
+      ]);
+      return rawLists
+        .map((l: any) => ({ ...l, shopping_list_items: rawItems.filter((it: any) => it.list_id === l.id) }))
+        .filter((l: any) => showArchived || !l.archived)
+        .sort((a: any, b: any) => String(b.occurred_on).localeCompare(String(a.occurred_on)));
+    },
   });
+
+
 
 
   return (
@@ -125,8 +141,8 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
 
   const toggleChecked = useMutation({
     mutationFn: async ({ id, checked }: { id: string; checked: boolean }) => {
-      const { error } = await supabase.from("shopping_list_items").update({ checked }).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("shopping_list_items", id, { checked });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: onChange,
     onError: (e: Error) => toast.error(e.message),
@@ -134,9 +150,11 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
 
   const removeList = useMutation({
     mutationFn: async () => {
-      await supabase.from("shopping_list_items").delete().eq("list_id", list.id);
-      const { error } = await supabase.from("shopping_lists").delete().eq("id", list.id);
-      if (error) throw error;
+      for (const it of list.shopping_list_items ?? []) {
+        await offlineDelete("shopping_list_items", it.id);
+      }
+      const res = await offlineDelete("shopping_lists", list.id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
     },
     onSuccess: () => { toast.success("Liste supprimée"); onChange(); },
     onError: (e: Error) => toast.error(e.message),
@@ -144,8 +162,8 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
 
   const archiveList = useMutation({
     mutationFn: async () => {
-      const { error } = await (supabase as any).from("shopping_lists").update({ archived: !list.archived }).eq("id", list.id);
-      if (error) throw error;
+      const res = await offlineUpdate("shopping_lists", list.id, { archived: !list.archived });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success(list.archived ? "Liste restaurée" : "Liste archivée"); onChange(); },
     onError: (e: Error) => toast.error(e.message),
@@ -160,29 +178,30 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
         const q = Number(i.quantity || 0);
         return q > 1 ? `${i.product_name} ×${q}` : i.product_name;
       }).join(" + ");
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const desc = list.title || list.store || "Courses";
 
       // Tiers = Magasin
       let cpId: string | null = null;
       const storeName = (list.store ?? "").trim();
       if (storeName) {
-        const { data: cps } = await supabase.from("counterparties").select("id,name");
-        const existing = (cps ?? []).find((c: any) => (c.name ?? "").toLowerCase() === storeName.toLowerCase());
+        const cps = await offlineSelect<any>("counterparties", () =>
+          fetchAllRows<any>((from, to) => supabase.from("counterparties").select("*").range(from, to)),
+        );
+        const existing = cps.find((c: any) => (c.name ?? "").toLowerCase() === storeName.toLowerCase());
         if (existing) {
           cpId = existing.id;
         } else {
-          const { data: created, error: cerr } = await supabase
-            .from("counterparties")
-            .insert({ user_id: u.user!.id, name: storeName })
-            .select("id").single();
-          if (cerr) throw cerr;
-          cpId = created.id;
+          const res = await offlineInsert("counterparties", { id: uuidv4(), user_id: uid, name: storeName });
+          if (!res.ok) throw new Error(res.error ?? "Erreur tiers");
+          cpId = String(res.id);
         }
       }
 
-      const { data: tx, error: terr } = await supabase.from("transactions").insert({
-        user_id: u.user!.id,
+      const txId = uuidv4();
+      const txRes = await offlineInsert("transactions", {
+        id: txId,
+        user_id: uid,
         type: "expense",
         occurred_on: list.occurred_on,
         description: desc,
@@ -195,13 +214,14 @@ function ListCard({ list, wallets, nodes, tags, nodePath, onChange }: {
         counterparty_id: cpId,
         counterparty_label: storeName || null,
         notes,
-      }).select("id").single();
-      if (terr) throw terr;
+      });
+      if (!txRes.ok) throw new Error(txRes.error ?? "Erreur transaction");
       const tagIds: string[] = list.tag_ids ?? [];
       if (tagIds.length) {
-        await supabase.from("transaction_tags").insert(tagIds.map((tag_id) => ({ transaction_id: tx.id, tag_id, user_id: u.user!.id })));
+        await addTagsOffline("transaction_tags", txId, tagIds, "transaction_id");
       }
-      await supabase.from("shopping_lists").update({ transaction_id: tx.id, total: amount }).eq("id", list.id);
+      await offlineUpdate("shopping_lists", list.id, { transaction_id: txId, total: amount });
+
     },
     onSuccess: () => { toast.success("Envoyé vers transactions"); onChange(); qc.invalidateQueries({ queryKey: ["counterparties"] }); },
     onError: (e: Error) => toast.error(e.message),
@@ -305,13 +325,13 @@ function EditMetaDialog({ list, wallets, nodes, tags, onClose, onDone }: {
 
   const m = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("shopping_lists").update({
+      const res = await offlineUpdate("shopping_lists", list.id, {
         title: title || null,
         wallet_id: walletId || null,
         budget_node_id: nodeId,
         tag_ids: tagIds,
-      }).eq("id", list.id);
-      if (error) throw error;
+      });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Liste mise à jour"); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -357,13 +377,13 @@ function DefaultsDialog({ profile, wallets, nodes, tags, onDone }: {
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("profiles").update({
+      const uid = await currentUserId();
+      const res = await offlineUpdate("profiles", uid, {
         shopping_default_wallet_id: walletId || null,
         shopping_default_node_id: nodeId,
         shopping_default_tag_ids: tagIds,
-      }).eq("id", u.user!.id);
-      if (error) throw error;
+      });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Défauts enregistrés"); setOpen(false); onDone(); },
     onError: (e: Error) => toast.error(e.message),
@@ -412,12 +432,14 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
     queryKey: ["product_suggest"],
     enabled: open,
     queryFn: async () => {
-      const products = await fetchAllRows<any>((from, to) =>
-        supabase.from("products").select("id,name,unit,archived").order("name").range(from, to),
+      const products = await offlineSelect<any>(
+        "products",
+        () => fetchAllRows<any>((from, to) => supabase.from("products").select("*").order("name").range(from, to)),
+        { sort: byText("name") },
       );
-      const prices = await fetchAllRows<any>((from, to) =>
-        supabase.from("product_prices").select("product_id,unit_price,currency").eq("currency", "MGA").range(from, to),
-      );
+      const prices = (await offlineSelect<any>("product_prices", () =>
+        fetchAllRows<any>((from, to) => supabase.from("product_prices").select("*").range(from, to)),
+      )).filter((p: any) => p.currency === "MGA");
       const priceStats = new Map<string, { total: number; count: number }>();
       for (const p of prices) {
         const unitPrice = Number(p.unit_price);
@@ -482,22 +504,27 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
   const m = useMutation({
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Titre requis");
-      const { data: u } = await supabase.auth.getUser();
-      const uid = u.user!.id;
+      const uid = await currentUserId();
+
+      const catalog = await offlineSelect<any>("products", () =>
+        fetchAllRows<any>((from, to) => supabase.from("products").select("*").range(from, to)),
+      );
 
       const productIds: Record<string, string> = {};
       for (const it of items) {
         if (!it.product_name.trim()) continue;
         const suggestion = suggestByName.get(it.product_name.trim().toLowerCase());
         if (suggestion?.id) { productIds[it.product_name] = suggestion.id; continue; }
-        const { data: existing } = await supabase.from("products").select("id,name").ilike("name", it.product_name.trim()).limit(1).maybeSingle();
+        const existing = catalog.find((p: any) => (p.name ?? "").trim().toLowerCase() === it.product_name.trim().toLowerCase());
         if (existing?.id) { productIds[it.product_name] = existing.id; continue; }
-        const { data: created, error } = await supabase.from("products").insert({ user_id: uid, name: it.product_name, unit: it.unit || null }).select("id").single();
-        if (error) throw error;
-        productIds[it.product_name] = created.id;
+        const res = await offlineInsert("products", { id: uuidv4(), user_id: uid, name: it.product_name, unit: it.unit || null });
+        if (!res.ok) throw new Error(res.error ?? "Erreur produit");
+        productIds[it.product_name] = String(res.id);
       }
 
-      const { data: list, error: lerr } = await supabase.from("shopping_lists").insert({
+      const listId = uuidv4();
+      const lres = await offlineInsert("shopping_lists", {
+        id: listId,
         user_id: uid,
         title,
         store: store || null,
@@ -507,20 +534,23 @@ function AddListDialog({ profile, wallets, nodes, tags, onDone }: {
         wallet_id: walletId || null,
         budget_node_id: nodeId,
         tag_ids: tagIds,
-      }).select("id").single();
-      if (lerr) throw lerr;
+      });
+      if (!lres.ok) throw new Error(lres.error ?? "Erreur liste");
 
-      const itemsRows = items.filter((it) => it.product_name.trim()).map((it) => ({
-        user_id: uid, list_id: list.id, product_id: it.product_id || productIds[it.product_name],
-        product_name: it.product_name, unit: it.unit || null,
-        quantity: Number(it.quantity || 0),
-        unit_price: Number(it.unit_price || 0),
-        total: Number(it.quantity || 0) * Number(it.unit_price || 0),
-        checked: false,
-      }));
-      if (itemsRows.length) {
-        const { error: ierr } = await supabase.from("shopping_list_items").insert(itemsRows);
-        if (ierr) throw ierr;
+      for (const it of items.filter((x) => x.product_name.trim())) {
+        const res = await offlineInsert("shopping_list_items", {
+          id: uuidv4(),
+          user_id: uid,
+          list_id: listId,
+          product_id: it.product_id || productIds[it.product_name],
+          product_name: it.product_name,
+          unit: it.unit || null,
+          quantity: Number(it.quantity || 0),
+          unit_price: Number(it.unit_price || 0),
+          total: Number(it.quantity || 0) * Number(it.unit_price || 0),
+          checked: false,
+        });
+        if (!res.ok) throw new Error(res.error ?? "Erreur ligne");
       }
     },
     onSuccess: () => {
