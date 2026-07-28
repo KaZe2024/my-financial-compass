@@ -250,12 +250,12 @@ function BudgetsPage() {
         const wantSort = i * 10;
         if (n.id === moved.id) {
           if (moved.parent_id !== newParentId || moved.sort_order !== wantSort) {
-            const { error } = await supabase.from("budget_nodes").update({ parent_id: newParentId, sort_order: wantSort }).eq("id", n.id);
-            if (error) throw error;
+            const res = await offlineUpdate("budget_nodes", n.id, { parent_id: newParentId, sort_order: wantSort });
+            if (!res.ok) throw new Error(res.error ?? "Erreur");
           }
         } else if (n.sort_order !== wantSort) {
-          const { error } = await supabase.from("budget_nodes").update({ sort_order: wantSort }).eq("id", n.id);
-          if (error) throw error;
+          const res = await offlineUpdate("budget_nodes", n.id, { sort_order: wantSort });
+          if (!res.ok) throw new Error(res.error ?? "Erreur");
         }
       }
     },
