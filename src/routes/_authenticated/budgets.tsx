@@ -217,8 +217,8 @@ function BudgetsPage() {
 
   const updateNode = useMutation({
     mutationFn: async (input: { id: string; patch: Partial<BudgetNode> }) => {
-      const { error } = await supabase.from("budget_nodes").update(input.patch).eq("id", input.id);
-      if (error) throw error;
+      const res = await offlineUpdate("budget_nodes", input.id, input.patch as Record<string, unknown>);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["budget_nodes"] }); },
     onError: (e: Error) => toast.error(e.message),
