@@ -11,6 +11,25 @@ export type MutationResult = {
   id?: string;
 };
 
+const UID_KEY = "optis-user-id";
+
+/** Works offline: reads the persisted Supabase session instead of hitting the network. */
+export async function currentUserId(): Promise<string> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const id = data.session?.user?.id;
+    if (id) {
+      if (typeof localStorage !== "undefined") localStorage.setItem(UID_KEY, id);
+      return id;
+    }
+  } catch {
+    /* ignore, fall back to cache */
+  }
+  const cached = typeof localStorage !== "undefined" ? localStorage.getItem(UID_KEY) : null;
+  if (cached) return cached;
+  throw new Error("Utilisateur non authentifié");
+}
+
 export async function offlineInsert(table: SyncedTable, payload: Record<string, unknown>): Promise<MutationResult> {
   const row = { ...payload, id: payload.id ?? uuidv4(), updated_at: new Date().toISOString() };
   try {

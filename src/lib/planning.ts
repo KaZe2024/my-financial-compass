@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { offlineSelect, byText, byDateDesc } from "@/lib/offline/read";
 import { queryOptions } from "@tanstack/react-query";
 import { fetchAllRows } from "@/lib/fetch-all";
 
@@ -95,8 +96,10 @@ export const qkPlanTypes = ["plan_types"] as const;
 export const planTypesQO = queryOptions({
   queryKey: qkPlanTypes,
   queryFn: async () =>
-    (await fetchAllRows<any>((from, to) =>
-      supabase.from("plan_types").select("*").order("sort_order").order("name").range(from, to),
+    (await offlineSelect<any>(
+      "plan_types",
+      () => fetchAllRows<any>((from, to) => supabase.from("plan_types").select("*").range(from, to)),
+      { sort: (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.name ?? "").localeCompare(String(b.name ?? "")) },
     )) as PlanType[],
 });
 
@@ -104,8 +107,10 @@ export const qkPlanTags = ["plan_tags"] as const;
 export const planTagsQO = queryOptions({
   queryKey: qkPlanTags,
   queryFn: async () =>
-    (await fetchAllRows<any>((from, to) =>
-      supabase.from("plan_tags").select("*").order("name").range(from, to),
+    (await offlineSelect<any>(
+      "plan_tags",
+      () => fetchAllRows<any>((from, to) => supabase.from("plan_tags").select("*").range(from, to)),
+      { sort: byText("name") },
     )) as PlanTag[],
 });
 
@@ -113,8 +118,10 @@ export const qkPlanProjects = ["plan_projects"] as const;
 export const planProjectsQO = queryOptions({
   queryKey: qkPlanProjects,
   queryFn: async () =>
-    (await fetchAllRows<any>((from, to) =>
-      supabase.from("plan_projects").select("*").order("created_at", { ascending: false }).range(from, to),
+    (await offlineSelect<any>(
+      "plan_projects",
+      () => fetchAllRows<any>((from, to) => supabase.from("plan_projects").select("*").range(from, to)),
+      { sort: byDateDesc("created_at") },
     )) as PlanProject[],
 });
 
@@ -122,14 +129,15 @@ export const qkPlanItems = ["plan_items"] as const;
 export const planItemsQO = queryOptions({
   queryKey: qkPlanItems,
   queryFn: async () =>
-    (await fetchAllRows<any>((from, to) =>
-      supabase
-        .from("plan_items")
-        .select("*")
-        .order("scheduled_on", { ascending: true })
-        .order("start_time", { ascending: true, nullsFirst: true })
-        .order("sort_order", { ascending: true })
-        .range(from, to),
+    (await offlineSelect<any>(
+      "plan_items",
+      () => fetchAllRows<any>((from, to) => supabase.from("plan_items").select("*").range(from, to)),
+      {
+        sort: (a: any, b: any) =>
+          String(a.scheduled_on ?? "").localeCompare(String(b.scheduled_on ?? "")) ||
+          String(a.start_time ?? "").localeCompare(String(b.start_time ?? "")) ||
+          (a.sort_order ?? 0) - (b.sort_order ?? 0),
+      },
     )) as PlanItem[],
 });
 
@@ -137,10 +145,11 @@ export const qkPlanItemTags = ["plan_item_tags"] as const;
 export const planItemTagsQO = queryOptions({
   queryKey: qkPlanItemTags,
   queryFn: async () =>
-    (await fetchAllRows<any>((from, to) =>
-      supabase.from("plan_item_tags").select("*").range(from, to),
+    (await offlineSelect<any>("plan_item_tags", () =>
+      fetchAllRows<any>((from, to) => supabase.from("plan_item_tags").select("*").range(from, to)),
     )) as PlanItemTag[],
 });
+
 
 /* ---------- date helpers (local, no timezone shift) ---------- */
 

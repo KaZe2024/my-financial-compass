@@ -11,6 +11,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Refrigerator, GripVertical, Archive, ArchiveRestore } from "lucide-react";
 import { fmtDate, toISODate } from "@/lib/format";
 import { toast } from "sonner";
+import { offlineSelect, byDateDesc } from "@/lib/offline/read";
+import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
 
 export const Route = createFileRoute("/_authenticated/fridge")({
   head: () => ({ meta: [{ title: "Gestion frigo — OPTIS" }] }),
@@ -41,26 +43,29 @@ function FridgePage() {
 
   const items = useQuery({
     queryKey: ["fridge_items"],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("fridge_items")
-        .select("*")
-        .order("added_on", { ascending: false });
-      if (error) throw error;
-      return data as any[];
-    },
+    queryFn: async () =>
+      await offlineSelect<any>(
+        "fridge_items",
+        async () => {
+          const { data, error } = await (supabase as any).from("fridge_items").select("*");
+          if (error) throw error;
+          return data as any[];
+        },
+        { sort: byDateDesc("added_on") },
+      ),
   });
 
   const entries = useQuery({
     queryKey: ["meal_plan_entries", weekIso],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("meal_plan_entries")
-        .select("*")
-        .eq("week_start", weekIso)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return data as any[];
+      const rows = await offlineSelect<any>("meal_plan_entries", async () => {
+        const { data, error } = await (supabase as any).from("meal_plan_entries").select("*");
+        if (error) throw error;
+        return data as any[];
+      });
+      return rows
+        .filter((e: any) => e.week_start === weekIso)
+        .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     },
   });
 
@@ -68,11 +73,11 @@ function FridgePage() {
 
   const addEntry = useMutation({
     mutationFn: async (payload: { day: number; label: string; fridge_item_id: string | null }) => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const list = (entries.data ?? []).filter((e) => e.day_of_week === payload.day);
       const nextOrder = list.reduce((m, e) => Math.max(m, e.sort_order ?? 0), 0) + 1;
-      const { error } = await (supabase as any).from("meal_plan_entries").insert({
-        user_id: u.user!.id,
+      const res = await offlineInsert("meal_plan_entries", {
+        user_id: uid,
         week_start: weekIso,
         day_of_week: payload.day,
         slot: "lunch",
@@ -80,7 +85,7 @@ function FridgePage() {
         fridge_item_id: payload.fridge_item_id,
         sort_order: nextOrder,
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries", weekIso] }),
     onError: (e: Error) => toast.error(e.message),
@@ -88,8 +93,8 @@ function FridgePage() {
 
   const updateEntry = useMutation({
     mutationFn: async ({ id, label }: { id: string; label: string }) => {
-      const { error } = await (supabase as any).from("meal_plan_entries").update({ label }).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("meal_plan_entries", id, { label });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["meal_plan_entries", weekIso] }); setEntryEdit(null); },
     onError: (e: Error) => toast.error(e.message),
@@ -97,8 +102,8 @@ function FridgePage() {
 
   const moveEntry = useMutation({
     mutationFn: async ({ id, day, week }: { id: string; day: number; week: string }) => {
-      const { error } = await (supabase as any).from("meal_plan_entries").update({ day_of_week: day, week_start: week }).eq("id", id);
-      if (error) throw error;
+      const res = await offlineUpdate("meal_plan_entries", id, { day_of_week: day, week_start: week });
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries"] }),
     onError: (e: Error) => toast.error(e.message),
@@ -106,12 +111,13 @@ function FridgePage() {
 
   const delEntry = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from("meal_plan_entries").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("meal_plan_entries", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["meal_plan_entries", weekIso] }),
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   const byDay = useMemo(() => {
     const m = new Map<number, any[]>();
@@ -160,8 +166,8 @@ function FridgePage() {
     await addEntry.mutateAsync({ day, label, fridge_item_id: item.id });
     if (qty != null && available != null) {
       const remaining = Math.max(0, available - qty);
-      const { error } = await (supabase as any).from("fridge_items").update({ quantity: remaining }).eq("id", item.id);
-      if (error) toast.error(error.message);
+      const res = await offlineUpdate("fridge_items", item.id, { quantity: remaining });
+      if (!res.ok) toast.error(res.error ?? "Erreur");
       qc.invalidateQueries({ queryKey: ["fridge_items"] });
     }
     setPendingDrop(null);
@@ -329,14 +335,14 @@ function FridgePage() {
 }
 
 async function toggleArchive(it: any, qc: any) {
-  const { error } = await (supabase as any).from("fridge_items").update({ archived: !it.archived }).eq("id", it.id);
-  if (error) return toast.error(error.message);
+  const res = await offlineUpdate("fridge_items", it.id, { archived: !it.archived });
+  if (!res.ok) return toast.error(res.error ?? "Erreur");
   qc.invalidateQueries({ queryKey: ["fridge_items"] });
 }
 
 async function deleteItem(id: string, qc: any) {
-  const { error } = await (supabase as any).from("fridge_items").delete().eq("id", id);
-  if (error) return toast.error(error.message);
+  const res = await offlineDelete("fridge_items", id);
+  if (!res.ok) return toast.error(res.error ?? "Erreur");
   qc.invalidateQueries({ queryKey: ["fridge_items"] });
 }
 
@@ -353,9 +359,9 @@ function FridgeItemDialog({ editingItem, onDone, onClose }: { editingItem?: any;
 
   const m = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const payload: any = {
-        user_id: u.user!.id,
+        user_id: uid,
         name: form.name.trim(),
         quantity: form.quantity ? Number(form.quantity) : null,
         unit: form.unit || null,
@@ -363,17 +369,15 @@ function FridgeItemDialog({ editingItem, onDone, onClose }: { editingItem?: any;
         expires_on: form.expires_on || null,
         notes: form.notes || null,
       };
-      if (editingItem) {
-        const { error } = await (supabase as any).from("fridge_items").update(payload).eq("id", editingItem.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from("fridge_items").insert(payload);
-        if (error) throw error;
-      }
+      const res = editingItem
+        ? await offlineUpdate("fridge_items", editingItem.id, payload)
+        : await offlineInsert("fridge_items", payload);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success(editingItem ? "Mis à jour" : "Ajouté"); setOpen(false); onClose?.(); onDone(); },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   return (
     <Dialog open={editingItem ? true : open} onOpenChange={(v) => { setOpen(v); if (!v) onClose?.(); }}>
