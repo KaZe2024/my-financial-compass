@@ -226,8 +226,8 @@ function BudgetsPage() {
 
   const deleteNode = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("budget_nodes").delete().eq("id", id);
-      if (error) throw error;
+      const res = await offlineDelete("budget_nodes", id);
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Supprimé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); qc.invalidateQueries({ queryKey: ["bna"] }); },
     onError: (e: Error) => toast.error(e.message),
