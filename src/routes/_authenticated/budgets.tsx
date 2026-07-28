@@ -810,7 +810,7 @@ function BulkAmountDialog({ open, onOpenChange, nodes, months, amounts, onDone, 
 
   const save = useMutation({
     mutationFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const rows: any[] = [];
       for (const n of nodes) {
         for (const m of months) {
@@ -819,13 +819,12 @@ function BulkAmountDialog({ open, onOpenChange, nodes, months, amounts, onDone, 
           if (raw === undefined) continue;
           const num = raw === "" ? 0 : Number(raw);
           if (Number.isNaN(num)) continue;
-          rows.push({ user_id: u.user!.id, node_id: n.id, period_month: m, planned: num, revised: null });
+          rows.push({ user_id: uid, node_id: n.id, period_month: m, planned: num, revised: null });
         }
       }
       if (!rows.length) return;
-      // Upsert replaces (no cumul) via unique key (node_id, period_month).
-      const { error } = await supabase.from("budget_node_amounts").upsert(rows, { onConflict: "node_id,period_month" });
-      if (error) throw error;
+      // Remplacement (pas de cumul) sur la clé (node_id, period_month).
+      await upsertNodeAmounts(rows, amounts);
     },
     onSuccess: () => { toast.success("Montants enregistrés"); qc.invalidateQueries({ queryKey: ["bna"] }); onDone(); },
     onError: (e: Error) => toast.error(e.message),
