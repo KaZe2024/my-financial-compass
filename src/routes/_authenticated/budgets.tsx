@@ -202,14 +202,14 @@ function BudgetsPage() {
 
   const createNode = useMutation({
     mutationFn: async (input: { name: string; parent_id: string | null; is_income: boolean; kind: "normal" | "subtotal" }) => {
-      const { data: u } = await supabase.auth.getUser();
+      const uid = await currentUserId();
       const siblings = (nodesQ.data ?? []).filter((n) => n.parent_id === input.parent_id);
       const sort_order = (siblings.reduce((max, n) => Math.max(max, n.sort_order), -1) + 1);
-      const { error } = await supabase.from("budget_nodes").insert({
-        user_id: u.user!.id, name: input.name.trim(), parent_id: input.parent_id,
+      const res = await offlineInsert("budget_nodes", {
+        user_id: uid, name: input.name.trim(), parent_id: input.parent_id,
         is_income: input.is_income, sort_order, kind: input.kind,
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(res.error ?? "Erreur");
     },
     onSuccess: () => { toast.success("Créé"); qc.invalidateQueries({ queryKey: ["budget_nodes"] }); setCreatingUnder(null); },
     onError: (e: Error) => toast.error(e.message),
