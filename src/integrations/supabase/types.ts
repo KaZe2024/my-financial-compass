@@ -349,6 +349,175 @@ export type Database = {
         }
         Relationships: []
       }
+      brainstorm_blocks: {
+        Row: {
+          action_done: boolean
+          content: string
+          created_at: string
+          id: string
+          is_action: boolean
+          items: string[]
+          kind: string
+          parent_id: string | null
+          plan_item_id: string | null
+          pos_x: number
+          pos_y: number
+          session_id: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action_done?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          is_action?: boolean
+          items?: string[]
+          kind?: string
+          parent_id?: string | null
+          plan_item_id?: string | null
+          pos_x?: number
+          pos_y?: number
+          session_id: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action_done?: boolean
+          content?: string
+          created_at?: string
+          id?: string
+          is_action?: boolean
+          items?: string[]
+          kind?: string
+          parent_id?: string | null
+          plan_item_id?: string | null
+          pos_x?: number
+          pos_y?: number
+          session_id?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brainstorm_blocks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "brainstorm_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "brainstorm_blocks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "brainstorm_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brainstorm_folders: {
+        Row: {
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          is_system: boolean
+          name: string
+          parent_id: string | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_system?: boolean
+          name: string
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_system?: boolean
+          name?: string
+          parent_id?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brainstorm_folders_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "brainstorm_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brainstorm_sessions: {
+        Row: {
+          archived: boolean
+          color: string | null
+          created_at: string
+          folder_id: string | null
+          icon: string | null
+          id: string
+          status: string
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+          view_mode: string
+        }
+        Insert: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          folder_id?: string | null
+          icon?: string | null
+          id?: string
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id: string
+          view_mode?: string
+        }
+        Update: {
+          archived?: boolean
+          color?: string | null
+          created_at?: string
+          folder_id?: string | null
+          icon?: string | null
+          id?: string
+          status?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+          view_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brainstorm_sessions_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "brainstorm_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_categories: {
         Row: {
           archived: boolean
