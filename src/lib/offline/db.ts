@@ -67,6 +67,10 @@ export const SYNCED_TABLES = [
   "plan_item_tags",
   "documents",
   "document_events",
+  "brainstorm_folders",
+  "brainstorm_sessions",
+  "brainstorm_blocks",
+
 ] as const;
 
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
