@@ -203,13 +203,20 @@ function Dashboard() {
     netWorthGrowth3m: threeMoGrowth,
   });
 
-  // Allocation
-  const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
-    type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows }).marketValue,
-  }));
-  const allocation = buildAllocation(assetAllocationRows, cash);
+  // Allocation — cohérente avec la période sélectionnée et avec le patrimoine :
+  // valeur des actifs (VNC/réévaluée) à la date de fin de période + liquidités à cette date.
+  const allocCash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
+  const assetAllocationRows = (assetsRows.data ?? [])
+    .filter((a: any) => !a.archived)
+    .filter((a: any) => !a.purchase_date || a.purchase_date <= periodTo)
+    .map((a: any) => ({
+      type: a.type || "autre",
+      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).marketValue,
+    }))
+    .filter((r) => r.current_value > 0);
+  const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
+
 
   // Wealth evolution (snapshots + current point)
   const wealthChart = [
@@ -307,26 +314,37 @@ function Dashboard() {
         </Panel>
 
         <Panel title="Allocation d'actifs">
-          <div className="h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={allocation} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
-                  {allocation.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="mt-2 space-y-1 font-mono text-[11px]">
-            {allocation.slice(0, 5).map((a, i) => (
-              <li key={a.name} className="flex justify-between">
-                <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} /> {a.name}</span>
-                <span className="text-muted-foreground">{allocTotal > 0 ? ((a.value / allocTotal) * 100).toFixed(1) : "0"}%</span>
-              </li>
-            ))}
-          </ul>
+          {allocation.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Aucun actif ni liquidité sur la période sélectionnée.</p>
+          ) : (
+            <>
+              <div className="h-64">
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={allocation} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
+                      {allocation.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                {allocation.map((a, i) => (
+                  <li key={a.name} className="flex justify-between">
+                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} /> {a.name}</span>
+                    <span className="text-muted-foreground">{fmtMoney(a.value, cur)} · {allocTotal > 0 ? ((a.value / allocTotal) * 100).toFixed(1) : "0"}%</span>
+                  </li>
+                ))}
+                <li className="flex justify-between border-t border-border pt-1">
+                  <span>Total</span>
+                  <span>{fmtMoney(allocTotal, cur)}</span>
+                </li>
+              </ul>
+            </>
+          )}
         </Panel>
+
       </section>
 
       {/* Forecast + Health */}
