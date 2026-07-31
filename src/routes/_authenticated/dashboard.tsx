@@ -314,26 +314,37 @@ function Dashboard() {
         </Panel>
 
         <Panel title="Allocation d'actifs">
-          <div className="h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={allocation} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
-                  {allocation.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="mt-2 space-y-1 font-mono text-[11px]">
-            {allocation.slice(0, 5).map((a, i) => (
-              <li key={a.name} className="flex justify-between">
-                <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} /> {a.name}</span>
-                <span className="text-muted-foreground">{allocTotal > 0 ? ((a.value / allocTotal) * 100).toFixed(1) : "0"}%</span>
-              </li>
-            ))}
-          </ul>
+          {allocation.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Aucun actif ni liquidité sur la période sélectionnée.</p>
+          ) : (
+            <>
+              <div className="h-64">
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={allocation} dataKey="value" nameKey="name" outerRadius={90} innerRadius={50} paddingAngle={2}>
+                      {allocation.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
+                    <Legend wrapperStyle={{ fontSize: 10 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <ul className="mt-2 space-y-1 font-mono text-[11px]">
+                {allocation.map((a, i) => (
+                  <li key={a.name} className="flex justify-between">
+                    <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} /> {a.name}</span>
+                    <span className="text-muted-foreground">{fmtMoney(a.value, cur)} · {allocTotal > 0 ? ((a.value / allocTotal) * 100).toFixed(1) : "0"}%</span>
+                  </li>
+                ))}
+                <li className="flex justify-between border-t border-border pt-1">
+                  <span>Total</span>
+                  <span>{fmtMoney(allocTotal, cur)}</span>
+                </li>
+              </ul>
+            </>
+          )}
         </Panel>
+
       </section>
 
       {/* Forecast + Health */}
