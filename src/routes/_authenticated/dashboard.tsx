@@ -203,13 +203,20 @@ function Dashboard() {
     netWorthGrowth3m: threeMoGrowth,
   });
 
-  // Allocation
-  const assetAllocationRows = (assetsRows.data ?? []).map((a: any) => ({
-    type: a.type,
-    current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows }).marketValue,
-  }));
-  const allocation = buildAllocation(assetAllocationRows, cash);
+  // Allocation — cohérente avec la période sélectionnée et avec le patrimoine :
+  // valeur des actifs (VNC/réévaluée) à la date de fin de période + liquidités à cette date.
+  const allocCash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
+  const assetAllocationRows = (assetsRows.data ?? [])
+    .filter((a: any) => !a.archived)
+    .filter((a: any) => !a.purchase_date || a.purchase_date <= periodTo)
+    .map((a: any) => ({
+      type: a.type || "autre",
+      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).marketValue,
+    }))
+    .filter((r) => r.current_value > 0);
+  const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
+
 
   // Wealth evolution (snapshots + current point)
   const wealthChart = [
