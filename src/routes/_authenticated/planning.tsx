@@ -9,14 +9,15 @@ import { toast } from "sonner";
 import { offlineUpdate } from "@/lib/offline/mutations";
 import { PlanItemDialog } from "@/components/planning/plan-item-dialog";
 import { PlanTypeManager } from "@/components/planning/plan-type-manager";
+import { DuplicateDayDialog } from "@/components/planning/duplicate-day-dialog";
 import {
   addDays, endOfMonth, fmtDayLabel, fmtTimeRange, isClosed, monthGrid, occurrencesInRange,
   planItemTagsQO, planItemsQO, planProjectsQO, planTagsQO, planTypesQO, priorityMeta, qkPlanItems,
-  startOfMonth, startOfWeek, statusMeta, STATUSES, ymd, parseYmd, type PlanItem,
+  recurrenceLabel, startOfMonth, startOfWeek, statusMeta, STATUSES, ymd, parseYmd, type PlanItem,
 } from "@/lib/planning";
 import {
   CalendarDays, CalendarRange, CalendarClock, ListChecks, Clock, ChevronLeft, ChevronRight,
-  Plus, Settings2, MapPin, User, Grid2X2,
+  Plus, Settings2, MapPin, User, Grid2X2, CopyPlus, Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
