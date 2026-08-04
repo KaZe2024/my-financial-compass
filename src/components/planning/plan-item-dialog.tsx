@@ -152,6 +152,10 @@ export function PlanItemDialog({
         notes: notes.trim() || null,
         recurrence,
         recurrence_until: recurrence !== "none" && recurrenceUntil ? recurrenceUntil : null,
+        recurrence_interval: recurrence === "none" ? 1 : Math.max(1, Number(interval) || 1),
+        recurrence_weekdays: recurrence === "none" || weekdays.length === 0 ? null : [...weekdays].sort((a, b) => a - b),
+        recurrence_month_days: recurrence !== "monthly" || monthDays.length === 0 ? null : [...monthDays].sort((a, b) => a - b),
+        times_per_day: Math.max(1, Number(timesPerDay) || 1),
         reminder_minutes: reminder ? Number(reminder) : null,
         completed_at: status === "done" ? new Date().toISOString() : null,
       };
