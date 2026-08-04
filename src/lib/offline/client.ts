@@ -266,7 +266,7 @@ class OfflineBuilder implements PromiseLike<Result> {
   private mode: "read" | "insert" | "update" | "delete" | "upsert" = "read";
   private writePayload: any = null;
   private writeOpts: any = null;
-  private single = false;
+  private wantSingle = false;
   private maybe = false;
   private countMode: string | null = null;
   private headOnly = false;
@@ -344,7 +344,7 @@ class OfflineBuilder implements PromiseLike<Result> {
   }
   abortSignal(signal: AbortSignal) { return this.push("abortSignal", signal); }
   maybeSingle() { this.maybe = true; return this.push("maybeSingle"); }
-  single() { this.single = true; return this.push("single"); }
+  single() { this.wantSingle = true; return this.push("single"); }
   csv() { return this.push("csv"); }
   throwOnError() { return this.push("throwOnError"); }
 
@@ -386,9 +386,9 @@ class OfflineBuilder implements PromiseLike<Result> {
     if (this.rangeFrom !== null && this.rangeTo !== null) out = out.slice(this.rangeFrom, this.rangeTo + 1);
     if (this.limitN !== null) out = out.slice(0, this.limitN);
     if (this.headOnly) return { data: null, error: null, count: total };
-    if (this.single || this.maybe) {
+    if (this.wantSingle || this.maybe) {
       const first = out[0] ?? null;
-      if (!first && this.single) return { data: null, error: { message: "Aucune ligne trouvée (hors ligne)" } };
+      if (!first && this.wantSingle) return { data: null, error: { message: "Aucune ligne trouvée (hors ligne)" } };
       return { data: first, error: null, count: this.countMode ? total : null };
     }
     return { data: out, error: null, count: this.countMode ? total : null };
@@ -396,7 +396,7 @@ class OfflineBuilder implements PromiseLike<Result> {
 
   private async runOfflineRead(): Promise<Result> {
     if (!isSynced(this.table)) {
-      return { data: this.single || this.maybe ? null : [], error: null, count: 0 };
+      return { data: this.wantSingle || this.maybe ? null : [], error: null, count: 0 };
     }
     const all = await getSyncedRows(this.table as SyncedTable);
     const filtered = applyOps(all as any[], this.ops);
@@ -434,7 +434,7 @@ class OfflineBuilder implements PromiseLike<Result> {
         written.push(row);
       }
       const projected = await projectRows(written, this.selectStr);
-      if (this.single || this.maybe) return { data: projected[0] ?? null, error: null };
+      if (this.wantSingle || this.maybe) return { data: projected[0] ?? null, error: null };
       return { data: this.hasSelect ? projected : null, error: null };
     }
 
@@ -450,7 +450,7 @@ class OfflineBuilder implements PromiseLike<Result> {
         written.push(row);
       }
       const projected = await projectRows(written, this.selectStr);
-      if (this.single || this.maybe) return { data: projected[0] ?? null, error: null };
+      if (this.wantSingle || this.maybe) return { data: projected[0] ?? null, error: null };
       return { data: this.hasSelect ? projected : null, error: null };
     }
 
@@ -464,7 +464,7 @@ class OfflineBuilder implements PromiseLike<Result> {
       deleted.push(t);
     }
     const projected = await projectRows(deleted, this.selectStr);
-    if (this.single || this.maybe) return { data: projected[0] ?? null, error: null };
+    if (this.wantSingle || this.maybe) return { data: projected[0] ?? null, error: null };
     return { data: this.hasSelect ? projected : null, error: null };
   }
 
