@@ -341,14 +341,86 @@ export function PlanItemDialog({
             <Input type="number" min="0" value={reminder} onChange={(e) => setReminder(e.target.value)} placeholder="Ex. 15" />
           </div>
 
-          <div>
-            <Label>Récurrence</Label>
-            <Select value={recurrence} onValueChange={setRecurrence}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RECURRENCES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+          <div className="md:col-span-2">
+            <Label>Habitude / récurrence</Label>
+            <Select
+              value={preset}
+              onValueChange={(v) => {
+                setPreset(v);
+                const p = RECURRENCE_PRESETS.find((x) => x.id === v);
+                if (!p || v === "custom") { if (v === "custom" && recurrence === "none") setRecurrence("daily"); return; }
+                setRecurrence(p.freq);
+                setIntervalValue(String(p.interval));
+                setWeekdays(p.weekdays ?? []);
+                setMonthDays(p.monthDays ?? []);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Choisir un rythme" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {RECURRENCE_PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+
+          {preset === "custom" && (
+            <>
+              <div>
+                <Label>Fréquence de base</Label>
+                <Select value={recurrence} onValueChange={setRecurrence}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RECURRENCES.filter((r) => r.value !== "none").map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tous les… (intervalle)</Label>
+                <Input type="number" min="1" value={interval} onChange={(e) => setIntervalValue(e.target.value)} />
+              </div>
+
+              {(recurrence === "weekly" || recurrence === "daily") && (
+                <div className="md:col-span-2">
+                  <Label>Jours de la semaine (optionnel)</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((w) => {
+                      const on = weekdays.includes(w.value);
+                      return (
+                        <button key={w.value} type="button"
+                          onClick={() => setWeekdays((prev) => on ? prev.filter((x) => x !== w.value) : [...prev, w.value])}
+                          className={`rounded-sm border px-2.5 py-1 text-xs ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>
+                          {w.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {recurrence === "monthly" && (
+                <div className="md:col-span-2">
+                  <Label>Jours du mois (ex. 1, 15 pour 2×/mois)</Label>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                      const on = monthDays.includes(d);
+                      return (
+                        <button key={d} type="button"
+                          onClick={() => setMonthDays((prev) => on ? prev.filter((x) => x !== d) : [...prev, d])}
+                          className={`h-7 w-7 rounded-sm border text-[11px] ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <Label>Répétitions par jour</Label>
+            <Input type="number" min="1" value={timesPerDay} onChange={(e) => setTimesPerDay(e.target.value)} placeholder="Ex. 3" />
           </div>
           <div>
             <Label>Répéter jusqu'au</Label>
