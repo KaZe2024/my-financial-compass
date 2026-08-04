@@ -118,6 +118,11 @@ export function PlanItemDialog({
       setNotes("");
       setRecurrence("none");
       setRecurrenceUntil("");
+      setPreset("none");
+      setIntervalValue("1");
+      setWeekdays([]);
+      setMonthDays([]);
+      setTimesPerDay("1");
       setReminder("");
       setSelectedTags([]);
     }
