@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { checkOnlineWithHeartbeat } from "./network-status";
 import { getSyncedRows, applyLocalMutation, type SyncedTable } from "./db";
 import { queueMutation } from "./sync";
