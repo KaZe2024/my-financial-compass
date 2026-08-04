@@ -38,16 +38,27 @@ export default defineConfig({
               warnings: [],
             }),
           ],
-          navigateFallback: "/offline.html",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/mcp/, /^\/\.mcp/, /^\/\.well-known/],
+          // Do not use Workbox's navigateFallback here: it is registered before
+          // runtimeCaching and would therefore serve offline.html for every page.
+          navigateFallback: null,
           runtimeCaching: [
             {
-              urlPattern: ({ request }) => request.mode === "navigate",
+              urlPattern: ({ url, request }) =>
+                request.mode === "navigate" &&
+                !/^\/(~oauth|api\/|mcp(?:\/|$)|\.mcp(?:\/|$)|\.well-known(?:\/|$))/.test(url.pathname),
               handler: "NetworkFirst",
               options: {
-                cacheName: "pages",
+                cacheName: "optis-pages-v2",
                 networkTimeoutSeconds: 4,
                 expiration: { maxEntries: 60 },
+                plugins: [
+                  {
+                    // A visited page is returned first by NetworkFirst. This is
+                    // only the terminal fallback for a route never cached before.
+                    handlerDidError: async () =>
+                      (await caches.match("/offline.html")) ?? Response.error(),
+                  },
+                ],
               },
             },
             {
