@@ -94,6 +94,27 @@ function Dashboard() {
     queryKey: ["subscriptions"],
     queryFn: async () => (await supabase.from("subscriptions").select("*")).data ?? [],
   });
+  const nodeAmounts = useQuery({
+    queryKey: ["budget_node_amounts", "forecast"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("budget_node_amounts").select("node_id, period_month, planned, revised").range(from, to),
+      ),
+  });
+  const invoicesRows = useQuery({
+    queryKey: ["invoices_to_issue", "open"],
+    queryFn: async () =>
+      (await supabase.from("invoices_to_issue").select("client, amount, paid_amount, due_date, status")
+        .not("status", "in", "(paid,cancelled)")).data ?? [],
+  });
+  const loanSchedule = useQuery({
+    queryKey: ["loan_amortizations", "unpaid"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("loan_amortizations").select("payment_date, principal_amount, interest_amount, paid").eq("paid", false).range(from, to),
+      ),
+  });
+
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
     queryFn: async () => (await supabase.from("assets").select("id, type, purchase_date, purchase_value, current_value, status, archived")).data ?? [],
