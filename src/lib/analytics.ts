@@ -310,3 +310,75 @@ export function buildExpertForecast(
     groups: Array.from(groups.values()).sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow)),
   };
 }
+
+// ---------- Commentaire qualitatif (analyste financier) ----------
+
+export interface HealthCommentary {
+  verdict: string;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  actions: string[];
+}
+
+/** Lecture qualitative du score de santé, style note d'analyste. */
+export function healthCommentary(h: HealthBreakdown): HealthCommentary {
+  const tone = scoreTone(h.score);
+  const verdict =
+    tone === "positive" ? "Solide — profil investisseur"
+    : tone === "neutral" ? "Correct — marge de progression"
+    : tone === "warning" ? "Fragile — vigilance requise"
+    : "Sous tension — redressement prioritaire";
+
+  const strengths: string[] = [];
+  const risks: string[] = [];
+  const actions: string[] = [];
+
+  // Capacité d'épargne
+  if (h.savingsRate >= 25) strengths.push(`Capacité d'épargne élevée (${h.savingsRate.toFixed(0)} %) : le foyer autofinance sa croissance.`);
+  else if (h.savingsRate >= 10) strengths.push(`Épargne positive mais moyenne (${h.savingsRate.toFixed(0)} %), en dessous du standard de 20-30 %.`);
+  else if (h.savingsRate >= 0) {
+    risks.push(`Taux d'épargne trop faible (${h.savingsRate.toFixed(0)} %) : aucun coussin d'accumulation.`);
+    actions.push("Fixer une règle d'épargne automatique de 20 % du revenu net en début de mois.");
+  } else {
+    risks.push(`Épargne négative (${h.savingsRate.toFixed(0)} %) : les charges dépassent les revenus, ponction sur la trésorerie.`);
+    actions.push("Réduire les charges récurrentes non essentielles jusqu'au retour à un solde mensuel positif.");
+  }
+
+  // Levier / dette
+  if (h.debtRatio <= 0.2) strengths.push(`Endettement maîtrisé (${(h.debtRatio * 100).toFixed(0)} % du patrimoine) : capacité d'emprunt intacte.`);
+  else if (h.debtRatio <= 0.45) strengths.push(`Levier raisonnable (${(h.debtRatio * 100).toFixed(0)} %), compatible avec un financement de projet.`);
+  else {
+    risks.push(`Levier élevé (${(h.debtRatio * 100).toFixed(0)} % du patrimoine) : sensibilité forte à un choc de revenu.`);
+    actions.push("Prioriser le remboursement des dettes les plus coûteuses avant tout nouvel engagement.");
+  }
+
+  // Liquidité / fonds d'urgence
+  if (h.emergencyMonths >= 6) strengths.push(`Fonds d'urgence complet (${h.emergencyMonths.toFixed(1)} mois de charges couvertes).`);
+  else if (h.emergencyMonths >= 3) {
+    strengths.push(`Coussin de sécurité partiel (${h.emergencyMonths.toFixed(1)} mois), cible 6 mois.`);
+    actions.push("Compléter le fonds d'urgence jusqu'à 6 mois de charges avant d'immobiliser du capital.");
+  } else {
+    risks.push(`Liquidité insuffisante (${h.emergencyMonths.toFixed(1)} mois) : risque de recours à la dette au premier imprévu.`);
+    actions.push("Constituer en priorité 3 mois de charges sur un portefeuille liquide dédié.");
+  }
+
+  // Croissance patrimoniale
+  if (h.growth >= 4) strengths.push(`Patrimoine en progression (${h.growth.toFixed(1)} % sur 3 mois) : dynamique de création de valeur.`);
+  else if (h.growth >= 0) risks.push(`Croissance patrimoniale quasi nulle (${h.growth.toFixed(1)} % sur 3 mois) : l'épargne ne se transforme pas en actifs.`);
+  else {
+    risks.push(`Patrimoine en recul (${h.growth.toFixed(1)} % sur 3 mois) : destruction de valeur à expliquer.`);
+    actions.push("Analyser les postes de dépenses et les moins-values d'actifs des 3 derniers mois.");
+  }
+
+  const summary =
+    tone === "positive"
+      ? "Les fondamentaux sont réunis : le foyer dégage un excédent, l'endettement reste sous contrôle et la liquidité couvre les aléas. L'enjeu passe de la protection à l'allocation du capital."
+      : tone === "neutral"
+        ? "La structure financière est saine mais peu résiliente : les excédents existent sans être encore convertis en réserve et en actifs productifs de façon régulière."
+        : tone === "warning"
+          ? "Le profil est vulnérable : la marge de manœuvre mensuelle et/ou la liquidité sont trop courtes pour absorber un choc. La priorité est défensive avant tout projet."
+          : "La situation exige un plan de redressement : rétablir un solde mensuel positif, sécuriser la trésorerie, puis désendetter avant toute nouvelle acquisition.";
+
+  return { verdict, summary, strengths, risks, actions };
+}
