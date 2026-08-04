@@ -443,7 +443,7 @@ export function wealthCommentary(w: WealthInputs): WealthCommentary {
   // Moteur de la croissance : épargne vs valorisation
   if (netSaving > 0 && Math.abs(w.netWorth) > 0) {
     const contrib = (netSaving / Math.abs(w.netWorth)) * 100;
-    drivers.push(`L'excédent de la période (${netSaving >= 0 ? "+" : ""}${netSaving.toFixed(0)}) représente ${contrib.toFixed(1)} % du patrimoine net : la croissance est portée par l'épargne, pas seulement par la valorisation.`);
+    drivers.push(`L'excédent dégagé sur la période représente ${contrib.toFixed(1)} % du patrimoine net (taux d'épargne ${w.savingsRate.toFixed(0)} %) : la croissance est portée par l'épargne, pas seulement par la valorisation.`);
   } else if (netSaving < 0) {
     watch.push("La période est déficitaire : toute progression du patrimoine provient de la valorisation d'actifs, non d'un flux d'épargne — donc non récurrente.");
     actions.push("Rétablir un flux d'épargne positif pour rendre la croissance patrimoniale structurelle.");
