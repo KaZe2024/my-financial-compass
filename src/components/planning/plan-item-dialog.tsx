@@ -91,6 +91,11 @@ export function PlanItemDialog({
       setNotes(item.notes ?? "");
       setRecurrence(item.recurrence);
       setRecurrenceUntil(item.recurrence_until ?? "");
+      setPreset(detectRecurrencePreset(item));
+      setIntervalValue(String(item.recurrence_interval ?? 1));
+      setWeekdays(item.recurrence_weekdays ?? []);
+      setMonthDays(item.recurrence_month_days ?? []);
+      setTimesPerDay(String(item.times_per_day ?? 1));
       setReminder(item.reminder_minutes ? String(item.reminder_minutes) : "");
       setSelectedTags(currentTagIds);
     } else {
