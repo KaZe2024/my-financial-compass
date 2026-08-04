@@ -55,7 +55,7 @@ function PlanningPage() {
   const [editing, setEditing] = useState<PlanItem | null>(null);
   const [defaultDate, setDefaultDate] = useState<string>(ymd(new Date()));
   const [managerOpen, setManagerOpen] = useState(false);
-  const [showEisenhower, setShowEisenhower] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
