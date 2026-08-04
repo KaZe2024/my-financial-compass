@@ -211,3 +211,102 @@ export function buildAllocation(assets: Array<{ type: string; current_value: num
   if (cash > 0) out.unshift({ name: "liquidités", value: cash });
   return out.sort((a, b) => b.value - a.value);
 }
+
+// ---------- Prévision de trésorerie "expert" ----------
+
+export interface CashItem {
+  label: string;
+  amount: number;            // signé : + entrée, - sortie
+  date: string | null;       // échéance
+  confidence?: number;       // pondération 0..1 (probabilité d'encaissement/décaissement)
+  group: string;             // regroupement pour l'explication
+}
+
+export interface MonthBaseline {
+  /** "YYYY-MM" */
+  month: string;
+  income: number;
+  expense: number;
+  /** true si issu du budget planifié, false si extrapolé des 90 derniers jours */
+  planned: boolean;
+}
+
+export interface ExpertForecastInput {
+  startingCash: number;
+  baselines: MonthBaseline[];
+  items: CashItem[];
+  /** Les échéances déjà dépassées sont replacées à J+graceDays. */
+  graceDays?: number;
+}
+
+export interface ExpertForecast {
+  points: ForecastPoint[];
+  /** Point le plus bas de l'horizon. */
+  low: ForecastPoint;
+  /** Premier jour où le solde devient négatif, sinon null. */
+  breachDay: ForecastPoint | null;
+  /** Détail des flux ponctuels retenus, groupés. */
+  groups: { group: string; inflow: number; outflow: number; count: number }[];
+}
+
+function monthKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function daysInMonthOf(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
+export function buildExpertForecast(
+  { startingCash, baselines, items, graceDays = 7 }: ExpertForecastInput,
+  horizonDays = 365,
+): ExpertForecast {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dayMs = 86_400_000;
+  const byMonth = new Map(baselines.map(b => [b.month, b]));
+
+  // Flux ponctuels bucketisés par jour.
+  const bucket = new Map<number, number>();
+  const groups = new Map<string, { group: string; inflow: number; outflow: number; count: number }>();
+  for (const it of items) {
+    const weight = it.confidence ?? 1;
+    const amt = it.amount * weight;
+    if (!amt) continue;
+    let offset = graceDays;
+    if (it.date) {
+      const d = new Date(it.date); d.setHours(0, 0, 0, 0);
+      offset = Math.round((d.getTime() - today.getTime()) / dayMs);
+      if (offset < 0) offset = graceDays;          // échéance dépassée → régularisation proche
+    }
+    if (offset > horizonDays) continue;
+    bucket.set(offset, (bucket.get(offset) ?? 0) + amt);
+    const g = groups.get(it.group) ?? { group: it.group, inflow: 0, outflow: 0, count: 0 };
+    if (amt > 0) g.inflow += amt; else g.outflow += -amt;
+    g.count += 1;
+    groups.set(it.group, g);
+  }
+
+  let balance = startingCash;
+  const points: ForecastPoint[] = [{ day: 0, date: today.toISOString().slice(0, 10), balance }];
+  let low = points[0];
+  let breach: ForecastPoint | null = balance < 0 ? points[0] : null;
+
+  for (let d = 1; d <= horizonDays; d++) {
+    const dt = new Date(today.getTime() + d * dayMs);
+    const b = byMonth.get(monthKey(dt));
+    const dim = daysInMonthOf(dt);
+    const dailyNet = b ? (b.income - b.expense) / dim : 0;
+    balance += dailyNet + (bucket.get(d) ?? 0);
+    const p = { day: d, date: dt.toISOString().slice(0, 10), balance };
+    points.push(p);
+    if (p.balance < low.balance) low = p;
+    if (!breach && p.balance < 0) breach = p;
+  }
+
+  return {
+    points,
+    low,
+    breachDay: breach,
+    groups: Array.from(groups.values()).sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow)),
+  };
+}
