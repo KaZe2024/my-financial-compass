@@ -147,15 +147,19 @@ function Dashboard() {
 
   const cur = profile.data?.base_currency ?? "MGA";
   const txRows = allTx.data ?? [];
-  const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
-  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows });
-  const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC)
-  const totalDebt = computeObligationTotalAsOf(debtsRows.data ?? [], txRows, "debt");
-  const totalRec = computeObligationTotalAsOf(recRows.data ?? [], txRows, "receivable");
+  const todayISO = toISODate(now);
+  // Tout est daté sur la fin de la période sélectionnée → chaque carte bouge avec le sélecteur.
+  const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
+  const cashToday = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
+  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows, through: periodTo });
+  const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC) à la fin de période
+  const totalDebt = computeObligationTotalAsOf(debtsRows.data ?? [], txRows, "debt", periodTo);
+  const totalRec = computeObligationTotalAsOf(recRows.data ?? [], txRows, "receivable", periodTo);
   const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);
   const savings = income - expense;
   const savingsRate = income > 0 ? (savings / income) * 100 : 0;
   const netWorth = cash + totalAssets + totalRec - totalDebt;
+
 
   // Growth from snapshots
   const fromMonth = periodFrom.slice(0, 7);
