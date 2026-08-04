@@ -382,3 +382,106 @@ export function healthCommentary(h: HealthBreakdown): HealthCommentary {
 
   return { verdict, summary, strengths, risks, actions };
 }
+
+// ---------- Commentaire qualitatif — évolution du patrimoine ----------
+
+export interface WealthInputs {
+  netWorth: number;
+  cash: number;
+  assets: number;
+  receivables: number;
+  debt: number;
+  income: number;
+  expense: number;
+  savingsRate: number;
+  /** Croissances en fraction (0.05 = +5 %) — null si pas de référence disponible. */
+  momGrowth: number | null;
+  threeMoGrowth: number | null;
+  yoyGrowth: number | null;
+  /** Nombre de snapshots mensuels disponibles sur la période affichée. */
+  snapshotCount: number;
+  periodLabel: string;
+}
+
+export interface WealthCommentary {
+  verdict: string;
+  summary: string;
+  drivers: string[];
+  watch: string[];
+  actions: string[];
+}
+
+/** Lecture qualitative de l'évolution patrimoniale, style note de gestion privée. */
+export function wealthCommentary(w: WealthInputs): WealthCommentary {
+  const pct = (x: number) => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)} %`;
+  const g = w.threeMoGrowth ?? w.momGrowth ?? 0;
+  const gross = w.cash + w.assets + w.receivables;
+  const share = (x: number) => (gross > 0 ? (x / gross) * 100 : 0);
+  const leverage = gross > 0 ? w.debt / gross : (w.debt > 0 ? 1 : 0);
+  const netSaving = w.income - w.expense;
+
+  const verdict =
+    w.snapshotCount === 0 ? "Historique insuffisant"
+    : g >= 0.05 ? "Accumulation soutenue"
+    : g >= 0.01 ? "Progression modérée"
+    : g >= -0.01 ? "Stagnation"
+    : "Contraction du patrimoine";
+
+  const drivers: string[] = [];
+  const watch: string[] = [];
+  const actions: string[] = [];
+
+  // Trajectoire
+  if (w.momGrowth != null) {
+    drivers.push(`Variation d'un mois sur l'autre : ${pct(w.momGrowth)} ; sur 3 mois : ${w.threeMoGrowth != null ? pct(w.threeMoGrowth) : "référence indisponible"}.`);
+  } else {
+    watch.push("Aucun snapshot de clôture antérieur : la croissance ne peut pas encore être mesurée de façon fiable.");
+    actions.push("Lancer la clôture mensuelle chaque fin de mois pour bâtir la série patrimoniale.");
+  }
+  if (w.yoyGrowth != null) drivers.push(`Sur 12 mois glissants, le patrimoine évolue de ${pct(w.yoyGrowth)}.`);
+
+  // Moteur de la croissance : épargne vs valorisation
+  if (netSaving > 0 && Math.abs(w.netWorth) > 0) {
+    const contrib = (netSaving / Math.abs(w.netWorth)) * 100;
+    drivers.push(`L'excédent de la période (${netSaving >= 0 ? "+" : ""}${netSaving.toFixed(0)}) représente ${contrib.toFixed(1)} % du patrimoine net : la croissance est portée par l'épargne, pas seulement par la valorisation.`);
+  } else if (netSaving < 0) {
+    watch.push("La période est déficitaire : toute progression du patrimoine provient de la valorisation d'actifs, non d'un flux d'épargne — donc non récurrente.");
+    actions.push("Rétablir un flux d'épargne positif pour rendre la croissance patrimoniale structurelle.");
+  }
+
+  // Structure
+  drivers.push(`Structure brute : liquidités ${share(w.cash).toFixed(0)} %, actifs ${share(w.assets).toFixed(0)} %, créances ${share(w.receivables).toFixed(0)} %.`);
+  if (share(w.cash) > 60) {
+    watch.push("Poids des liquidités très élevé : capital sous-employé, rendement réel érodé par l'inflation.");
+    actions.push("Après constitution du fonds d'urgence, orienter l'excédent de liquidités vers des actifs productifs.");
+  }
+  if (share(w.assets) > 85) {
+    watch.push("Patrimoine fortement immobilisé en actifs : faible flexibilité en cas de besoin de trésorerie.");
+    actions.push("Maintenir une poche liquide d'au moins 3 mois de charges en parallèle des actifs.");
+  }
+  if (share(w.receivables) > 25) {
+    watch.push(`Créances significatives (${share(w.receivables).toFixed(0)} % du brut) : le patrimoine dépend du recouvrement effectif.`);
+    actions.push("Relancer les créances les plus anciennes et provisionner celles jugées douteuses.");
+  }
+
+  // Levier
+  if (leverage > 0.5) {
+    watch.push(`Endettement à ${(leverage * 100).toFixed(0)} % du patrimoine brut : la valeur nette est très sensible à une baisse de valorisation.`);
+    actions.push("Réduire le levier avant tout nouvel investissement financé par la dette.");
+  } else if (w.debt > 0) {
+    drivers.push(`Levier contenu (${(leverage * 100).toFixed(0)} % du brut) : effet amplificateur maîtrisé sur la valeur nette.`);
+  }
+
+  const summary =
+    w.snapshotCount === 0
+      ? `Sur ${w.periodLabel}, la valeur nette est reconstituée à partir des transactions, mais sans clôtures mensuelles il n'existe pas encore de série comparable pour juger la tendance.`
+      : g >= 0.05
+        ? `Sur ${w.periodLabel}, le patrimoine s'apprécie nettement. La combinaison d'un flux d'épargne positif et d'une valorisation favorable crée un effet cumulatif : l'enjeu devient l'allocation, pas l'accumulation.`
+        : g >= 0.01
+          ? `Sur ${w.periodLabel}, la trajectoire est haussière mais lente. À ce rythme, l'atteinte des objectifs dépend davantage de la discipline d'épargne que du rendement des actifs.`
+          : g >= -0.01
+            ? `Sur ${w.periodLabel}, le patrimoine est stable : les flux entrants compensent tout juste les sorties et l'amortissement des actifs. Aucune création de valeur nette.`
+            : `Sur ${w.periodLabel}, le patrimoine se contracte. Il faut distinguer ce qui relève d'un déficit de trésorerie de ce qui relève d'une perte de valeur d'actifs ou d'un désendettement.`;
+
+  return { verdict, summary, drivers, watch, actions };
+}
