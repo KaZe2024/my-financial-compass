@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>OPTIS — Mode hors ligne</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0e1a" />
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 1.5rem;
+        background: #0a0e1a; color: #e6edf7;
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .card { max-width: 30rem; width: 100%; text-align: center; }
+      .badge {
+        display: inline-block; letter-spacing: .28em; font-size: .7rem; font-weight: 700;
+        color: #f0a92b; border: 1px solid rgba(240,169,43,.35); border-radius: 999px;
+        padding: .35rem .85rem; margin-bottom: 1.25rem;
+      }
+      h1 { font-size: 1.35rem; margin: 0 0 .5rem; }
+      p { color: #93a4bf; margin: 0 0 1.75rem; }
+      .actions { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+      button, a {
+        font: inherit; cursor: pointer; text-decoration: none; border-radius: .5rem;
+        padding: .6rem 1.1rem; border: 1px solid transparent;
+      }
+      .primary { background: #f0a92b; color: #0a0e1a; font-weight: 600; }
+      .secondary { background: transparent; color: #e6edf7; border-color: rgba(230,237,247,.22); }
+      .hint { margin-top: 1.75rem; font-size: .8rem; color: #6b7c99; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="badge">OPTIS</span>
+      <h1>Mode hors ligne</h1>
+      <p>
+        Cette page n'a pas encore été enregistrée sur cet appareil. Ouvrez-la une fois
+        avec du réseau : elle restera ensuite accessible sans connexion.
+      </p>
+      <div class="actions">
+        <button class="primary" onclick="location.reload()">Réessayer</button>
+        <a class="secondary" href="/dashboard">Ouvrir le tableau de bord</a>
+      </div>
+      <p class="hint">Vos saisies hors ligne sont conservées et synchronisées au retour du réseau.</p>
+    </div>
+    <script>
+      window.addEventListener("online", function () { location.reload(); });
+    </script>
+  </body>
+</html>
