@@ -281,6 +281,7 @@ function PlanningPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setManagerOpen(true)}><Settings2 className="mr-1.5 h-4 w-4" /> Types & tags</Button>
+          <Button variant="outline" size="sm" onClick={() => setDupOpen(true)}><CopyPlus className="mr-1.5 h-4 w-4" /> Dupliquer une journée</Button>
           <Button size="sm" onClick={() => openNew(ymd(mode === "day" ? anchor : new Date()))}><Plus className="mr-1.5 h-4 w-4" /> Planifier</Button>
         </div>
       </div>
