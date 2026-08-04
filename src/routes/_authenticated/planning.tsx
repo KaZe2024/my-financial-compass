@@ -185,6 +185,7 @@ function PlanningPage() {
             {it.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{it.location}</span>}
             {it.person_label && <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{it.person_label}</span>}
             <span className={priorityMeta(it.priority).className}>{priorityMeta(it.priority).label}</span>
+            {recurrenceLabel(it) && <span className="inline-flex items-center gap-1 text-primary"><Repeat className="h-3 w-3" />{recurrenceLabel(it)}</span>}
             {(tagsOf.get(it.id) ?? []).map((tid) => {
               const tg = tagById.get(tid);
               if (!tg) return null;
@@ -444,6 +445,7 @@ function PlanningPage() {
 
       <PlanItemDialog open={dialogOpen} onOpenChange={setDialogOpen} item={editing} defaultDate={defaultDate} />
       <PlanTypeManager open={managerOpen} onOpenChange={setManagerOpen} />
+      <DuplicateDayDialog open={dupOpen} onOpenChange={setDupOpen} sourceDate={ymd(mode === "day" ? anchor : new Date())} />
     </div>
   );
 }

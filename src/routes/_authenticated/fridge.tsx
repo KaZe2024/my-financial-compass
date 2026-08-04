@@ -15,7 +15,7 @@ import { offlineSelect, byDateDesc } from "@/lib/offline/read";
 import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
 
 export const Route = createFileRoute("/_authenticated/fridge")({
-  head: () => ({ meta: [{ title: "Gestion frigo — OPTIS" }] }),
+  head: () => ({ meta: [{ title: "Gestion Stock Food — OPTIS" }] }),
   component: FridgePage,
 });
 
@@ -183,8 +183,8 @@ function FridgePage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Planification</p>
-          <h1 className="mt-1 text-2xl font-semibold">Gestion frigo</h1>
-          <p className="text-xs text-muted-foreground">Glissez les items du frigo vers les jours de la semaine.</p>
+          <h1 className="mt-1 text-2xl font-semibold">Gestion Stock Food</h1>
+          <p className="text-xs text-muted-foreground">Glissez les items du stock vers les jours de la semaine.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => shiftWeek(-1)} onDragEnter={(e) => { e.preventDefault(); shiftWeek(-1); }} onDragOver={(e) => e.preventDefault()}><ChevronLeft className="h-4 w-4" /></Button>
@@ -197,7 +197,7 @@ function FridgePage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
-        <Panel title="Contenu du frigo" action={
+        <Panel title="Contenu du stock" action={
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => setShowArchived(v => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
             <FridgeItemDialog onDone={() => qc.invalidateQueries({ queryKey: ["fridge_items"] })} />
@@ -313,7 +313,7 @@ function FridgePage() {
             <form onSubmit={(e) => { e.preventDefault(); confirmDrop(); }} className="space-y-3">
               <div className="text-xs text-muted-foreground">
                 {pendingDrop.item.quantity != null
-                  ? <>Disponible dans le frigo : <span className="font-mono text-foreground">{pendingDrop.item.quantity} {pendingDrop.item.unit ?? ""}</span></>
+                  ? <>Disponible en stock : <span className="font-mono text-foreground">{pendingDrop.item.quantity} {pendingDrop.item.unit ?? ""}</span></>
                   : <>Aucune quantité renseignée sur l'item — la déduction sera ignorée.</>}
               </div>
               {pendingDrop.item.quantity != null && (
@@ -383,7 +383,7 @@ function FridgeItemDialog({ editingItem, onDone, onClose }: { editingItem?: any;
     <Dialog open={editingItem ? true : open} onOpenChange={(v) => { setOpen(v); if (!v) onClose?.(); }}>
       {!editingItem && <DialogTrigger asChild><Button size="sm"><Plus className="mr-1 h-3.5 w-3.5" /> Item</Button></DialogTrigger>}
       <DialogContent>
-        <DialogHeader><DialogTitle>{editingItem ? "Modifier l'item" : "Nouvel item du frigo"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editingItem ? "Modifier l'item" : "Nouvel item de stock"}</DialogTitle></DialogHeader>
         <form onSubmit={(e) => { e.preventDefault(); m.mutate(); }} className="space-y-3">
           <div className="space-y-1"><Label>Nom</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus /></div>
           <div className="grid grid-cols-2 gap-3">
