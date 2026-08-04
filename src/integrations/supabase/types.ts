@@ -1628,12 +1628,16 @@ export type Database = {
           priority: string
           project_id: string | null
           recurrence: string
+          recurrence_interval: number
+          recurrence_month_days: number[] | null
           recurrence_until: string | null
+          recurrence_weekdays: number[] | null
           reminder_minutes: number | null
           scheduled_on: string
           sort_order: number
           start_time: string | null
           status: string
+          times_per_day: number
           title: string
           type_id: string | null
           updated_at: string
@@ -1657,12 +1661,16 @@ export type Database = {
           priority?: string
           project_id?: string | null
           recurrence?: string
+          recurrence_interval?: number
+          recurrence_month_days?: number[] | null
           recurrence_until?: string | null
+          recurrence_weekdays?: number[] | null
           reminder_minutes?: number | null
           scheduled_on?: string
           sort_order?: number
           start_time?: string | null
           status?: string
+          times_per_day?: number
           title: string
           type_id?: string | null
           updated_at?: string
@@ -1686,12 +1694,16 @@ export type Database = {
           priority?: string
           project_id?: string | null
           recurrence?: string
+          recurrence_interval?: number
+          recurrence_month_days?: number[] | null
           recurrence_until?: string | null
+          recurrence_weekdays?: number[] | null
           reminder_minutes?: number | null
           scheduled_on?: string
           sort_order?: number
           start_time?: string | null
           status?: string
+          times_per_day?: number
           title?: string
           type_id?: string | null
           updated_at?: string

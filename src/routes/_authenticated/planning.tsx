@@ -9,14 +9,15 @@ import { toast } from "sonner";
 import { offlineUpdate } from "@/lib/offline/mutations";
 import { PlanItemDialog } from "@/components/planning/plan-item-dialog";
 import { PlanTypeManager } from "@/components/planning/plan-type-manager";
+import { DuplicateDayDialog } from "@/components/planning/duplicate-day-dialog";
 import {
   addDays, endOfMonth, fmtDayLabel, fmtTimeRange, isClosed, monthGrid, occurrencesInRange,
   planItemTagsQO, planItemsQO, planProjectsQO, planTagsQO, planTypesQO, priorityMeta, qkPlanItems,
-  startOfMonth, startOfWeek, statusMeta, STATUSES, ymd, parseYmd, type PlanItem,
+  recurrenceLabel, startOfMonth, startOfWeek, statusMeta, STATUSES, ymd, parseYmd, type PlanItem,
 } from "@/lib/planning";
 import {
   CalendarDays, CalendarRange, CalendarClock, ListChecks, Clock, ChevronLeft, ChevronRight,
-  Plus, Settings2, MapPin, User, Grid2X2,
+  Plus, Settings2, MapPin, User, Grid2X2, CopyPlus, Repeat,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ function PlanningPage() {
   const [editing, setEditing] = useState<PlanItem | null>(null);
   const [defaultDate, setDefaultDate] = useState<string>(ymd(new Date()));
   const [managerOpen, setManagerOpen] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
   const [showEisenhower, setShowEisenhower] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -183,6 +185,7 @@ function PlanningPage() {
             {it.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{it.location}</span>}
             {it.person_label && <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{it.person_label}</span>}
             <span className={priorityMeta(it.priority).className}>{priorityMeta(it.priority).label}</span>
+            {recurrenceLabel(it) && <span className="inline-flex items-center gap-1 text-primary"><Repeat className="h-3 w-3" />{recurrenceLabel(it)}</span>}
             {(tagsOf.get(it.id) ?? []).map((tid) => {
               const tg = tagById.get(tid);
               if (!tg) return null;
@@ -279,6 +282,7 @@ function PlanningPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setManagerOpen(true)}><Settings2 className="mr-1.5 h-4 w-4" /> Types & tags</Button>
+          <Button variant="outline" size="sm" onClick={() => setDupOpen(true)}><CopyPlus className="mr-1.5 h-4 w-4" /> Dupliquer une journée</Button>
           <Button size="sm" onClick={() => openNew(ymd(mode === "day" ? anchor : new Date()))}><Plus className="mr-1.5 h-4 w-4" /> Planifier</Button>
         </div>
       </div>
@@ -441,6 +445,7 @@ function PlanningPage() {
 
       <PlanItemDialog open={dialogOpen} onOpenChange={setDialogOpen} item={editing} defaultDate={defaultDate} />
       <PlanTypeManager open={managerOpen} onOpenChange={setManagerOpen} />
+      <DuplicateDayDialog open={dupOpen} onOpenChange={setDupOpen} sourceDate={ymd(mode === "day" ? anchor : new Date())} />
     </div>
   );
 }

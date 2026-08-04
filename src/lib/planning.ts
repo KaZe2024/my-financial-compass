@@ -55,6 +55,10 @@ export type PlanItem = {
   notes: string | null;
   recurrence: "none" | "daily" | "weekly" | "monthly" | "yearly";
   recurrence_until: string | null;
+  recurrence_interval: number;
+  recurrence_weekdays: number[] | null;
+  recurrence_month_days: number[] | null;
+  times_per_day: number;
   reminder_minutes: number | null;
   completed_at: string | null;
   sort_order: number;
@@ -84,6 +88,106 @@ export const RECURRENCES: { value: PlanItem["recurrence"]; label: string }[] = [
   { value: "monthly", label: "Mensuelle" },
   { value: "yearly", label: "Annuelle" },
 ];
+
+export const WEEKDAYS: { value: number; label: string; short: string }[] = [
+  { value: 1, label: "Lundi", short: "Lun" },
+  { value: 2, label: "Mardi", short: "Mar" },
+  { value: 3, label: "Mercredi", short: "Mer" },
+  { value: 4, label: "Jeudi", short: "Jeu" },
+  { value: 5, label: "Vendredi", short: "Ven" },
+  { value: 6, label: "Samedi", short: "Sam" },
+  { value: 0, label: "Dimanche", short: "Dim" },
+];
+
+/** Modular habit patterns. `custom` lets the user tune every field by hand. */
+export type RecurrencePreset = {
+  id: string;
+  label: string;
+  group: string;
+  freq: PlanItem["recurrence"];
+  interval: number;
+  weekdays: number[] | null;
+  monthDays: number[] | null;
+};
+
+export const RECURRENCE_PRESETS: RecurrencePreset[] = [
+  { id: "none", label: "Aucune (ponctuel)", group: "Ponctuel", freq: "none", interval: 1, weekdays: null, monthDays: null },
+
+  { id: "daily", label: "Journalier — tous les jours", group: "Journalier", freq: "daily", interval: 1, weekdays: null, monthDays: null },
+  { id: "daily_weekdays", label: "Journalier — jours ouvrés (hors week-end)", group: "Journalier", freq: "weekly", interval: 1, weekdays: [1, 2, 3, 4, 5], monthDays: null },
+  { id: "weekends", label: "Chaque week-end (samedi & dimanche)", group: "Journalier", freq: "weekly", interval: 1, weekdays: [6, 0], monthDays: null },
+  { id: "daily_2", label: "Tous les 2 jours", group: "Journalier", freq: "daily", interval: 2, weekdays: null, monthDays: null },
+  { id: "daily_3", label: "Tous les 3 jours", group: "Journalier", freq: "daily", interval: 3, weekdays: null, monthDays: null },
+
+  { id: "weekly", label: "Hebdomadaire (1×/semaine)", group: "Hebdomadaire", freq: "weekly", interval: 1, weekdays: null, monthDays: null },
+  { id: "weekly_2x", label: "2×/semaine (lundi & jeudi)", group: "Hebdomadaire", freq: "weekly", interval: 1, weekdays: [1, 4], monthDays: null },
+  { id: "weekly_3x", label: "3×/semaine (lundi, mercredi, vendredi)", group: "Hebdomadaire", freq: "weekly", interval: 1, weekdays: [1, 3, 5], monthDays: null },
+  { id: "biweekly", label: "Toutes les 2 semaines", group: "Hebdomadaire", freq: "weekly", interval: 2, weekdays: null, monthDays: null },
+  { id: "monthly_week", label: "Toutes les 4 semaines", group: "Hebdomadaire", freq: "weekly", interval: 4, weekdays: null, monthDays: null },
+
+  { id: "monthly", label: "Mensuel (1×/mois)", group: "Mensuel & plus", freq: "monthly", interval: 1, weekdays: null, monthDays: null },
+  { id: "monthly_2x", label: "2×/mois (1 & 15)", group: "Mensuel & plus", freq: "monthly", interval: 1, weekdays: null, monthDays: [1, 15] },
+  { id: "monthly_3x", label: "3×/mois (1, 10 & 20)", group: "Mensuel & plus", freq: "monthly", interval: 1, weekdays: null, monthDays: [1, 10, 20] },
+  { id: "monthly_5x", label: "5×/mois (1, 7, 14, 21 & 28)", group: "Mensuel & plus", freq: "monthly", interval: 1, weekdays: null, monthDays: [1, 7, 14, 21, 28] },
+  { id: "bimonthly", label: "Bimestriel (tous les 2 mois)", group: "Mensuel & plus", freq: "monthly", interval: 2, weekdays: null, monthDays: null },
+  { id: "quarterly", label: "Trimestriel (tous les 3 mois)", group: "Mensuel & plus", freq: "monthly", interval: 3, weekdays: null, monthDays: null },
+  { id: "semiannual", label: "Semestriel (tous les 6 mois)", group: "Mensuel & plus", freq: "monthly", interval: 6, weekdays: null, monthDays: null },
+  { id: "yearly", label: "Annuel", group: "Mensuel & plus", freq: "yearly", interval: 1, weekdays: null, monthDays: null },
+  { id: "biennial", label: "Tous les 2 ans", group: "Mensuel & plus", freq: "yearly", interval: 2, weekdays: null, monthDays: null },
+
+  { id: "custom", label: "Personnalisé…", group: "Avancé", freq: "daily", interval: 1, weekdays: null, monthDays: null },
+];
+
+const sameSet = (a: number[] | null | undefined, b: number[] | null | undefined) => {
+  const x = [...(a ?? [])].sort((m, n) => m - n).join(",");
+  const y = [...(b ?? [])].sort((m, n) => m - n).join(",");
+  return x === y;
+};
+
+/** Find which preset matches the stored recurrence fields (else "custom"). */
+export function detectRecurrencePreset(v: {
+  recurrence: PlanItem["recurrence"];
+  recurrence_interval?: number | null;
+  recurrence_weekdays?: number[] | null;
+  recurrence_month_days?: number[] | null;
+}): string {
+  const interval = v.recurrence_interval && v.recurrence_interval > 0 ? v.recurrence_interval : 1;
+  const hit = RECURRENCE_PRESETS.find(
+    (p) =>
+      p.id !== "custom" &&
+      p.freq === v.recurrence &&
+      p.interval === interval &&
+      sameSet(p.weekdays, v.recurrence_weekdays) &&
+      sameSet(p.monthDays, v.recurrence_month_days),
+  );
+  return hit?.id ?? "custom";
+}
+
+/** Short human label for a recurrence, used in lists/cards. */
+export function recurrenceLabel(item: {
+  recurrence: PlanItem["recurrence"];
+  recurrence_interval?: number | null;
+  recurrence_weekdays?: number[] | null;
+  recurrence_month_days?: number[] | null;
+  times_per_day?: number | null;
+}): string | null {
+  if (item.recurrence === "none") return (item.times_per_day ?? 1) > 1 ? `${item.times_per_day}×/jour` : null;
+  const id = detectRecurrencePreset(item);
+  const preset = RECURRENCE_PRESETS.find((p) => p.id === id);
+  const interval = item.recurrence_interval && item.recurrence_interval > 0 ? item.recurrence_interval : 1;
+  let base =
+    preset && preset.id !== "custom"
+      ? preset.label
+      : item.recurrence === "daily"
+        ? `Tous les ${interval} jour(s)`
+        : item.recurrence === "weekly"
+          ? `Toutes les ${interval} semaine(s)${(item.recurrence_weekdays ?? []).length ? ` · ${(item.recurrence_weekdays ?? []).map((w) => WEEKDAYS.find((x) => x.value === w)?.short).join(", ")}` : ""}`
+          : item.recurrence === "monthly"
+            ? `Tous les ${interval} mois${(item.recurrence_month_days ?? []).length ? ` · le ${(item.recurrence_month_days ?? []).join(", ")}` : ""}`
+            : `Tous les ${interval} an(s)`;
+  if ((item.times_per_day ?? 1) > 1) base += ` · ${item.times_per_day}×/jour`;
+  return base;
+}
 
 /** A planned item is "done" (traité) when it reached a terminal state. */
 export const CLOSED_STATUSES: PlanStatus[] = ["done", "failed", "cancelled"];
@@ -210,6 +314,9 @@ export function occurrencesInRange(item: PlanItem, from: Date, to: Date): string
   const until = item.recurrence_until ? parseYmd(item.recurrence_until) : null;
   const out: string[] = [];
   const spanEnd = item.end_on ? parseYmd(item.end_on) : null;
+  const interval = item.recurrence_interval && item.recurrence_interval > 0 ? item.recurrence_interval : 1;
+  const weekdays = (item.recurrence_weekdays ?? []).filter((w) => w >= 0 && w <= 6);
+  const monthDays = (item.recurrence_month_days ?? []).filter((d) => d >= 1 && d <= 31);
 
   const pushRange = (start: Date) => {
     const days = spanEnd ? Math.max(0, Math.round((spanEnd.getTime() - base.getTime()) / 86400000)) : 0;
@@ -225,15 +332,60 @@ export function occurrencesInRange(item: PlanItem, from: Date, to: Date): string
   }
 
   const limit = until && until < to ? until : to;
-  let cursor = new Date(base);
+  if (base > limit) return out;
+
+  if (item.recurrence === "daily") {
+    let cursor = new Date(base);
+    let guard = 0;
+    while (cursor <= limit && guard < 4000) {
+      guard++;
+      if (cursor >= from && (weekdays.length === 0 || weekdays.includes(cursor.getDay()))) pushRange(cursor);
+      cursor = addDays(cursor, interval);
+    }
+    return out;
+  }
+
+  if (item.recurrence === "weekly") {
+    const days = weekdays.length ? weekdays : [base.getDay()];
+    let weekStart = startOfWeek(base);
+    let guard = 0;
+    while (weekStart <= limit && guard < 1000) {
+      guard++;
+      for (const wd of days) {
+        const offset = (wd + 6) % 7; // Monday-based offset
+        const d = addDays(weekStart, offset);
+        if (d >= base && d >= from && d <= limit) pushRange(d);
+      }
+      weekStart = addDays(weekStart, 7 * interval);
+    }
+    return out;
+  }
+
+  if (item.recurrence === "monthly") {
+    const days = monthDays.length ? monthDays : [base.getDate()];
+    let monthCursor = new Date(base.getFullYear(), base.getMonth(), 1);
+    let guard = 0;
+    while (monthCursor <= limit && guard < 600) {
+      guard++;
+      const lastDay = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0).getDate();
+      for (const dd of days) {
+        const d = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), Math.min(dd, lastDay));
+        if (d >= base && d >= from && d <= limit) pushRange(d);
+      }
+      monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + interval, 1);
+    }
+    return out;
+  }
+
+  // yearly
+  let year = base.getFullYear();
   let guard = 0;
-  while (cursor <= limit && guard < 1500) {
+  while (guard < 200) {
     guard++;
-    if (cursor >= from) pushRange(cursor);
-    if (item.recurrence === "daily") cursor = addDays(cursor, 1);
-    else if (item.recurrence === "weekly") cursor = addDays(cursor, 7);
-    else if (item.recurrence === "monthly") cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
-    else cursor = new Date(cursor.getFullYear() + 1, cursor.getMonth(), cursor.getDate());
+    const d = new Date(year, base.getMonth(), base.getDate());
+    if (d > limit) break;
+    if (d >= base && d >= from) pushRange(d);
+    year += interval;
   }
   return out;
 }

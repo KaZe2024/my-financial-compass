@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
 import { counterpartiesQO } from "@/lib/queries";
 import {
-  PRIORITIES, RECURRENCES, STATUSES, planItemTagsQO, planProjectsQO, planTagsQO, planTypesQO,
+  PRIORITIES, RECURRENCES, RECURRENCE_PRESETS, WEEKDAYS, detectRecurrencePreset,
+  STATUSES, planItemTagsQO, planProjectsQO, planTagsQO, planTypesQO,
   qkPlanItemTags, qkPlanItems, type PlanItem, ymd,
 } from "@/lib/planning";
 import { Trash2 } from "lucide-react";
@@ -55,6 +56,11 @@ export function PlanItemDialog({
   const [notes, setNotes] = useState("");
   const [recurrence, setRecurrence] = useState("none");
   const [recurrenceUntil, setRecurrenceUntil] = useState("");
+  const [preset, setPreset] = useState("none");
+  const [interval, setIntervalValue] = useState("1");
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [monthDays, setMonthDays] = useState<number[]>([]);
+  const [timesPerDay, setTimesPerDay] = useState("1");
   const [reminder, setReminder] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
@@ -85,6 +91,11 @@ export function PlanItemDialog({
       setNotes(item.notes ?? "");
       setRecurrence(item.recurrence);
       setRecurrenceUntil(item.recurrence_until ?? "");
+      setPreset(detectRecurrencePreset(item));
+      setIntervalValue(String(item.recurrence_interval ?? 1));
+      setWeekdays(item.recurrence_weekdays ?? []);
+      setMonthDays(item.recurrence_month_days ?? []);
+      setTimesPerDay(String(item.times_per_day ?? 1));
       setReminder(item.reminder_minutes ? String(item.reminder_minutes) : "");
       setSelectedTags(currentTagIds);
     } else {
@@ -107,6 +118,11 @@ export function PlanItemDialog({
       setNotes("");
       setRecurrence("none");
       setRecurrenceUntil("");
+      setPreset("none");
+      setIntervalValue("1");
+      setWeekdays([]);
+      setMonthDays([]);
+      setTimesPerDay("1");
       setReminder("");
       setSelectedTags([]);
     }
@@ -136,6 +152,10 @@ export function PlanItemDialog({
         notes: notes.trim() || null,
         recurrence,
         recurrence_until: recurrence !== "none" && recurrenceUntil ? recurrenceUntil : null,
+        recurrence_interval: recurrence === "none" ? 1 : Math.max(1, Number(interval) || 1),
+        recurrence_weekdays: recurrence === "none" || weekdays.length === 0 ? null : [...weekdays].sort((a, b) => a - b),
+        recurrence_month_days: recurrence !== "monthly" || monthDays.length === 0 ? null : [...monthDays].sort((a, b) => a - b),
+        times_per_day: Math.max(1, Number(timesPerDay) || 1),
         reminder_minutes: reminder ? Number(reminder) : null,
         completed_at: status === "done" ? new Date().toISOString() : null,
       };
@@ -321,14 +341,86 @@ export function PlanItemDialog({
             <Input type="number" min="0" value={reminder} onChange={(e) => setReminder(e.target.value)} placeholder="Ex. 15" />
           </div>
 
-          <div>
-            <Label>Récurrence</Label>
-            <Select value={recurrence} onValueChange={setRecurrence}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RECURRENCES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+          <div className="md:col-span-2">
+            <Label>Habitude / récurrence</Label>
+            <Select
+              value={preset}
+              onValueChange={(v) => {
+                setPreset(v);
+                const p = RECURRENCE_PRESETS.find((x) => x.id === v);
+                if (!p || v === "custom") { if (v === "custom" && recurrence === "none") setRecurrence("daily"); return; }
+                setRecurrence(p.freq);
+                setIntervalValue(String(p.interval));
+                setWeekdays(p.weekdays ?? []);
+                setMonthDays(p.monthDays ?? []);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Choisir un rythme" /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                {RECURRENCE_PRESETS.map((p) => <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+
+          {preset === "custom" && (
+            <>
+              <div>
+                <Label>Fréquence de base</Label>
+                <Select value={recurrence} onValueChange={setRecurrence}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RECURRENCES.filter((r) => r.value !== "none").map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tous les… (intervalle)</Label>
+                <Input type="number" min="1" value={interval} onChange={(e) => setIntervalValue(e.target.value)} />
+              </div>
+
+              {(recurrence === "weekly" || recurrence === "daily") && (
+                <div className="md:col-span-2">
+                  <Label>Jours de la semaine (optionnel)</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {WEEKDAYS.map((w) => {
+                      const on = weekdays.includes(w.value);
+                      return (
+                        <button key={w.value} type="button"
+                          onClick={() => setWeekdays((prev) => on ? prev.filter((x) => x !== w.value) : [...prev, w.value])}
+                          className={`rounded-sm border px-2.5 py-1 text-xs ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>
+                          {w.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {recurrence === "monthly" && (
+                <div className="md:col-span-2">
+                  <Label>Jours du mois (ex. 1, 15 pour 2×/mois)</Label>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                      const on = monthDays.includes(d);
+                      return (
+                        <button key={d} type="button"
+                          onClick={() => setMonthDays((prev) => on ? prev.filter((x) => x !== d) : [...prev, d])}
+                          className={`h-7 w-7 rounded-sm border text-[11px] ${on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"}`}>
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <Label>Répétitions par jour</Label>
+            <Input type="number" min="1" value={timesPerDay} onChange={(e) => setTimesPerDay(e.target.value)} placeholder="Ex. 3" />
           </div>
           <div>
             <Label>Répéter jusqu'au</Label>
