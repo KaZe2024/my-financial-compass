@@ -445,6 +445,18 @@ function Dashboard() {
               </div>
             </div>
           </div>
+          <div className="mb-3 h-56">
+            <ResponsiveContainer>
+              <LineChart data={forecastChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="label" stroke="#6b7280" fontSize={10} interval={6} />
+                <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => new Intl.NumberFormat("fr-FR", { notation: "compact" }).format(v)} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
+                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Solde projeté" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
           <div className="rounded-sm border border-border bg-background/40 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
             <ol className="mt-2 space-y-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
