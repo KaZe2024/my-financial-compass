@@ -35,9 +35,11 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  buildAllocation, buildForecast, computeHealth,
+  buildAllocation, buildExpertForecast, computeHealth,
   forecastAt, growthRate, scoreTone,
+  type CashItem, type MonthBaseline,
 } from "@/lib/analytics";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OPTIS" }] }),
