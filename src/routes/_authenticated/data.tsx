@@ -62,15 +62,15 @@ async function buildLabelizer() {
     supabase.from("receivables").select("id, debtor"),
     supabase.from("analytical_tags").select("id, name"),
   ]);
-  const wallets = new Map((walletsR.data ?? []).map((r: any) => [r.id, r.name]));
-  const cps = new Map((cpsR.data ?? []).map((r: any) => [r.id, r.name]));
-  const projects = new Map((projectsR.data ?? []).map((r: any) => [r.id, r.name]));
-  const assets = new Map((assetsR.data ?? []).map((r: any) => [r.id, r.name]));
-  const debts = new Map((debtsR.data ?? []).map((r: any) => [r.id, r.creditor]));
-  const recs = new Map((recR.data ?? []).map((r: any) => [r.id, r.debtor]));
-  const tags = new Map((tagsR.data ?? []).map((r: any) => [r.id, r.name]));
+  const wallets = new Map<string, any>((walletsR.data ?? []).map((r: any) => [r.id, r.name] as [string, any]));
+  const cps = new Map<string, any>((cpsR.data ?? []).map((r: any) => [r.id, r.name] as [string, any]));
+  const projects = new Map<string, any>((projectsR.data ?? []).map((r: any) => [r.id, r.name] as [string, any]));
+  const assets = new Map<string, any>((assetsR.data ?? []).map((r: any) => [r.id, r.name] as [string, any]));
+  const debts = new Map<string, any>((debtsR.data ?? []).map((r: any) => [r.id, r.creditor] as [string, any]));
+  const recs = new Map<string, any>((recR.data ?? []).map((r: any) => [r.id, r.debtor] as [string, any]));
+  const tags = new Map<string, any>((tagsR.data ?? []).map((r: any) => [r.id, r.name] as [string, any]));
   // Budget node: display full path
-  const nodesById = new Map((nodesR.data ?? []).map((n: any) => [n.id, n]));
+  const nodesById = new Map<string, any>((nodesR.data ?? []).map((n: any) => [n.id, n] as [string, any]));
   function nodePath(id: string): string {
     const parts: string[] = [];
     let cur = nodesById.get(id);
@@ -255,7 +255,7 @@ async function buildDelabelizer() {
   const debts = idx(debtsR.data ?? [], "creditor");
   const recs = idx(recR.data ?? [], "debtor");
   const tags = idx(tagsR.data ?? [], "name");
-  const nodesById = new Map((nodesR.data ?? []).map((n: any) => [n.id, n]));
+  const nodesById = new Map<string, any>((nodesR.data ?? []).map((n: any) => [n.id, n] as [string, any]));
   const nodePath = (id: string): string => {
     const parts: string[] = []; let cur: any = nodesById.get(id); let g = 0;
     while (cur && g++ < 20) { parts.unshift(cur.name); cur = cur.parent_id ? nodesById.get(cur.parent_id) : null; }

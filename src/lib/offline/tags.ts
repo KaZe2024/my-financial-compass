@@ -19,7 +19,7 @@ export async function syncTagsOffline(txId: string, newIds: string[]) {
       .select("tag_id")
       .eq("transaction_id", txId);
     if (readError) throw readError;
-    oldIds = (existing ?? []).map((r) => r.tag_id);
+    oldIds = (existing ?? []).map((r: any) => r.tag_id);
 
     const toRemove = oldIds.filter((x) => !nextIds.includes(x));
     if (toRemove.length) {

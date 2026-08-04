@@ -282,7 +282,7 @@ function Dashboard() {
       type: a.type || "autre",
       current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).marketValue,
     }))
-    .filter((r) => r.current_value > 0);
+    .filter((r: any) => r.current_value > 0);
   const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 

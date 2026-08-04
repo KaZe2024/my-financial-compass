@@ -154,7 +154,7 @@ function BudgetsPage() {
 
   const spentRollupByNode = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of spend.data ?? []) {
+    for (const r of (spend.data ?? []) as any[]) {
       if (!r.node_id) continue;
       m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent_rollup));
     }
@@ -163,7 +163,7 @@ function BudgetsPage() {
 
   const directSpendByNode = useMemo(() => {
     const m = new Map<string, number>();
-    for (const r of directSpend.data ?? []) {
+    for (const r of (directSpend.data ?? []) as any[]) {
       if (!r.node_id) continue;
       m.set(r.node_id, (m.get(r.node_id) ?? 0) + Number(r.spent));
     }
