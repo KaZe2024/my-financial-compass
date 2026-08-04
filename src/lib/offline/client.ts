@@ -352,7 +352,7 @@ class OfflineBuilder implements PromiseLike<Result> {
   throwOnError() { return this.push("throwOnError"); }
 
   // ---- execution
-  private async runOnline(): Promise<Result> {
+  private async runOnline(): Promise<Result<any>> {
     let q: any = (realSupabase as any).from(this.table);
     for (const { m, args } of this.chain) {
       q = q[m](...args);
@@ -380,7 +380,7 @@ class OfflineBuilder implements PromiseLike<Result> {
     return res;
   }
 
-  private finishRead(rows: any[]): Result {
+  private finishRead(rows: any[]): Result<any> {
     let out = rows;
     for (const o of [...this.orders].reverse()) {
       out = [...out].sort((a, b) => (o.asc ? cmp(a?.[o.col], b?.[o.col]) : cmp(b?.[o.col], a?.[o.col])));
@@ -397,7 +397,7 @@ class OfflineBuilder implements PromiseLike<Result> {
     return { data: out, error: null, count: this.countMode ? total : null };
   }
 
-  private async runOfflineRead(): Promise<Result> {
+  private async runOfflineRead(): Promise<Result<any>> {
     if (!isSynced(this.table)) {
       return { data: this.wantSingle || this.maybe ? null : [], error: null, count: 0 };
     }
@@ -407,7 +407,7 @@ class OfflineBuilder implements PromiseLike<Result> {
     return this.finishRead(projected);
   }
 
-  private async runOfflineWrite(): Promise<Result> {
+  private async runOfflineWrite(): Promise<Result<any>> {
     if (!isSynced(this.table)) {
       return { data: null, error: { message: `Table ${this.table} indisponible hors ligne` } };
     }
@@ -471,7 +471,7 @@ class OfflineBuilder implements PromiseLike<Result> {
     return { data: this.hasSelect ? projected : null, error: null };
   }
 
-  private async exec(): Promise<Result> {
+  private async exec(): Promise<Result<any>> {
     let online = false;
     try {
       online = await checkOnlineWithHeartbeat();
