@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import { offlineInsert, offlineUpdate, offlineDelete } from "@/lib/offline/mutations";
 import { counterpartiesQO } from "@/lib/queries";
 import {
-  PRIORITIES, RECURRENCES, STATUSES, planItemTagsQO, planProjectsQO, planTagsQO, planTypesQO,
+  PRIORITIES, RECURRENCES, RECURRENCE_PRESETS, WEEKDAYS, detectRecurrencePreset,
+  STATUSES, planItemTagsQO, planProjectsQO, planTagsQO, planTypesQO,
   qkPlanItemTags, qkPlanItems, type PlanItem, ymd,
 } from "@/lib/planning";
 import { Trash2 } from "lucide-react";
