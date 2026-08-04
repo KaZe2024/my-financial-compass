@@ -36,7 +36,7 @@ import {
 } from "recharts";
 import {
   buildAllocation, buildExpertForecast, computeHealth,
-  forecastAt, growthRate, scoreTone,
+  forecastAt, growthRate, scoreTone, healthCommentary,
   type CashItem, type MonthBaseline,
 } from "@/lib/analytics";
 
