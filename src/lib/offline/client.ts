@@ -252,7 +252,10 @@ async function projectRows(rows: any[], sel: string): Promise<any[]> {
 
 type Chain = { m: string; args: any[] };
 
-type Result<T = any> = { data: T; error: any; count?: number | null; status?: number; statusText?: string };
+/** Données souples : indexables comme un tableau ET comme un objet (single). */
+type FlexData = any[] & Record<string, any>;
+
+type Result<T = FlexData> = { data: T; error: any; count?: number | null; status?: number; statusText?: string };
 
 class OfflineBuilder implements PromiseLike<Result> {
   private chain: Chain[] = [];
