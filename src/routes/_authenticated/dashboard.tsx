@@ -418,20 +418,65 @@ function Dashboard() {
               );
             })}
           </div>
-          <div className="h-56">
-            <ResponsiveContainer>
-              <LineChart data={forecastChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                <XAxis dataKey="label" stroke="#6b7280" fontSize={10} interval={6} />
-                <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => new Intl.NumberFormat("fr-FR", { notation: "compact" }).format(v)} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Solde projeté" />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Point le plus bas</div>
+              <div className={`num text-sm font-semibold ${expert.low.balance >= 0 ? "text-foreground" : "text-negative"}`}>
+                {fmtMoney(expert.low.balance, cur, { compact: true })}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">{fmtDate(expert.low.date)}</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Risque de découvert</div>
+              <div className={`num text-sm font-semibold ${expert.breachDay ? "text-negative" : "text-positive"}`}>
+                {expert.breachDay ? fmtDate(expert.breachDay.date) : "Aucun"}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">
+                {expert.breachDay ? `J+${expert.breachDay.day}` : "sur 365 jours"}
+              </div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Base mensuelle (mois en cours)</div>
+              <div className="num text-sm font-semibold">
+                {fmtMoney((baseline0?.income ?? 0) - (baseline0?.expense ?? 0), cur, { compact: true })}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">
+                {baseline0?.planned ? "budget planifié" : "moyenne réelle 90 j"}
+              </div>
+            </div>
           </div>
-          <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Planifie les revenus récurrents (~{fmtMoney(recurringIncomePerDay * 30, cur, { compact: true })}/mois) et abonnements (~{fmtMoney(subscriptionsPerDay * 30, cur, { compact: true })}/mois) sur leur vraie cadence, plus une base résiduelle (revenus {fmtMoney(residualDailyIncome * 30, cur, { compact: true })}/mois, dépenses {fmtMoney(residualDailyExpense * 30, cur, { compact: true })}/mois) et les échéances dettes/créances/provisions.
-          </p>
+          <div className="rounded-sm border border-border bg-background/40 p-3">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
+            <ol className="mt-2 space-y-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
+              <li>
+                1. Point de départ = trésorerie disponible aujourd'hui : {fmtMoney(cash, cur)} (soldes d'ouverture + impact de toutes les transactions saisies).
+              </li>
+              <li>
+                2. Base opérationnelle mois par mois = budget planifié quand il existe ({plannedMonths}/14 mois planifiés),
+                sinon extrapolation de la moyenne réelle des 90 derniers jours
+                (entrées {fmtMoney(avgIn * 30, cur, { compact: true })}/mois, sorties {fmtMoney(avgOut * 30, cur, { compact: true })}/mois).
+                Achats d'actifs, provisions comptables et transferts entre comptes sont exclus.
+                Les revenus récurrents ({activeIncomeSrc.length}) et abonnements actifs ({activeSubs.length}) sont déjà contenus
+                dans cette base — ils ne sont pas ajoutés une seconde fois.
+              </li>
+              <li>
+                3. Flux datés ajoutés à leur échéance réelle :
+                {expert.groups.length === 0 ? " aucun." : ""}
+              </li>
+              {expert.groups.map(g => (
+                <li key={g.group} className="pl-4">
+                  • {g.group} ({g.count}) :
+                  {g.inflow > 0 ? ` +${fmtMoney(g.inflow, cur, { compact: true })}` : ""}
+                  {g.outflow > 0 ? ` −${fmtMoney(g.outflow, cur, { compact: true })}` : ""}
+                </li>
+              ))}
+              <li>
+                4. Prudence : les créances sont pondérées à 85 % et les factures à émettre à 60–90 % selon leur statut ;
+                toute échéance déjà dépassée est replacée à J+7 (régularisation) au lieu d'être ignorée.
+              </li>
+            </ol>
+          </div>
+
         </Panel>
 
         <Panel title="Santé financière">
