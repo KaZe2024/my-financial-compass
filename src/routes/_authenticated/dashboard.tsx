@@ -36,7 +36,7 @@ import {
 } from "recharts";
 import {
   buildAllocation, buildExpertForecast, computeHealth,
-  forecastAt, growthRate, scoreTone, healthCommentary,
+  forecastAt, growthRate, scoreTone, healthCommentary, wealthCommentary,
   type CashItem, type MonthBaseline,
 } from "@/lib/analytics";
 
@@ -249,7 +249,7 @@ function Dashboard() {
     })),
   ].filter((i) => i.amount !== 0);
 
-  const expert = buildExpertForecast({ startingCash: cash, baselines, items }, 365);
+  const expert = buildExpertForecast({ startingCash: cashToday, baselines, items }, 365);
   const forecast = expert.points;
   const plannedMonths = baselines.filter((b) => b.planned).length;
   const baseline0 = baselines[0];
@@ -274,7 +274,7 @@ function Dashboard() {
 
   // Allocation — cohérente avec la période sélectionnée et avec le patrimoine :
   // valeur des actifs (VNC/réévaluée) à la date de fin de période + liquidités à cette date.
-  const allocCash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
+  const allocCash = cash;
   const assetAllocationRows = (assetsRows.data ?? [])
     .filter((a: any) => !a.archived)
     .filter((a: any) => !a.purchase_date || a.purchase_date <= periodTo)
@@ -288,9 +288,19 @@ function Dashboard() {
 
 
   // Wealth evolution (snapshots + current point)
+  const wealth = wealthCommentary({
+    netWorth, cash, assets: totalAssets, receivables: totalRec, debt: totalDebt,
+    income, expense, savingsRate,
+    momGrowth: monthAgoSnap ? momGrowth : null,
+    threeMoGrowth: threeAgoSnap ? threeMoGrowth : null,
+    yoyGrowth: yearAgoSnap ? yoyGrowth : null,
+    snapshotCount: snapList.length,
+    periodLabel: resolved.label,
+  });
+
   const wealthChart = [
     ...snapList.map(s => ({ month: fmtMonth(s.snapshot_month), net: Number(s.net_worth) })),
-    { month: "Auj.", net: netWorth },
+    { month: periodTo >= todayISO ? "Auj." : fmtMonth(periodTo), net: netWorth },
   ];
 
   // Goal forecast
@@ -380,6 +390,42 @@ function Dashboard() {
             </ResponsiveContainer>
           </div>
           {snapList.length === 0 && <p className="mt-2 text-xs text-muted-foreground">Aucun snapshot mensuel. Lancez la clôture mensuelle pour démarrer l'historique.</p>}
+          <div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-xs leading-relaxed">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Lecture analyste — {resolved.label}</span>
+              <span className={`font-mono text-[10px] uppercase tracking-wider ${(threeMoGrowth || momGrowth) >= 0.01 ? "text-positive" : (threeMoGrowth || momGrowth) <= -0.01 ? "text-negative" : "text-warning"}`}>{wealth.verdict}</span>
+            </div>
+            <p className="text-muted-foreground">{wealth.summary}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {wealth.drivers.length > 0 && (
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-positive">Moteurs</div>
+                  <ul className="mt-1 space-y-1 text-muted-foreground">
+                    {wealth.drivers.map((d) => <li key={d} className="flex gap-1.5"><span className="text-positive">▸</span><span>{d}</span></li>)}
+                  </ul>
+                </div>
+              )}
+              {wealth.watch.length > 0 && (
+                <div>
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-warning">Points de vigilance</div>
+                  <ul className="mt-1 space-y-1 text-muted-foreground">
+                    {wealth.watch.map((d) => <li key={d} className="flex gap-1.5"><span className="text-warning">▸</span><span>{d}</span></li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {wealth.actions.length > 0 && (
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-primary">Recommandations</div>
+                <ol className="mt-1 space-y-1 text-muted-foreground">
+                  {wealth.actions.map((d, i) => <li key={d} className="flex gap-1.5"><span className="num text-primary">{i + 1}.</span><span>{d}</span></li>)}
+                </ol>
+              </div>
+            )}
+            <p className="font-mono text-[10px] text-muted-foreground">
+              Composition à fin de période : trésorerie {fmtMoney(cash, cur, { compact: true })} · actifs {fmtMoney(totalAssets, cur, { compact: true })} · créances {fmtMoney(totalRec, cur, { compact: true })} · dettes −{fmtMoney(totalDebt, cur, { compact: true })} → valeur nette {fmtMoney(netWorth, cur, { compact: true })}.
+            </p>
+          </div>
         </Panel>
 
         <Panel title="Allocation d'actifs">
@@ -473,7 +519,7 @@ function Dashboard() {
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
             <ol className="mt-2 space-y-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
               <li>
-                1. Point de départ = trésorerie disponible aujourd'hui : {fmtMoney(cash, cur)} (soldes d'ouverture + impact de toutes les transactions saisies).
+                1. Point de départ = trésorerie disponible aujourd'hui : {fmtMoney(cashToday, cur)} (soldes d'ouverture + impact de toutes les transactions saisies).
               </li>
               <li>
                 2. Base opérationnelle mois par mois = budget planifié quand il existe ({plannedMonths}/14 mois planifiés),
@@ -583,7 +629,7 @@ function Dashboard() {
           </div>
         </Panel>
 
-        <Panel title="Dépenses du mois · branches">
+        <Panel title={`Dépenses · ${resolved.label} · branches`}>
           {(() => {
             const tree = buildTree(nodesQ.data ?? []);
             const flat = flattenTree(tree);
@@ -620,7 +666,7 @@ function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {rootData.length === 0 && <p className="mt-2 text-center text-xs text-muted-foreground">Aucune dépense liée à un budget ce mois-ci.</p>}
+                {rootData.length === 0 && <p className="mt-2 text-center text-xs text-muted-foreground">Aucune dépense liée à un budget sur la période.</p>}
               </>
             );
           })()}
