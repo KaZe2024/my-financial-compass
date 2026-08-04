@@ -5,7 +5,7 @@ import {
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
   Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";

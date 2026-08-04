@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { walletsQO } from "@/lib/queries";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";

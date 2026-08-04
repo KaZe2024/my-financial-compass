@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 
 export type AuditAction = "create" | "update" | "delete" | "archive" | "restore" | "close";
 export type AuditEntity =
