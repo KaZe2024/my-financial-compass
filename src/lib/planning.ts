@@ -314,6 +314,9 @@ export function occurrencesInRange(item: PlanItem, from: Date, to: Date): string
   const until = item.recurrence_until ? parseYmd(item.recurrence_until) : null;
   const out: string[] = [];
   const spanEnd = item.end_on ? parseYmd(item.end_on) : null;
+  const interval = item.recurrence_interval && item.recurrence_interval > 0 ? item.recurrence_interval : 1;
+  const weekdays = (item.recurrence_weekdays ?? []).filter((w) => w >= 0 && w <= 6);
+  const monthDays = (item.recurrence_month_days ?? []).filter((d) => d >= 1 && d <= 31);
 
   const pushRange = (start: Date) => {
     const days = spanEnd ? Math.max(0, Math.round((spanEnd.getTime() - base.getTime()) / 86400000)) : 0;
@@ -329,15 +332,60 @@ export function occurrencesInRange(item: PlanItem, from: Date, to: Date): string
   }
 
   const limit = until && until < to ? until : to;
-  let cursor = new Date(base);
+  if (base > limit) return out;
+
+  if (item.recurrence === "daily") {
+    let cursor = new Date(base);
+    let guard = 0;
+    while (cursor <= limit && guard < 4000) {
+      guard++;
+      if (cursor >= from && (weekdays.length === 0 || weekdays.includes(cursor.getDay()))) pushRange(cursor);
+      cursor = addDays(cursor, interval);
+    }
+    return out;
+  }
+
+  if (item.recurrence === "weekly") {
+    const days = weekdays.length ? weekdays : [base.getDay()];
+    let weekStart = startOfWeek(base);
+    let guard = 0;
+    while (weekStart <= limit && guard < 1000) {
+      guard++;
+      for (const wd of days) {
+        const offset = (wd + 6) % 7; // Monday-based offset
+        const d = addDays(weekStart, offset);
+        if (d >= base && d >= from && d <= limit) pushRange(d);
+      }
+      weekStart = addDays(weekStart, 7 * interval);
+    }
+    return out;
+  }
+
+  if (item.recurrence === "monthly") {
+    const days = monthDays.length ? monthDays : [base.getDate()];
+    let monthCursor = new Date(base.getFullYear(), base.getMonth(), 1);
+    let guard = 0;
+    while (monthCursor <= limit && guard < 600) {
+      guard++;
+      const lastDay = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0).getDate();
+      for (const dd of days) {
+        const d = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), Math.min(dd, lastDay));
+        if (d >= base && d >= from && d <= limit) pushRange(d);
+      }
+      monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + interval, 1);
+    }
+    return out;
+  }
+
+  // yearly
+  let year = base.getFullYear();
   let guard = 0;
-  while (cursor <= limit && guard < 1500) {
+  while (guard < 200) {
     guard++;
-    if (cursor >= from) pushRange(cursor);
-    if (item.recurrence === "daily") cursor = addDays(cursor, 1);
-    else if (item.recurrence === "weekly") cursor = addDays(cursor, 7);
-    else if (item.recurrence === "monthly") cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, cursor.getDate());
-    else cursor = new Date(cursor.getFullYear() + 1, cursor.getMonth(), cursor.getDate());
+    const d = new Date(year, base.getMonth(), base.getDate());
+    if (d > limit) break;
+    if (d >= base && d >= from) pushRange(d);
+    year += interval;
   }
   return out;
 }
