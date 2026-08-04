@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";

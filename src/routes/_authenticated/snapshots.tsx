@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { Panel, StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +122,7 @@ function SnapshotsPage() {
   );
   const last = list[list.length - 1];
   const prev = list[list.length - 2];
-  const yearAgo = list.find(s => {
+  const yearAgo = list.find((s: any) => {
     const now = new Date();
     const d = new Date(s.snapshot_month);
     return d.getFullYear() === now.getFullYear() - 1 && d.getMonth() === now.getMonth();
@@ -251,7 +251,7 @@ function SnapshotsPage() {
               </tr>
             </thead>
             <tbody>
-              {list.slice().reverse().map((s: any, idx, arr) => {
+              {list.slice().reverse().map((s: any, idx: number, arr: any[]) => {
                 const next = arr[idx + 1]; // previous chronologically
                 const delta = next ? growthRate(Number(s.net_worth), Number(next.net_worth)) * 100 : null;
                 return (

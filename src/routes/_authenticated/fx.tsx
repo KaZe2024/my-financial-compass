@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { Panel } from "@/components/stat-card";
 import { PeriodPicker, usePeriodState } from "@/components/period-picker";
 import { resolvePeriod, isoDate } from "@/lib/period";

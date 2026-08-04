@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, toISODate } from "@/lib/format";
 import { walletsQO, profileQO, budgetNodesQO } from "@/lib/queries";
@@ -282,7 +282,7 @@ function Dashboard() {
       type: a.type || "autre",
       current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).marketValue,
     }))
-    .filter((r) => r.current_value > 0);
+    .filter((r: any) => r.current_value > 0);
   const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 

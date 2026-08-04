@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { offlineSelect, byDateDesc } from "@/lib/offline/read";
 import { queryOptions } from "@tanstack/react-query";
 import { fetchAllRows } from "@/lib/fetch-all";
