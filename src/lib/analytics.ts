@@ -419,9 +419,10 @@ export function wealthCommentary(w: WealthInputs): WealthCommentary {
   const share = (x: number) => (gross > 0 ? (x / gross) * 100 : 0);
   const leverage = gross > 0 ? w.debt / gross : (w.debt > 0 ? 1 : 0);
   const netSaving = w.income - w.expense;
+  const noReference = w.momGrowth == null && w.threeMoGrowth == null && w.yoyGrowth == null;
 
   const verdict =
-    w.snapshotCount === 0 ? "Historique insuffisant"
+    noReference ? "Historique insuffisant"
     : g >= 0.05 ? "Accumulation soutenue"
     : g >= 0.01 ? "Progression modérée"
     : g >= -0.01 ? "Stagnation"
@@ -435,8 +436,8 @@ export function wealthCommentary(w: WealthInputs): WealthCommentary {
   if (w.momGrowth != null) {
     drivers.push(`Variation d'un mois sur l'autre : ${pct(w.momGrowth)} ; sur 3 mois : ${w.threeMoGrowth != null ? pct(w.threeMoGrowth) : "référence indisponible"}.`);
   } else {
-    watch.push("Aucun snapshot de clôture antérieur : la croissance ne peut pas encore être mesurée de façon fiable.");
-    actions.push("Lancer la clôture mensuelle chaque fin de mois pour bâtir la série patrimoniale.");
+    watch.push("Pas de clôture mensuelle sur le mois précédent : la variation court terme n'est pas mesurable, seule la tendance longue est exploitable.");
+    actions.push("Lancer la clôture mensuelle chaque fin de mois pour bâtir une série patrimoniale continue.");
   }
   if (w.yoyGrowth != null) drivers.push(`Sur 12 mois glissants, le patrimoine évolue de ${pct(w.yoyGrowth)}.`);
 
@@ -473,7 +474,7 @@ export function wealthCommentary(w: WealthInputs): WealthCommentary {
   }
 
   const summary =
-    w.snapshotCount === 0
+    noReference
       ? `Sur ${w.periodLabel}, la valeur nette est reconstituée à partir des transactions, mais sans clôtures mensuelles il n'existe pas encore de série comparable pour juger la tendance.`
       : g >= 0.05
         ? `Sur ${w.periodLabel}, le patrimoine s'apprécie nettement. La combinaison d'un flux d'épargne positif et d'une valorisation favorable crée un effet cumulatif : l'enjeu devient l'allocation, pas l'accumulation.`
