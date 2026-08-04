@@ -55,6 +55,10 @@ export type PlanItem = {
   notes: string | null;
   recurrence: "none" | "daily" | "weekly" | "monthly" | "yearly";
   recurrence_until: string | null;
+  recurrence_interval: number;
+  recurrence_weekdays: number[] | null;
+  recurrence_month_days: number[] | null;
+  times_per_day: number;
   reminder_minutes: number | null;
   completed_at: string | null;
   sort_order: number;
