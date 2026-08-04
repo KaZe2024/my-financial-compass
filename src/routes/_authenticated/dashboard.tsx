@@ -35,9 +35,11 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import {
-  buildAllocation, buildForecast, computeHealth,
+  buildAllocation, buildExpertForecast, computeHealth,
   forecastAt, growthRate, scoreTone,
+  type CashItem, type MonthBaseline,
 } from "@/lib/analytics";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OPTIS" }] }),
@@ -92,6 +94,27 @@ function Dashboard() {
     queryKey: ["subscriptions"],
     queryFn: async () => (await supabase.from("subscriptions").select("*")).data ?? [],
   });
+  const nodeAmounts = useQuery({
+    queryKey: ["budget_node_amounts", "forecast"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("budget_node_amounts").select("node_id, period_month, planned, revised").range(from, to),
+      ),
+  });
+  const invoicesRows = useQuery({
+    queryKey: ["invoices_to_issue", "open"],
+    queryFn: async () =>
+      (await supabase.from("invoices_to_issue").select("client, amount, paid_amount, due_date, status")
+        .not("status", "in", "(paid,cancelled)")).data ?? [],
+  });
+  const loanSchedule = useQuery({
+    queryKey: ["loan_amortizations", "unpaid"],
+    queryFn: async () =>
+      await fetchAllRows<any>((from, to) =>
+        supabase.from("loan_amortizations").select("payment_date, principal_amount, interest_amount, paid").eq("paid", false).range(from, to),
+      ),
+  });
+
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
     queryFn: async () => (await supabase.from("assets").select("id, type, purchase_date, purchase_value, current_value, status, archived")).data ?? [],
@@ -151,47 +174,81 @@ function Dashboard() {
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
 
-  // Forecast — planifie les flux récurrents (salaires, abonnements…) sur leur vraie cadence,
-  // puis complète avec une base quotidienne résiduelle (discrétionnaire). Cela évite les
-  // trajectoires trop lisses/agressives et respecte la saisonnalité mensuelle du salaire.
-  const activeIncomeSrc = (incomeSrc.data ?? []).filter((r: any) => r.active && r.recurring);
-  const activeSubs = (subs.data ?? []).filter((s: any) => s.active);
-  const perDay = (amt: number, cyc: string) => {
-    const c = (cyc || "monthly").toLowerCase();
-    if (c === "weekly") return amt / 7;
-    if (c === "biweekly" || c === "bi-weekly") return amt / 14;
-    if (c === "monthly") return amt / 30;
-    if (c === "bimonthly") return amt / 60;
-    if (c === "quarterly") return amt / 91;
-    if (c === "semiannual" || c === "semiannually") return amt / 182;
-    if (c === "yearly" || c === "annual" || c === "annually") return amt / 365;
-    if (c === "daily") return amt;
-    return amt / 30;
-  };
-  const recurringIncomePerDay = activeIncomeSrc.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.cycle), 0);
-  const subscriptionsPerDay = activeSubs.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.billing_cycle), 0);
+  // Prévision de trésorerie — logique d'expert financier :
+  //  1) Base opérationnelle mensuelle = budget planifié du mois s'il existe, sinon
+  //     extrapolation de la moyenne réelle des 90 derniers jours (transactions
+  //     opérationnelles seulement : ni actifs, ni provisions, ni transferts).
+  //     Les revenus récurrents et abonnements sont déjà dans cette base (ils passent
+  //     en transactions / sont planifiés au budget) → jamais comptés deux fois.
+  //  2) Flux ponctuels datés : créances (pondérées), dettes, provisions à payer,
+  //     factures à encaisser et échéances d'emprunts.
+  //  3) Les échéances déjà dépassées sont replacées à J+7 (régularisation).
   const avgIn = averageDailyCashIn(txRows, 90);
   const avgOut = averageDailyCashOut(txRows, 90);
-  // Résiduel = ce qui n'est pas déjà expliqué par les récurrents.
-  const residualDailyIncome = Math.max(0, avgIn - recurringIncomePerDay);
-  const residualDailyExpense = Math.max(0, avgOut - subscriptionsPerDay);
-  const forecast = buildForecast({
-    startingCash: cash,
-    dailyIncome: residualDailyIncome,
-    dailyExpense: residualDailyExpense,
-    recurringInflows: activeIncomeSrc.map((r: any) => ({ amount: Number(r.amount), cycle: r.cycle, nextDate: r.next_date })),
-    recurringOutflows: activeSubs.map((s: any) => ({ amount: Number(s.amount), cycle: s.billing_cycle, nextDate: s.next_billing_date })),
-    inflows: (recRows.data ?? []).map(r => ({ amount: Number(r.outstanding), due_date: r.due_date })),
-    outflows: [
-      ...(debtsRows.data ?? []).map(d => ({ amount: Number(d.outstanding), due_date: d.due_date })),
-      ...(provisionsRows.data ?? []).map(p => ({ amount: Number(p.amount), due_date: p.due_date })),
-    ],
-  }, 365);
+  const activeIncomeSrc = (incomeSrc.data ?? []).filter((r: any) => r.active && r.recurring);
+  const activeSubs = (subs.data ?? []).filter((s: any) => s.active);
+
+  const incomeNodeIds = new Set((nodesQ.data ?? []).filter((n: any) => n.is_income).map((n: any) => n.id));
+  const plannedByMonth = new Map<string, { income: number; expense: number }>();
+  for (const row of nodeAmounts.data ?? []) {
+    const key = String(row.period_month).slice(0, 7);
+    const amt = Math.abs(Number(row.revised ?? row.planned ?? 0));
+    if (!amt) continue;
+    const slot = plannedByMonth.get(key) ?? { income: 0, expense: 0 };
+    if (incomeNodeIds.has(row.node_id)) slot.income += amt; else slot.expense += amt;
+    plannedByMonth.set(key, slot);
+  }
+
+  const baselines: MonthBaseline[] = [];
+  for (let i = 0; i <= 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const plan = plannedByMonth.get(key);
+    const hasPlan = !!plan && (plan.income > 0 || plan.expense > 0);
+    baselines.push({
+      month: key,
+      income: hasPlan && plan!.income > 0 ? plan!.income : avgIn * dim,
+      expense: hasPlan && plan!.expense > 0 ? plan!.expense : avgOut * dim,
+      planned: hasPlan,
+    });
+  }
+
+  const items: CashItem[] = [
+    // Créances : encaissement probable pondéré (85 %), risque de retard intégré.
+    ...(recRows.data ?? []).map((r: any) => ({
+      label: r.debtor ?? "Créance", amount: Number(r.outstanding), date: r.due_date,
+      confidence: 0.85, group: "Créances à encaisser",
+    })),
+    ...(invoicesRows.data ?? []).map((r: any) => ({
+      label: r.client ?? "Facture", amount: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
+      date: r.due_date, confidence: r.status === "issued" || r.status === "partially_paid" ? 0.9 : 0.6,
+      group: "Factures à émettre / encaisser",
+    })),
+    ...(debtsRows.data ?? []).map((d: any) => ({
+      label: d.creditor ?? "Dette", amount: -Number(d.outstanding), date: d.due_date,
+      group: "Dettes à rembourser",
+    })),
+    ...(provisionsRows.data ?? []).map((p: any) => ({
+      label: "Provision", amount: -Number(p.actual_amount ?? p.amount), date: p.due_date,
+      group: "Provisions à décaisser",
+    })),
+    ...(loanSchedule.data ?? []).map((l: any) => ({
+      label: "Échéance emprunt", amount: -(Number(l.principal_amount) + Number(l.interest_amount)),
+      date: l.payment_date, group: "Échéances d'emprunt",
+    })),
+  ].filter((i) => i.amount !== 0);
+
+  const expert = buildExpertForecast({ startingCash: cash, baselines, items }, 365);
+  const forecast = expert.points;
+  const plannedMonths = baselines.filter((b) => b.planned).length;
+  const baseline0 = baselines[0];
 
   const forecastChart = forecast.filter((_, i) => i % 7 === 0).map(p => ({
     day: p.day, label: `J+${p.day}`, balance: p.balance,
   }));
   const horizons = [30, 60, 90, 180, 365];
+
 
   // Health
   const health = computeHealth({
@@ -361,7 +418,34 @@ function Dashboard() {
               );
             })}
           </div>
-          <div className="h-56">
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Point le plus bas</div>
+              <div className={`num text-sm font-semibold ${expert.low.balance >= 0 ? "text-foreground" : "text-negative"}`}>
+                {fmtMoney(expert.low.balance, cur, { compact: true })}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">{fmtDate(expert.low.date)}</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Risque de découvert</div>
+              <div className={`num text-sm font-semibold ${expert.breachDay ? "text-negative" : "text-positive"}`}>
+                {expert.breachDay ? fmtDate(expert.breachDay.date) : "Aucun"}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">
+                {expert.breachDay ? `J+${expert.breachDay.day}` : "sur 365 jours"}
+              </div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Base mensuelle (mois en cours)</div>
+              <div className="num text-sm font-semibold">
+                {fmtMoney((baseline0?.income ?? 0) - (baseline0?.expense ?? 0), cur, { compact: true })}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">
+                {baseline0?.planned ? "budget planifié" : "moyenne réelle 90 j"}
+              </div>
+            </div>
+          </div>
+          <div className="mb-3 h-56">
             <ResponsiveContainer>
               <LineChart data={forecastChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
@@ -372,9 +456,39 @@ function Dashboard() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-            Planifie les revenus récurrents (~{fmtMoney(recurringIncomePerDay * 30, cur, { compact: true })}/mois) et abonnements (~{fmtMoney(subscriptionsPerDay * 30, cur, { compact: true })}/mois) sur leur vraie cadence, plus une base résiduelle (revenus {fmtMoney(residualDailyIncome * 30, cur, { compact: true })}/mois, dépenses {fmtMoney(residualDailyExpense * 30, cur, { compact: true })}/mois) et les échéances dettes/créances/provisions.
-          </p>
+
+          <div className="rounded-sm border border-border bg-background/40 p-3">
+            <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
+            <ol className="mt-2 space-y-1 font-mono text-[10px] leading-relaxed text-muted-foreground">
+              <li>
+                1. Point de départ = trésorerie disponible aujourd'hui : {fmtMoney(cash, cur)} (soldes d'ouverture + impact de toutes les transactions saisies).
+              </li>
+              <li>
+                2. Base opérationnelle mois par mois = budget planifié quand il existe ({plannedMonths}/14 mois planifiés),
+                sinon extrapolation de la moyenne réelle des 90 derniers jours
+                (entrées {fmtMoney(avgIn * 30, cur, { compact: true })}/mois, sorties {fmtMoney(avgOut * 30, cur, { compact: true })}/mois).
+                Achats d'actifs, provisions comptables et transferts entre comptes sont exclus.
+                Les revenus récurrents ({activeIncomeSrc.length}) et abonnements actifs ({activeSubs.length}) sont déjà contenus
+                dans cette base — ils ne sont pas ajoutés une seconde fois.
+              </li>
+              <li>
+                3. Flux datés ajoutés à leur échéance réelle :
+                {expert.groups.length === 0 ? " aucun." : ""}
+              </li>
+              {expert.groups.map(g => (
+                <li key={g.group} className="pl-4">
+                  • {g.group} ({g.count}) :
+                  {g.inflow > 0 ? ` +${fmtMoney(g.inflow, cur, { compact: true })}` : ""}
+                  {g.outflow > 0 ? ` −${fmtMoney(g.outflow, cur, { compact: true })}` : ""}
+                </li>
+              ))}
+              <li>
+                4. Prudence : les créances sont pondérées à 85 % et les factures à émettre à 60–90 % selon leur statut ;
+                toute échéance déjà dépassée est replacée à J+7 (régularisation) au lieu d'être ignorée.
+              </li>
+            </ol>
+          </div>
+
         </Panel>
 
         <Panel title="Santé financière">
