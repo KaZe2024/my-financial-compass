@@ -66,7 +66,7 @@ function Dashboard() {
       await fetchAllRows<any>((from, to) =>
         supabase
           .from("transactions")
-          .select("id, type, wallet_id, to_wallet_id, amount, base_amount, exchange_rate, occurred_on, budget_node_id, source_kind")
+          .select("id, type, wallet_id, to_wallet_id, asset_id, debt_id, receivable_id, source_id, source_kind, description, notes, amount, base_amount, exchange_rate, occurred_on, budget_node_id")
           .range(from, to),
       ),
   });
@@ -100,7 +100,7 @@ function Dashboard() {
     queryKey: ["asset_events", "dashboard"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
-        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").eq("event_type", "depreciation").range(from, to),
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").in("event_type", ["sale", "revaluation", "impairment"]).range(from, to),
       ),
   });
   const snaps = useQuery({
