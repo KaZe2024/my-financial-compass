@@ -56,6 +56,11 @@ export function PlanItemDialog({
   const [notes, setNotes] = useState("");
   const [recurrence, setRecurrence] = useState("none");
   const [recurrenceUntil, setRecurrenceUntil] = useState("");
+  const [preset, setPreset] = useState("none");
+  const [interval, setIntervalValue] = useState("1");
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [monthDays, setMonthDays] = useState<number[]>([]);
+  const [timesPerDay, setTimesPerDay] = useState("1");
   const [reminder, setReminder] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
