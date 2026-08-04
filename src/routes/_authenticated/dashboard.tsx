@@ -151,47 +151,81 @@ function Dashboard() {
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
 
-  // Forecast — planifie les flux récurrents (salaires, abonnements…) sur leur vraie cadence,
-  // puis complète avec une base quotidienne résiduelle (discrétionnaire). Cela évite les
-  // trajectoires trop lisses/agressives et respecte la saisonnalité mensuelle du salaire.
-  const activeIncomeSrc = (incomeSrc.data ?? []).filter((r: any) => r.active && r.recurring);
-  const activeSubs = (subs.data ?? []).filter((s: any) => s.active);
-  const perDay = (amt: number, cyc: string) => {
-    const c = (cyc || "monthly").toLowerCase();
-    if (c === "weekly") return amt / 7;
-    if (c === "biweekly" || c === "bi-weekly") return amt / 14;
-    if (c === "monthly") return amt / 30;
-    if (c === "bimonthly") return amt / 60;
-    if (c === "quarterly") return amt / 91;
-    if (c === "semiannual" || c === "semiannually") return amt / 182;
-    if (c === "yearly" || c === "annual" || c === "annually") return amt / 365;
-    if (c === "daily") return amt;
-    return amt / 30;
-  };
-  const recurringIncomePerDay = activeIncomeSrc.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.cycle), 0);
-  const subscriptionsPerDay = activeSubs.reduce((s: number, r: any) => s + perDay(Number(r.amount), r.billing_cycle), 0);
+  // Prévision de trésorerie — logique d'expert financier :
+  //  1) Base opérationnelle mensuelle = budget planifié du mois s'il existe, sinon
+  //     extrapolation de la moyenne réelle des 90 derniers jours (transactions
+  //     opérationnelles seulement : ni actifs, ni provisions, ni transferts).
+  //     Les revenus récurrents et abonnements sont déjà dans cette base (ils passent
+  //     en transactions / sont planifiés au budget) → jamais comptés deux fois.
+  //  2) Flux ponctuels datés : créances (pondérées), dettes, provisions à payer,
+  //     factures à encaisser et échéances d'emprunts.
+  //  3) Les échéances déjà dépassées sont replacées à J+7 (régularisation).
   const avgIn = averageDailyCashIn(txRows, 90);
   const avgOut = averageDailyCashOut(txRows, 90);
-  // Résiduel = ce qui n'est pas déjà expliqué par les récurrents.
-  const residualDailyIncome = Math.max(0, avgIn - recurringIncomePerDay);
-  const residualDailyExpense = Math.max(0, avgOut - subscriptionsPerDay);
-  const forecast = buildForecast({
-    startingCash: cash,
-    dailyIncome: residualDailyIncome,
-    dailyExpense: residualDailyExpense,
-    recurringInflows: activeIncomeSrc.map((r: any) => ({ amount: Number(r.amount), cycle: r.cycle, nextDate: r.next_date })),
-    recurringOutflows: activeSubs.map((s: any) => ({ amount: Number(s.amount), cycle: s.billing_cycle, nextDate: s.next_billing_date })),
-    inflows: (recRows.data ?? []).map(r => ({ amount: Number(r.outstanding), due_date: r.due_date })),
-    outflows: [
-      ...(debtsRows.data ?? []).map(d => ({ amount: Number(d.outstanding), due_date: d.due_date })),
-      ...(provisionsRows.data ?? []).map(p => ({ amount: Number(p.amount), due_date: p.due_date })),
-    ],
-  }, 365);
+  const activeIncomeSrc = (incomeSrc.data ?? []).filter((r: any) => r.active && r.recurring);
+  const activeSubs = (subs.data ?? []).filter((s: any) => s.active);
+
+  const incomeNodeIds = new Set((nodesQ.data ?? []).filter((n: any) => n.is_income).map((n: any) => n.id));
+  const plannedByMonth = new Map<string, { income: number; expense: number }>();
+  for (const row of nodeAmounts.data ?? []) {
+    const key = String(row.period_month).slice(0, 7);
+    const amt = Math.abs(Number(row.revised ?? row.planned ?? 0));
+    if (!amt) continue;
+    const slot = plannedByMonth.get(key) ?? { income: 0, expense: 0 };
+    if (incomeNodeIds.has(row.node_id)) slot.income += amt; else slot.expense += amt;
+    plannedByMonth.set(key, slot);
+  }
+
+  const baselines: MonthBaseline[] = [];
+  for (let i = 0; i <= 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const plan = plannedByMonth.get(key);
+    const hasPlan = !!plan && (plan.income > 0 || plan.expense > 0);
+    baselines.push({
+      month: key,
+      income: hasPlan && plan!.income > 0 ? plan!.income : avgIn * dim,
+      expense: hasPlan && plan!.expense > 0 ? plan!.expense : avgOut * dim,
+      planned: hasPlan,
+    });
+  }
+
+  const items: CashItem[] = [
+    // Créances : encaissement probable pondéré (85 %), risque de retard intégré.
+    ...(recRows.data ?? []).map((r: any) => ({
+      label: r.debtor ?? "Créance", amount: Number(r.outstanding), date: r.due_date,
+      confidence: 0.85, group: "Créances à encaisser",
+    })),
+    ...(invoicesRows.data ?? []).map((r: any) => ({
+      label: r.client ?? "Facture", amount: Math.max(0, Number(r.amount) - Number(r.paid_amount ?? 0)),
+      date: r.due_date, confidence: r.status === "issued" || r.status === "partially_paid" ? 0.9 : 0.6,
+      group: "Factures à émettre / encaisser",
+    })),
+    ...(debtsRows.data ?? []).map((d: any) => ({
+      label: d.creditor ?? "Dette", amount: -Number(d.outstanding), date: d.due_date,
+      group: "Dettes à rembourser",
+    })),
+    ...(provisionsRows.data ?? []).map((p: any) => ({
+      label: "Provision", amount: -Number(p.actual_amount ?? p.amount), date: p.due_date,
+      group: "Provisions à décaisser",
+    })),
+    ...(loanSchedule.data ?? []).map((l: any) => ({
+      label: "Échéance emprunt", amount: -(Number(l.principal_amount) + Number(l.interest_amount)),
+      date: l.payment_date, group: "Échéances d'emprunt",
+    })),
+  ].filter((i) => i.amount !== 0);
+
+  const expert = buildExpertForecast({ startingCash: cash, baselines, items }, 365);
+  const forecast = expert.points;
+  const plannedMonths = baselines.filter((b) => b.planned).length;
+  const baseline0 = baselines[0];
 
   const forecastChart = forecast.filter((_, i) => i % 7 === 0).map(p => ({
     day: p.day, label: `J+${p.day}`, balance: p.balance,
   }));
   const horizons = [30, 60, 90, 180, 365];
+
 
   // Health
   const health = computeHealth({
