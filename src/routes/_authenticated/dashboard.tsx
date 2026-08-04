@@ -161,22 +161,28 @@ function Dashboard() {
   const netWorth = cash + totalAssets + totalRec - totalDebt;
 
 
-  // Growth from snapshots
+  // Croissance : référencée sur la fin de la période sélectionnée, en utilisant
+  // tout l'historique de snapshots disponible (pas seulement celui de la période).
   const fromMonth = periodFrom.slice(0, 7);
   const toMonth = periodTo.slice(0, 7);
-  const snapList = (snaps.data ?? []).filter((s: any) => {
+  const allSnaps = (snaps.data ?? []) as any[];
+  const snapList = allSnaps.filter((s) => {
     const m = String(s.snapshot_month).slice(0, 7);
     return m >= fromMonth && m <= toMonth;
   });
-  const monthAgoSnap = snapList[snapList.length - 2];
-  const threeAgoSnap = snapList[snapList.length - 4];
-  const yearAgoSnap = snapList.find(s => {
-    const d = new Date(s.snapshot_month);
-    return d.getFullYear() === now.getFullYear() - 1 && d.getMonth() === now.getMonth();
-  });
+  const shiftMonth = (key: string, delta: number) => {
+    const [y, m] = key.split("-").map(Number);
+    const d = new Date(y, (m - 1) + delta, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  const snapAt = (key: string) => allSnaps.find((s) => String(s.snapshot_month).slice(0, 7) === key);
+  const monthAgoSnap = snapAt(shiftMonth(toMonth, -1));
+  const threeAgoSnap = snapAt(shiftMonth(toMonth, -3));
+  const yearAgoSnap = snapAt(shiftMonth(toMonth, -12));
   const momGrowth = monthAgoSnap ? growthRate(netWorth, Number(monthAgoSnap.net_worth)) : 0;
   const yoyGrowth = yearAgoSnap ? growthRate(netWorth, Number(yearAgoSnap.net_worth)) : 0;
   const threeMoGrowth = threeAgoSnap ? growthRate(netWorth, Number(threeAgoSnap.net_worth)) : 0;
+
 
   // Prévision de trésorerie — logique d'expert financier :
   //  1) Base opérationnelle mensuelle = budget planifié du mois s'il existe, sinon
