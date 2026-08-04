@@ -100,7 +100,7 @@ function Dashboard() {
     queryKey: ["asset_events", "dashboard"],
     queryFn: async () =>
       await fetchAllRows<any>((from, to) =>
-        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").eq("event_type", "depreciation").range(from, to),
+        supabase.from("asset_events").select("asset_id, event_type, amount, event_date, event_month").in("event_type", ["sale", "revaluation", "impairment"]).range(from, to),
       ),
   });
   const snaps = useQuery({
