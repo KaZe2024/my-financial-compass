@@ -514,7 +514,39 @@ function Dashboard() {
             <Stat label="Liquidité" value={`${health.liquidityRatio.toFixed(1)}m`} />
             <Stat label="Croissance 3m" value={fmtPct(health.growth)} />
           </dl>
+          <div className="mt-4 space-y-2 border-t border-border/60 pt-3 text-xs leading-relaxed">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Lecture analyste</span>
+              <span className={`font-mono text-[10px] uppercase tracking-wider ${scoreTone(health.score) === "positive" ? "text-positive" : scoreTone(health.score) === "negative" ? "text-negative" : scoreTone(health.score) === "warning" ? "text-warning" : "text-foreground"}`}>{commentary.verdict}</span>
+            </div>
+            <p className="text-muted-foreground">{commentary.summary}</p>
+            {commentary.strengths.length > 0 && (
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-positive">Points forts</div>
+                <ul className="mt-1 space-y-1 text-muted-foreground">
+                  {commentary.strengths.map((s) => <li key={s} className="flex gap-1.5"><span className="text-positive">▸</span><span>{s}</span></li>)}
+                </ul>
+              </div>
+            )}
+            {commentary.risks.length > 0 && (
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-warning">Risques</div>
+                <ul className="mt-1 space-y-1 text-muted-foreground">
+                  {commentary.risks.map((s) => <li key={s} className="flex gap-1.5"><span className="text-warning">▸</span><span>{s}</span></li>)}
+                </ul>
+              </div>
+            )}
+            {commentary.actions.length > 0 && (
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-wider text-primary">Recommandations</div>
+                <ol className="mt-1 space-y-1 text-muted-foreground">
+                  {commentary.actions.map((s, i) => <li key={s} className="flex gap-1.5"><span className="num text-primary">{i + 1}.</span><span>{s}</span></li>)}
+                </ol>
+              </div>
+            )}
+          </div>
         </Panel>
+
       </section>
 
       {/* Cashflow history + categories */}
