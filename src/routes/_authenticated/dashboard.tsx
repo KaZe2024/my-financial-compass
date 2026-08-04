@@ -259,6 +259,8 @@ function Dashboard() {
     totalAssets,
     netWorthGrowth3m: threeMoGrowth,
   });
+  const commentary = healthCommentary(health);
+
 
   // Allocation — cohérente avec la période sélectionnée et avec le patrimoine :
   // valeur des actifs (VNC/réévaluée) à la date de fin de période + liquidités à cette date.
