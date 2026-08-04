@@ -24,31 +24,53 @@ export default defineConfig({
         filename: "sw.js",
         manifest: false,
         devOptions: { enabled: false },
+        includeAssets: ["offline.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"],
         workbox: {
-          navigateFallback: "/",
-          navigateFallbackDenylist: [/^\/\~oauth/, /^\/api\/public/],
+          // The client build is emitted under `client/`, but the deployed site serves those
+          // files from the root (`/assets/...`). Without this rewrite every precache URL 404s
+          // and the whole service worker install fails, so nothing works offline.
+          manifestTransforms: [
+            (entries) => ({
+              manifest: entries.map((entry) => ({
+                ...entry,
+                url: entry.url.replace(/^client\//, ""),
+              })),
+              warnings: [],
+            }),
+          ],
+          navigateFallback: "/offline.html",
+          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//, /^\/mcp/, /^\/\.mcp/, /^\/\.well-known/],
           runtimeCaching: [
             {
               urlPattern: ({ request }) => request.mode === "navigate",
               handler: "NetworkFirst",
-              options: { cacheName: "pages", expiration: { maxEntries: 50 } },
+              options: {
+                cacheName: "pages",
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 60 },
+              },
             },
             {
               urlPattern: ({ url, request }) =>
                 url.origin === self.location.origin &&
-                request.destination === "script" ||
-                request.destination === "style" ||
-                request.destination === "worker",
+                (request.destination === "script" ||
+                  request.destination === "style" ||
+                  request.destination === "worker"),
               handler: "CacheFirst",
               options: {
                 cacheName: "assets",
-                expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
               },
             },
             {
-              urlPattern: ({ url }) => url.origin === self.location.origin && /\.(png|jpg|jpeg|svg|gif|webp|ico)$/i.test(url.pathname),
+              urlPattern: ({ url }) =>
+                url.origin === self.location.origin &&
+                /\.(png|jpg|jpeg|svg|gif|webp|ico|woff2?)$/i.test(url.pathname),
               handler: "CacheFirst",
-              options: { cacheName: "images", expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 } },
+              options: {
+                cacheName: "images",
+                expiration: { maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              },
             },
           ],
         },
