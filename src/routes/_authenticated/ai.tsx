@@ -87,6 +87,10 @@ function AiPage() {
   function submit() {
     const v = input.trim();
     if (!v || sendMut.isPending) return;
+    if (!online) {
+      toast.error("Connexion requise : l'Assistant CFO IA fonctionne uniquement en ligne.");
+      return;
+    }
     sendMut.mutate(v);
   }
 
