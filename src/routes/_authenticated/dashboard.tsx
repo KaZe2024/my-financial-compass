@@ -304,32 +304,36 @@ function Dashboard() {
     { month: periodTo >= todayISO ? "Auj." : fmtMonth(periodTo), net: netWorth },
   ];
 
-  // Goal forecast
-  const goalForecasts = (goals.data ?? []).slice(0, 4).map((g: any) => {
-    const progressData: ProgressInput = {
-      txs: txRows,
-      wallets: wallets.data ?? [],
-      debts: debtsRows.data ?? [],
-      assets: assetsRows.data ?? [],
-      assetEvents: assetEvents.data ?? [],
-      receivables: recRows.data ?? [],
-      nodes: nodesQ.data ?? [],
-    };
-    const computed = computeGoalProgress(g, progressData);
-    const currentAmount = computed.current;
-    const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
-    const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
-    const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
-    const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
-    const monthlyCapacity = (savings / periodDays) * 30;
-    const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
-    const eta = monthsAtCurrentPace
-      ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
-      : null;
-    const onTrack = monthlyNeeded != null && monthlyCapacity >= monthlyNeeded;
-    const progress = computed.pct;
-    return { ...g, current_amount: currentAmount, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
-  });
+  // Goal forecast — on ne garde que les objectifs réellement en cours (statut dérivé).
+  const goalProgressData: ProgressInput = {
+    txs: txRows,
+    wallets: wallets.data ?? [],
+    debts: debtsRows.data ?? [],
+    assets: assetsRows.data ?? [],
+    assetEvents: assetEvents.data ?? [],
+    receivables: recRows.data ?? [],
+    nodes: nodesQ.data ?? [],
+  };
+  const goalForecasts = (goals.data ?? [])
+    .map((g: any) => ({ g, computed: computeGoalProgress(g, goalProgressData) }))
+    .filter(({ g, computed }: any) => isGoalOpen(g, computed))
+    .slice(0, 4)
+    .map(({ g, computed }: any) => {
+      const currentAmount = computed.current;
+      const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
+      const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
+      const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
+      const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
+      const monthlyCapacity = (savings / periodDays) * 30;
+      const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
+      const eta = monthsAtCurrentPace
+        ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
+        : null;
+      const onTrack = monthlyNeeded != null && monthlyCapacity >= monthlyNeeded;
+      const progress = computed.pct;
+      return { ...g, current_amount: currentAmount, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
+    });
+
 
   const cfChart = monthlyCashflowFromTransactions(txRows, toISODate(twelveAgo), toISODate(now)).map((r: any) => ({
     month: fmtMonth(r.month), income: Number(r.income), expense: Number(r.expense),
