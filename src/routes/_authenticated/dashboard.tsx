@@ -603,6 +603,15 @@ function Dashboard() {
                 4. Prudence : les créances sont pondérées à 85 % et les factures à émettre à 60–90 % selon leur statut ;
                 toute échéance déjà dépassée est replacée à J+7 (régularisation) au lieu d'être ignorée.
               </li>
+              <li>
+                5. Scénarios probabilistes : {mc.iterations} trajectoires simulées (Monte Carlo). La volatilité mensuelle
+                (±{fmtMoney(mc.monthlySigma, cur, { compact: true })}) est calibrée sur l'écart-type de vos 12 derniers nets mensuels ;
+                chaque flux daté peut se réaliser ou non (selon sa pondération) et glisser de quelques jours.
+                P10 / P50 / P90 = solde dépassé dans 90 % / 50 % / 10 % des trajectoires.
+                Probabilité de rupture = part des trajectoires passant au moins un jour sous zéro
+                ({fmtPct(mc.probBreach * 100)}).
+              </li>
+
             </ol>
           </div>
 
