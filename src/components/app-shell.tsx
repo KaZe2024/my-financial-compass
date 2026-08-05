@@ -87,6 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Sidebar({ onNav }: { onNav: () => void }) {
   const pathname = useRouterState({ select: s => s.location.pathname });
+  const { online } = useNetworkStatus();
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 border-b border-sidebar-border px-5 py-4">
