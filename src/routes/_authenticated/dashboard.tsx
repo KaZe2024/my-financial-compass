@@ -131,9 +131,10 @@ function Dashboard() {
     queryFn: async () => (await supabase.from("monthly_snapshots").select("snapshot_month, net_worth, cash_position, total_assets, total_debt, total_receivables").order("snapshot_month", { ascending: true })).data ?? [],
   });
   const goals = useQuery({
-    queryKey: ["goals", "active"],
-    queryFn: async () => (await supabase.from("financial_goals").select("*").eq("status","active").order("target_date", { ascending: true })).data ?? [],
+    queryKey: ["goals", "not-archived"],
+    queryFn: async () => (await supabase.from("financial_goals").select("*").eq("archived", false).order("target_date", { ascending: true })).data ?? [],
   });
+
   const recentTx = useQuery({
     queryKey: ["tx", "recent"],
     queryFn: async () => {
