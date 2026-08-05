@@ -71,9 +71,39 @@ export function monthlyFromCycle(amount: number, cycle: string | null | undefine
   return amount;
 }
 
+/* ---- statistiques robustes (insensibles aux mois exceptionnels) ---- */
+
+export function median(xs: number[]): number {
+  if (!xs.length) return 0;
+  const s = xs.slice().sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** Écart absolu médian, remis à l'échelle d'un écart-type (×1,4826). */
+export function mad(xs: number[], med = median(xs)): number {
+  if (!xs.length) return 0;
+  return median(xs.map((x) => Math.abs(x - med))) * 1.4826;
+}
+
+/** Pente de régression linéaire simple (unité : montant par mois). */
+export function slope(xs: number[]): number {
+  const n = xs.length;
+  if (n < 2) return 0;
+  const mx = (n - 1) / 2;
+  const my = xs.reduce((s, x) => s + x, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - mx) * (xs[i] - my);
+    den += (i - mx) ** 2;
+  }
+  return den ? num / den : 0;
+}
+
 function addMonths(ref: Date, delta: number) {
   return new Date(ref.getFullYear(), ref.getMonth() + delta, 1);
 }
+
 
 function monthList(ref: Date, count: number) {
   const out: string[] = [];
