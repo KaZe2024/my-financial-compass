@@ -1,61 +1,36 @@
-# Plan de consolidation OPTIS — Vague 5
+# Fiabilité de la synchro offline + Assistant IA "connexion requise"
 
-Objectif : corriger les failles de fiabilité, de sécurité et de friction identifiées après les vagues 1-4, sans repartir sur de nouveaux gros modules.
+Périmètre limité à deux sujets : la traçabilité des mutations hors ligne et le statut en ligne du module Assistant CFO IA.
 
 ## 1. Fiabilité de la synchronisation offline
 
-- Corriger le matching des mutations dans `src/lib/offline/sync.ts` : `flushPendingMutations` doit supprimer les mutations appliquées d'après leurs IDs retournés par le serveur, et non pas par tranche d'index (`slice(0, result.applied)`). Risque actuel : perte silencieuse de données si une mutation du milieu échoue.
-- Ajouter une trace d'accusé de réception par mutation (id + timestamp) pour pouvoir identifier les mutations coincées.
+État vérifié : le matching par IDs est **déjà en place** dans `src/lib/offline/sync.ts` — `pushSync` renvoie `appliedIds` / `failedIds`, et `flushPendingMutations` supprime exactement les mutations confirmées (plus de `slice(0, result.applied)`). Rien à corriger de ce côté.
 
-## 2. Sécurité offline
+Ce qu'il reste à faire : la **trace d'accusé de réception**, aujourd'hui absente. Une mutation réussie disparaît sans laisser d'historique, et une mutation coincée n'est identifiable que par son compteur de tentatives.
 
-- Appeler `resetOfflineData()` lors de la déconnexion utilisateur (`src/hooks/use-auth.ts`) pour qu'un appareil partagé ne conserve pas les données IndexedDB du précédent compte.
-- Scoper les lignes de `syncedDataDb` par `user_id` : ajouter le champ `userId` dans `SyncedRow`, filtrer toutes les lectures/écritures par `auth.uid()`, et forcer un reset lors d'un changement d'utilisateur.
+- Ajouter une table locale `syncAcks` dans `src/lib/offline/db.ts` : `mutationId`, `table`, `op`, `rowId`, `status` (`applied` | `failed`), `ackedAt` (timestamp), `error`, `attempts`. Version de schéma Dexie incrémentée (migration additive, aucune perte de cache existant).
+- Dans `flushPendingMutations`, écrire un accusé pour chaque id renvoyé par le serveur (appliqué comme échoué), avec l'horodatage exact de la confirmation.
+- Purge automatique : conserver les 500 derniers accusés (ou 14 jours) pour éviter que le journal grossisse indéfiniment.
+- Exposer un diagnostic : dans les paramètres (ou le panneau hors ligne existant), une section "Journal de synchronisation" listant les dernières mutations avec leur statut, l'heure d'accusé, le nombre de tentatives et le message d'erreur, plus un compteur de mutations en attente et un bouton "Réessayer maintenant".
+- Détection des mutations coincées : marquer visuellement toute mutation en file avec `retryCount >= 3` ou plus vieille que 24 h, afin de pouvoir la supprimer ou la relancer manuellement.
 
-## 3. Assistant IA en offline
+## 2. Assistant IA — module "connexion requise"
 
-- Choix : soit rendre l'IA utilisable hors ligne (mise en file des messages + sync différée), soit marquer clairement le module IA comme "online only" dans le menu et l'écran.
-- Privilégier l'option "online only" si le cout des appels IA est un enjeu : afficher un badge `Connexion requise` et bloquer la saisie quand le navigateur est offline.
+Choix retenu : **online only**, pour maîtriser le coût des appels IA (pas de file d'attente de messages, pas de dépenses différées non maîtrisées).
 
-## 4. Recherche globale / palette de commandes
+- Retirer `chat_conversations` et `chat_messages` de la liste des tables synchronisées afin que le module ne promette plus un fonctionnement hors ligne qu'il n'a pas (l'IA passe par des server functions, jamais par le cache local).
+- Menu latéral (`src/components/app-shell.tsx`) : afficher un badge "Hors ligne" / icône désactivée sur l'entrée **Assistant CFO** quand le navigateur est hors ligne, via le hook existant `useNetworkStatus`.
+- Écran `/ai` : quand hors ligne, afficher un bandeau clair "Connexion requise — l'assistant IA n'est pas disponible hors ligne", désactiver la zone de saisie et le bouton d'envoi, et masquer les actions qui déclencheraient un appel réseau.
+- Reprise automatique : dès le retour de la connexion, réactiver la saisie sans rechargement de page.
+- Même traitement pour les autres actions IA lancées ailleurs (génération du plan Coach, rapports IA) : bouton désactivé avec info-bulle "Connexion requise" plutôt qu'une erreur réseau brute.
 
-- Ajouter une barre de recherche en haut de l'app-shell ou un raccourci `Ctrl+K` (Cmd+K) qui ouvre une palette de commandes.
-- Couvrir : navigation vers les modules, recherche de transactions, tiers, actifs, dettes, créances, objectifs, projets.
-- Amélioration directe : remplacer le long menu latéral de 32 items par un accès rapide clavier.
+## Détails techniques
 
-## 5. Actions groupées (bulk actions)
+- `src/lib/offline/db.ts` : nouvelle table `syncAcks` + helpers `recordSyncAck`, `listSyncAcks`, `pruneSyncAcks`.
+- `src/lib/offline/sync.ts` : `flushPendingMutations` écrit les accusés, puis purge.
+- `src/lib/offline/network-status.tsx` : réutilisation de `useNetworkStatus` / `useDebouncedOnline` (déjà présents), aucun nouveau hook.
+- Aucune migration base de données nécessaire : tout le journal reste local (IndexedDB).
 
-- Étendre les actions multi-sélection aux modules actuellement en ligne par ligne :
-  - Dettes / Créances : marquer "payé / reçu", archiver, changer le tiers.
-  - Abonnements : activer / suspendre / changer catégorie en masse.
-  - Actifs : archiver / changer type / taguer en masse.
-  - Objectifs : marquer en pause / reprendre / archiver en masse.
-  - Provisions : clôturer / reporter en masse.
+## Ce qui n'est pas touché
 
-## 6. États de chargement cohérents
-
-- Standardiser les squelettes (`Skeleton`) sur les ~27 routes authentifiées qui n'en ont pas encore.
-- Cible : plus d'écran blanc lors du premier chargement, notamment sur mobile.
-
-## 7. Réconciliation bancaire (workflow léger)
-
-- Ajouter une page / onglet de réconciliation dans le module Transactions.
-- Permettre d'importer un relevé bancaire (CSV), de matcher automatiquement les lignes avec les transactions existantes (date + montant + tiers), et de marquer les transactions comme "réconciliées".
-
-## 8. Documents et pièces jointes avec vrai stockage
-
-- Utiliser Supabase Storage pour les fichiers associés aux documents (`documents` et `attachments`).
-- Garder les tables métier comme métadonnées (nom, type, taille, chemin) et stocker les blobs côté Storage.
-- Fonctionnalité : upload, preview, suppression.
-
-## Livrables attendus
-
-- Corrections sans régression des modules existants.
-- Tests visuels sur les modules modifiés (offline, auth, recherche, bulk).
-- Aucune nouvelle table inutile si l'option IA retenue est "online only".
-
-## Questions à trancher
-
-1. IA : offline différé ou "online only" ? (recommandation : online only pour maîtriser les crédits IA)
-2. Réconciliation bancaire : format CSV prioritaire à supporter ?
-3. Documents : taille max de fichier et types MIME acceptés ?
+Les autres axes évoqués (recherche globale, actions groupées, réconciliation, stockage de fichiers, squelettes de chargement, purge du cache à la déconnexion) restent hors périmètre de ce plan.
