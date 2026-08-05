@@ -177,12 +177,13 @@ function AiPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
               }}
-              placeholder="Ta question au CFO IA… (Entrée pour envoyer, Shift+Entrée pour un saut de ligne)"
+              placeholder={online ? "Ta question au CFO IA… (Entrée pour envoyer, Shift+Entrée pour un saut de ligne)" : "Connexion requise pour interroger l'Assistant CFO."}
               rows={2}
               className="resize-none"
               autoFocus
+              disabled={!online}
             />
-            <Button onClick={submit} disabled={!input.trim() || sendMut.isPending}>
+            <Button onClick={submit} disabled={!input.trim() || sendMut.isPending || !online}>
               {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
