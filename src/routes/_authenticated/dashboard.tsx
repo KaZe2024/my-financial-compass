@@ -23,7 +23,7 @@ import {
   monthlyCashflowFromTransactions,
   sumAvailableCash,
 } from "@/lib/finance";
-import { computeGoalProgress, type ProgressInput } from "@/lib/goal-progress";
+import { computeGoalProgress, isGoalOpen, type ProgressInput } from "@/lib/goal-progress";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
