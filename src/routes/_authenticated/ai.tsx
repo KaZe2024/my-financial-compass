@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Send, Loader2, MessageSquare, Pencil } from "lucide-react";
+import { Sparkles, Plus, Trash2, Send, Loader2, MessageSquare, Pencil, WifiOff } from "lucide-react";
 import { listConversations, getConversation, createConversation, deleteConversation, renameConversation, sendMessage } from "@/lib/ai.functions";
+import { useNetworkStatus } from "@/lib/offline/network-status";
 
 export const Route = createFileRoute("/_authenticated/ai")({
   head: () => ({ meta: [{ title: "Assistant CFO — OPTIS" }] }),
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/ai")({
 
 function AiPage() {
   const qc = useQueryClient();
+  const { online } = useNetworkStatus();
   const listFn = useServerFn(listConversations);
   const createFn = useServerFn(createConversation);
   const deleteFn = useServerFn(deleteConversation);
@@ -85,6 +87,10 @@ function AiPage() {
   function submit() {
     const v = input.trim();
     if (!v || sendMut.isPending) return;
+    if (!online) {
+      toast.error("Connexion requise : l'Assistant CFO IA fonctionne uniquement en ligne.");
+      return;
+    }
     sendMut.mutate(v);
   }
 
@@ -96,13 +102,29 @@ function AiPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Assistant</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Sparkles className="h-6 w-6 text-primary" /> CFO IA</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Cumule les rôles de DAF, contrôleur de gestion et expert-comptable. Contexte financier injecté à chaque question.</p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+            <Sparkles className="h-6 w-6 text-primary" /> CFO IA
+            <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${online ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}>
+              Connexion requise
+            </span>
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">Cumule les rôles de DAF, contrôleur de gestion et expert-comptable. Contexte financier injecté à chaque question. Ce module fonctionne uniquement en ligne.</p>
         </div>
-        <Button onClick={() => createMut.mutate()} disabled={createMut.isPending}>
+        <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !online}>
           <Plus className="mr-2 h-4 w-4" /> Nouvelle conversation
         </Button>
       </header>
+
+      {!online && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">Mode hors ligne — Assistant CFO indisponible</p>
+            <p className="text-xs text-amber-500/80">Les réponses de l'IA nécessitent une connexion internet. Le reste de l'application (transactions, budgets, planification…) reste utilisable hors ligne.</p>
+          </div>
+        </div>
+      )}
+
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <Panel title="Historique">
@@ -159,12 +181,13 @@ function AiPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
               }}
-              placeholder="Ta question au CFO IA… (Entrée pour envoyer, Shift+Entrée pour un saut de ligne)"
+              placeholder={online ? "Ta question au CFO IA… (Entrée pour envoyer, Shift+Entrée pour un saut de ligne)" : "Connexion requise pour interroger l'Assistant CFO."}
               rows={2}
               className="resize-none"
               autoFocus
+              disabled={!online}
             />
-            <Button onClick={submit} disabled={!input.trim() || sendMut.isPending}>
+            <Button onClick={submit} disabled={!input.trim() || sendMut.isPending || !online}>
               {sendMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>

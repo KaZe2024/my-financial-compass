@@ -11,6 +11,7 @@ import { profileQO } from "@/lib/queries";
 import { toast } from "sonner";
 import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { SyncJournal } from "@/components/sync-journal";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Paramètres — OPTIS" }] }),
@@ -84,8 +85,15 @@ function SettingsPage() {
         </a>
       </Panel>
 
+      <Panel title="Journal de synchronisation">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Suivi des modifications saisies hors ligne : file d'attente locale et accusés de réception confirmés par le serveur, avec l'heure exacte de confirmation.
+        </p>
+        <SyncJournal />
+      </Panel>
+
       <Panel title="Modules disponibles">
-        <p className="text-sm text-muted-foreground">Cette version inclut : Dashboard, Portefeuilles, Transactions, Budgets, Listes d'achat, Prix produits, Dettes, Créances, Projets, Actifs, Objectifs, Snapshots, Journal d'audit.</p>
+        <p className="text-sm text-muted-foreground">Cette version inclut : Dashboard, Portefeuilles, Transactions, Budgets, Listes d'achat, Prix produits, Dettes, Créances, Projets, Actifs, Objectifs, Snapshots, Journal d'audit. L'Assistant CFO IA nécessite une connexion internet.</p>
       </Panel>
     </div>
   );
