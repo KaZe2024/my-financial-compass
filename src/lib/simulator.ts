@@ -38,8 +38,8 @@ export type LifestyleCost = {
   monthsAnalyzed: number;
 };
 
-function monthKey(d: string) {
-  return String(d).slice(0, 7);
+function monthKey(d: string | null | undefined) {
+  return String(d ?? "").slice(0, 7);
 }
 
 export function monthlyFromCycle(amount: number, cycle: string | null | undefined) {
