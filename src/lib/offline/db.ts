@@ -58,8 +58,7 @@ export const SYNCED_TABLES = [
   "attachments",
   "audit_log",
   "ai_insights",
-  "chat_conversations",
-  "chat_messages",
+  // "chat_conversations" / "chat_messages" : module IA volontairement online only.
   "plan_types",
   "plan_tags",
   "plan_projects",
