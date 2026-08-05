@@ -11,6 +11,7 @@ import { profileQO } from "@/lib/queries";
 import { toast } from "sonner";
 import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { SyncJournal } from "@/components/sync-journal";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Paramètres — OPTIS" }] }),
