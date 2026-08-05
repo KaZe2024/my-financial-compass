@@ -19,6 +19,7 @@ import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authent
 import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
 import { Route as AuthenticatedSubscriptionsRouteImport } from './routes/_authenticated/subscriptions'
 import { Route as AuthenticatedSnapshotsRouteImport } from './routes/_authenticated/snapshots'
+import { Route as AuthenticatedSimulatorRouteImport } from './routes/_authenticated/simulator'
 import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticated/shopping'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedReceivablesRouteImport } from './routes/_authenticated/receivables'
@@ -97,6 +98,11 @@ const AuthenticatedSubscriptionsRoute =
 const AuthenticatedSnapshotsRoute = AuthenticatedSnapshotsRouteImport.update({
   id: '/snapshots',
   path: '/snapshots',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSimulatorRoute = AuthenticatedSimulatorRouteImport.update({
+  id: '/simulator',
+  path: '/simulator',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedShoppingRoute = AuthenticatedShoppingRouteImport.update({
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
+  '/simulator': typeof AuthenticatedSimulatorRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/today': typeof AuthenticatedTodayRoute
@@ -315,6 +322,7 @@ export interface FileRoutesByTo {
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
+  '/simulator': typeof AuthenticatedSimulatorRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/today': typeof AuthenticatedTodayRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/_authenticated/receivables': typeof AuthenticatedReceivablesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping': typeof AuthenticatedShoppingRoute
+  '/_authenticated/simulator': typeof AuthenticatedSimulatorRoute
   '/_authenticated/snapshots': typeof AuthenticatedSnapshotsRoute
   '/_authenticated/subscriptions': typeof AuthenticatedSubscriptionsRoute
   '/_authenticated/today': typeof AuthenticatedTodayRoute
@@ -397,6 +406,7 @@ export interface FileRouteTypes {
     | '/receivables'
     | '/settings'
     | '/shopping'
+    | '/simulator'
     | '/snapshots'
     | '/subscriptions'
     | '/today'
@@ -436,6 +446,7 @@ export interface FileRouteTypes {
     | '/receivables'
     | '/settings'
     | '/shopping'
+    | '/simulator'
     | '/snapshots'
     | '/subscriptions'
     | '/today'
@@ -476,6 +487,7 @@ export interface FileRouteTypes {
     | '/_authenticated/receivables'
     | '/_authenticated/settings'
     | '/_authenticated/shopping'
+    | '/_authenticated/simulator'
     | '/_authenticated/snapshots'
     | '/_authenticated/subscriptions'
     | '/_authenticated/today'
@@ -569,6 +581,13 @@ declare module '@tanstack/react-router' {
       path: '/snapshots'
       fullPath: '/snapshots'
       preLoaderRoute: typeof AuthenticatedSnapshotsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/simulator': {
+      id: '/_authenticated/simulator'
+      path: '/simulator'
+      fullPath: '/simulator'
+      preLoaderRoute: typeof AuthenticatedSimulatorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/shopping': {
@@ -794,6 +813,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReceivablesRoute: typeof AuthenticatedReceivablesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShoppingRoute: typeof AuthenticatedShoppingRoute
+  AuthenticatedSimulatorRoute: typeof AuthenticatedSimulatorRoute
   AuthenticatedSnapshotsRoute: typeof AuthenticatedSnapshotsRoute
   AuthenticatedSubscriptionsRoute: typeof AuthenticatedSubscriptionsRoute
   AuthenticatedTodayRoute: typeof AuthenticatedTodayRoute
@@ -825,6 +845,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReceivablesRoute: AuthenticatedReceivablesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShoppingRoute: AuthenticatedShoppingRoute,
+  AuthenticatedSimulatorRoute: AuthenticatedSimulatorRoute,
   AuthenticatedSnapshotsRoute: AuthenticatedSnapshotsRoute,
   AuthenticatedSubscriptionsRoute: AuthenticatedSubscriptionsRoute,
   AuthenticatedTodayRoute: AuthenticatedTodayRoute,

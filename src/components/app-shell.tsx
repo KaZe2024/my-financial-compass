@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
-  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass,
+  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass, FlaskConical,
 } from "lucide-react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ const NAV = [
   { group: "Vue d'ensemble", items: [
     { to: "/today", label: "Briefing du jour", icon: Compass },
     { to: "/dashboard", label: "Dashboard", icon: Activity },
+    { to: "/simulator", label: "Simulateur", icon: FlaskConical },
     { to: "/ai", label: "Assistant CFO", icon: Sparkles },
     { to: "/alerts", label: "Alertes", icon: Bell },
     { to: "/calendar", label: "Calendrier", icon: CalendarDays },
