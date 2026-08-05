@@ -14,6 +14,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { OfflineIndicator } from "@/components/offline-indicator";
+import { useNetworkStatus } from "@/lib/offline/network-status";
 
 const NAV = [
   { group: "Vue d'ensemble", items: [
