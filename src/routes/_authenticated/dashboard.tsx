@@ -272,7 +272,7 @@ function Dashboard() {
     [cashToday, JSON.stringify(baselines), JSON.stringify(items), JSON.stringify(histNet)],
   );
   const mcVerdict = breachVerdict(mc.probBreach);
-  const mcByDay = new Map(mc.bands.map((b) => [b.day, b]));
+  const mcByDay = new Map<number, McBand>(mc.bands.map((b: McBand) => [b.day, b]));
 
   const forecastChart = forecast.filter((_, i) => i % 7 === 0).map(p => ({
     day: p.day, label: `J+${p.day}`, balance: p.balance,
