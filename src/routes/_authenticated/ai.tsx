@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Sparkles, Plus, Trash2, Send, Loader2, MessageSquare, Pencil } from "lucide-react";
+import { Sparkles, Plus, Trash2, Send, Loader2, MessageSquare, Pencil, WifiOff } from "lucide-react";
 import { listConversations, getConversation, createConversation, deleteConversation, renameConversation, sendMessage } from "@/lib/ai.functions";
+import { useNetworkStatus } from "@/lib/offline/network-status";
 
 export const Route = createFileRoute("/_authenticated/ai")({
   head: () => ({ meta: [{ title: "Assistant CFO — OPTIS" }] }),
