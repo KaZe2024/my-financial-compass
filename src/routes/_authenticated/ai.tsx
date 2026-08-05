@@ -96,13 +96,29 @@ function AiPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Assistant</p>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Sparkles className="h-6 w-6 text-primary" /> CFO IA</h1>
-          <p className="mt-1 text-xs text-muted-foreground">Cumule les rôles de DAF, contrôleur de gestion et expert-comptable. Contexte financier injecté à chaque question.</p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+            <Sparkles className="h-6 w-6 text-primary" /> CFO IA
+            <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${online ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/15 text-amber-500"}`}>
+              Connexion requise
+            </span>
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">Cumule les rôles de DAF, contrôleur de gestion et expert-comptable. Contexte financier injecté à chaque question. Ce module fonctionne uniquement en ligne.</p>
         </div>
-        <Button onClick={() => createMut.mutate()} disabled={createMut.isPending}>
+        <Button onClick={() => createMut.mutate()} disabled={createMut.isPending || !online}>
           <Plus className="mr-2 h-4 w-4" /> Nouvelle conversation
         </Button>
       </header>
+
+      {!online && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-500">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">Mode hors ligne — Assistant CFO indisponible</p>
+            <p className="text-xs text-amber-500/80">Les réponses de l'IA nécessitent une connexion internet. Le reste de l'application (transactions, budgets, planification…) reste utilisable hors ligne.</p>
+          </div>
+        </div>
+      )}
+
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <Panel title="Historique">
