@@ -337,12 +337,42 @@ function TxPage() {
       });
   }, [filtered, f.walletId]);
 
+  // Rendu progressif : on n'injecte dans le DOM qu'une fenêtre de lignes, agrandie
+  // automatiquement quand on atteint le bas. Les totaux restent calculés sur TOUT.
+  const PAGE_ROWS = 200;
+  const [renderLimit, setRenderLimit] = useState(PAGE_ROWS);
+  useEffect(() => { setRenderLimit(PAGE_ROWS); }, [filtered]);
+
+  const renderedGroups = useMemo(() => {
+    let budget = renderLimit;
+    const out: typeof grouped = [];
+    for (const g of grouped) {
+      if (budget <= 0) break;
+      out.push(budget >= g.rows.length ? g : { ...g, rows: g.rows.slice(0, budget) });
+      budget -= g.rows.length;
+    }
+    return out;
+  }, [grouped, renderLimit]);
+  const renderedCount = renderedGroups.reduce((s, g) => s + g.rows.length, 0);
+  const hasMoreRows = renderedCount < filtered.length;
+
+  const sentinelRef = useRef<HTMLTableRowElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMoreRows) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setRenderLimit((n) => n + PAGE_ROWS);
+    }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMoreRows, renderedCount]);
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
     for (const g of grouped) { inflow += g.inflow; outflow += g.outflow; }
     return { inflow, outflow, net: inflow - outflow };
   }, [grouped]);
+
 
   const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
   const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id: string) => selected.has(id));
