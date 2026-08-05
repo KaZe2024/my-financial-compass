@@ -223,14 +223,56 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
   };
 }
 
-/** Postes dont la dérive récente est significative — base des alertes prédictives. */
-export function detectDrifts(cost: LifestyleCost, opts: { minAmount?: number; minPct?: number } = {}) {
+/**
+ * Postes dont la dérive récente est significative — base des alertes prédictives.
+ *
+ * Un pic isolé n'est pas une dérive. On ne retient donc un poste que si :
+ *  - la variation 3 mois vs 3 mois précédents est matérielle (montant ET %), ou
+ *  - la dérive est structurelle (3 mois consécutifs au-dessus de la médiane), ou
+ *  - le dernier mois est une anomalie robuste (> 3 MAD de la médiane).
+ * Les postes très volatils par nature (MAD > médiane) exigent un seuil plus élevé.
+ */
+export function detectDrifts(
+  cost: LifestyleCost,
+  opts: { minAmount?: number; minPct?: number; minZ?: number } = {},
+) {
   const minAmount = opts.minAmount ?? Math.max(1, cost.monthlyExpense * 0.03);
   const minPct = opts.minPct ?? 15;
+  const minZ = opts.minZ ?? 3;
+
   return cost.categories
-    .filter((c) => c.drift != null && Math.abs(c.drift) >= minPct && Math.abs(c.driftAmount) >= minAmount)
-    .sort((a, b) => Math.abs(b.driftAmount) - Math.abs(a.driftAmount));
+    .filter((c) => {
+      if (Math.abs(c.driftAmount) < minAmount) return false;
+      // Poste erratique : on exige une dérive structurelle ou une anomalie franche.
+      const noisy = c.volatility > 1;
+      const pctThreshold = noisy ? minPct * 2 : minPct;
+      const materialPct = c.drift != null && Math.abs(c.drift) >= pctThreshold;
+      const anomaly = c.zScore != null && Math.abs(c.zScore) >= minZ;
+      if (noisy) return c.structural || anomaly;
+      return materialPct || c.structural || anomaly;
+    })
+    .sort((a, b) => driftSeverity(b) - driftSeverity(a));
 }
+
+/** Gravité d'une dérive : montant, pondéré par la persistance. */
+export function driftSeverity(c: CategoryCost): number {
+  const persistence = c.structural ? 1.5 : 1;
+  const trend = c.trendSlope > 0 ? 1.2 : 1;
+  return Math.abs(c.driftAmount) * persistence * trend;
+}
+
+/** Explication lisible d'une dérive, à afficher tel quel. */
+export function explainDrift(c: CategoryCost): string {
+  const parts: string[] = [];
+  if (c.structural) parts.push("hausse installée sur 3 mois consécutifs");
+  else if (c.zScore != null && Math.abs(c.zScore) >= 3) parts.push("dernier mois atypique (pic isolé)");
+  if (c.trendSlope > 0) parts.push("tendance haussière");
+  else if (c.trendSlope < 0) parts.push("tendance baissière");
+  if (c.volatility > 1) parts.push("poste très irrégulier");
+  if (c.activeMonths <= 2) parts.push("poste ponctuel");
+  return parts.length ? parts.join(" · ") : "écart matériel vs période précédente";
+}
+
 
 /* ------------------------------------------------------------------ */
 /* Simulateur what-if                                                  */
