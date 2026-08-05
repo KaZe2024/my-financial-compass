@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { simulateCashflow, breachVerdict, type McBand } from "@/lib/montecarlo";
+
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, toISODate } from "@/lib/format";
