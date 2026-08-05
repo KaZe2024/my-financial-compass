@@ -92,12 +92,14 @@ function GoalsPage() {
   const syncedRef = useRef<string>("");
 
   // Progression + statut dérivé pour chaque objectif (source de vérité unique).
-  const rows = useMemo(() => {
-    return (goals.data ?? []).map((g: any) => {
+  type GoalRow = { goal: any; progress: ProgressResult; status: GoalStatus };
+  const rows = useMemo<GoalRow[]>(() => {
+    return (goals.data ?? []).map((g: any): GoalRow => {
       const p = computeGoalProgress(g, progressData);
       return { goal: g, progress: p, status: deriveGoalStatus(g, p) };
     });
   }, [goals.data, progressData]);
+
 
   const visible = rows.filter((r) => showArchived || !r.goal.archived);
   const achievedCount = rows.filter((r) => !r.goal.archived && r.status === "achieved").length;
