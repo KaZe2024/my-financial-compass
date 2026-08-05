@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,10 @@ import { NodePicker } from "@/components/node-picker";
 import { budgetNodesQO, walletsQO } from "@/lib/queries";
 import {
   computeGoalProgress, GOAL_TYPE_LABELS, GOAL_TYPES_NEED_NODE, GOAL_TYPES_NEED_PERIOD,
-  type GoalType, type ProgressInput,
+  deriveGoalStatus, GOAL_STATUS_LABELS, GOAL_STATUS_TONE,
+  type GoalType, type GoalStatus, type ProgressInput, type ProgressResult,
 } from "@/lib/goal-progress";
+
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 
