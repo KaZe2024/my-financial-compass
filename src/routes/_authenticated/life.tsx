@@ -23,7 +23,7 @@ import {
   fmtHours, DOMAIN_PALETTE, DOMAIN_PRESETS, REVIEW_STEPS,
   type LifeDomain, type WeeklyReview,
 } from "@/lib/life";
-import { computeExecutionScore, computeAlignmentScore, computeLifeScore, scoreTone } from "@/lib/life-score";
+import { computeExecutionScore, computeAlignmentScore, scoreTone } from "@/lib/life-score";
 import {
   Compass, Plus, Trash2, Pencil, Wand2, Target, Flame, ChevronLeft, ChevronRight, Check, Save, ArrowRight,
 } from "lucide-react";
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_authenticated/life")({
   head: () => ({
     meta: [
       { title: "Priorités de vie & revue — OPTIS" },
-      { name: "description", content: "Déclarez vos domaines de vie, mesurez le temps réellement投 consacré, suivez vos habitudes et conduisez votre revue hebdomadaire." },
+      { name: "description", content: "Déclarez vos domaines de vie, mesurez le temps réellement consacré, suivez vos habitudes et conduisez votre revue hebdomadaire." },
       { property: "og:title", content: "Priorités de vie & revue hebdomadaire — OPTIS" },
       { property: "og:description", content: "Alignement entre priorités déclarées et emploi du temps réel, traces d'habitudes et revue guidée en 5 étapes." },
       { property: "og:type", content: "website" },
@@ -296,8 +296,7 @@ function LifePage() {
     });
     const habits = computeHabitTraces(d.items, d.domains, d.itemTags, today, Math.min(56, Math.max(14, windowDays)));
     const commentary = alignmentCommentary(time);
-    const life = computeLifeScore(execution.score, execution.score, alignment?.score ?? null);
-    return { time, execution, alignment, habits, commentary, life };
+    return { time, execution, alignment, habits, commentary };
   }, [d.items, d.domains, d.itemTags, windowDays, today]);
 
   // revue de la semaine sélectionnée
@@ -410,7 +409,6 @@ function LifePage() {
       finance_note: form.finance_note.trim() || null,
       execution_score: weekModel.exec.score,
       alignment_score: model.alignment?.score ?? null,
-      life_score: model.life.score,
       completed_at: complete ? new Date().toISOString() : review?.completed_at ?? null,
     };
     const res = review
