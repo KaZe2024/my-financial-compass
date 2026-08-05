@@ -70,6 +70,7 @@ export const SYNCED_TABLES = [
   "brainstorm_folders",
   "brainstorm_sessions",
   "brainstorm_blocks",
+  "advisor_actions",
 
 ] as const;
 

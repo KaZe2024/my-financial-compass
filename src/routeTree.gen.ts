@@ -16,6 +16,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWalletsRouteImport } from './routes/_authenticated/wallets'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
 import { Route as AuthenticatedSubscriptionsRouteImport } from './routes/_authenticated/subscriptions'
 import { Route as AuthenticatedSnapshotsRouteImport } from './routes/_authenticated/snapshots'
 import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticated/shopping'
@@ -82,6 +83,11 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedTodayRoute = AuthenticatedTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSubscriptionsRoute =
   AuthenticatedSubscriptionsRouteImport.update({
     id: '/subscriptions',
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/shopping': typeof AuthenticatedShoppingRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
+  '/today': typeof AuthenticatedTodayRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/shopping': typeof AuthenticatedShoppingRoute
   '/snapshots': typeof AuthenticatedSnapshotsRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsRoute
+  '/today': typeof AuthenticatedTodayRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/wallets': typeof AuthenticatedWalletsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -350,6 +358,7 @@ export interface FileRoutesById {
   '/_authenticated/shopping': typeof AuthenticatedShoppingRoute
   '/_authenticated/snapshots': typeof AuthenticatedSnapshotsRoute
   '/_authenticated/subscriptions': typeof AuthenticatedSubscriptionsRoute
+  '/_authenticated/today': typeof AuthenticatedTodayRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/_authenticated/wallets': typeof AuthenticatedWalletsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -390,6 +399,7 @@ export interface FileRouteTypes {
     | '/shopping'
     | '/snapshots'
     | '/subscriptions'
+    | '/today'
     | '/transactions'
     | '/wallets'
     | '/.lovable/oauth/consent'
@@ -428,6 +438,7 @@ export interface FileRouteTypes {
     | '/shopping'
     | '/snapshots'
     | '/subscriptions'
+    | '/today'
     | '/transactions'
     | '/wallets'
     | '/.lovable/oauth/consent'
@@ -467,6 +478,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shopping'
     | '/_authenticated/snapshots'
     | '/_authenticated/subscriptions'
+    | '/_authenticated/today'
     | '/_authenticated/transactions'
     | '/_authenticated/wallets'
     | '/.lovable/oauth/consent'
@@ -536,6 +548,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/today': {
+      id: '/_authenticated/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof AuthenticatedTodayRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/subscriptions': {
@@ -777,6 +796,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedShoppingRoute: typeof AuthenticatedShoppingRoute
   AuthenticatedSnapshotsRoute: typeof AuthenticatedSnapshotsRoute
   AuthenticatedSubscriptionsRoute: typeof AuthenticatedSubscriptionsRoute
+  AuthenticatedTodayRoute: typeof AuthenticatedTodayRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
   AuthenticatedWalletsRoute: typeof AuthenticatedWalletsRoute
 }
@@ -807,6 +827,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedShoppingRoute: AuthenticatedShoppingRoute,
   AuthenticatedSnapshotsRoute: AuthenticatedSnapshotsRoute,
   AuthenticatedSubscriptionsRoute: AuthenticatedSubscriptionsRoute,
+  AuthenticatedTodayRoute: AuthenticatedTodayRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
   AuthenticatedWalletsRoute: AuthenticatedWalletsRoute,
 }

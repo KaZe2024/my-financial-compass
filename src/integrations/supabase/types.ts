@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      advisor_actions: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          impact: number
+          notes: string | null
+          plan_item_id: string | null
+          rec_key: string
+          resolved_at: string | null
+          snooze_until: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          impact?: number
+          notes?: string | null
+          plan_item_id?: string | null
+          rec_key: string
+          resolved_at?: string | null
+          snooze_until?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          impact?: number
+          notes?: string | null
+          plan_item_id?: string | null
+          rec_key?: string
+          resolved_at?: string | null
+          snooze_until?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisor_actions_plan_item_id_fkey"
+            columns: ["plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "plan_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_insights: {
         Row: {
           body: string | null
