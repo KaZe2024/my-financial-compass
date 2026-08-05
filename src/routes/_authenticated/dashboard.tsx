@@ -255,10 +255,31 @@ function Dashboard() {
   const plannedMonths = baselines.filter((b) => b.planned).length;
   const baseline0 = baselines[0];
 
+  // Scénarios probabilistes (Monte Carlo) : volatilité calibrée sur les 12 derniers
+  // mois réalisés + aléa de réalisation/timing sur chaque flux ponctuel.
+  const histNet = monthlyCashflowFromTransactions(txRows, toISODate(twelveAgo), todayISO)
+    .map((r: any) => Number(r.income) - Number(r.expense));
+  const mc = useMemo(
+    () => simulateCashflow({
+      startingCash: cashToday,
+      baselines,
+      items: items.map((i: any) => ({ amount: i.amount, date: i.date, confidence: i.confidence })),
+      historicalMonthlyNet: histNet,
+      iterations: 400,
+    }, 365),
+    [cashToday, JSON.stringify(baselines), JSON.stringify(items), JSON.stringify(histNet)],
+  );
+  const mcVerdict = breachVerdict(mc.probBreach);
+  const mcByDay = new Map(mc.bands.map((b) => [b.day, b]));
+
   const forecastChart = forecast.filter((_, i) => i % 7 === 0).map(p => ({
     day: p.day, label: `J+${p.day}`, balance: p.balance,
+    p10: mcByDay.get(p.day)?.p10 ?? p.balance,
+    p50: mcByDay.get(p.day)?.p50 ?? p.balance,
+    p90: mcByDay.get(p.day)?.p90 ?? p.balance,
   }));
   const horizons = [30, 60, 90, 180, 365];
+
 
 
   // Health
