@@ -152,3 +152,48 @@ export function computeGoalProgress(goal: any, data: ProgressInput): ProgressRes
 
   return { current: 0, target, pct: 0, label: "—", inverse: false };
 }
+
+/* ------------------------------------------------------------------ */
+/* Statuts d'objectifs — dérivés, jamais saisis à la main             */
+/* ------------------------------------------------------------------ */
+
+export type GoalStatus = "active" | "achieved" | "paused" | "cancelled";
+
+export const GOAL_STATUS_LABELS: Record<GoalStatus, string> = {
+  active: "Actif",
+  achieved: "Atteint",
+  paused: "En pause",
+  cancelled: "Annulé",
+};
+
+export const GOAL_STATUS_TONE: Record<GoalStatus, "positive" | "neutral" | "warning" | "negative"> = {
+  active: "neutral",
+  achieved: "positive",
+  paused: "warning",
+  cancelled: "negative",
+};
+
+/** Cible atteinte ? Pour un objectif inversé, atteinte = rester sous la cible. */
+export function isGoalReached(p: ProgressResult): boolean {
+  if (p.target <= 0) return false;
+  return p.inverse ? p.current <= p.target : p.current >= p.target;
+}
+
+/**
+ * Statut unique et déterministe :
+ *   archivé            → cancelled
+ *   mis en pause       → paused (seul statut manuel)
+ *   cible atteinte     → achieved
+ *   sinon              → active
+ */
+export function deriveGoalStatus(goal: any, p: ProgressResult): GoalStatus {
+  if (goal?.archived) return "cancelled";
+  if (goal?.status === "paused") return "paused";
+  return isGoalReached(p) ? "achieved" : "active";
+}
+
+/** Un objectif "en cours" : ni archivé, ni en pause, ni atteint. */
+export function isGoalOpen(goal: any, p: ProgressResult): boolean {
+  return deriveGoalStatus(goal, p) === "active";
+}
+
