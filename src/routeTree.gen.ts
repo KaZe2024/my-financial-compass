@@ -37,6 +37,7 @@ import { Route as AuthenticatedDebtsRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDataRouteImport } from './routes/_authenticated/data'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCounterpartiesRouteImport } from './routes/_authenticated/counterparties'
+import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/coach'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
 import { Route as AuthenticatedBrainstormRouteImport } from './routes/_authenticated/brainstorm'
@@ -194,6 +195,11 @@ const AuthenticatedCounterpartiesRoute =
     path: '/counterparties',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCoachRoute = AuthenticatedCoachRouteImport.update({
+  id: '/coach',
+  path: '/coach',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/coach': typeof AuthenticatedCoachRoute
   '/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data': typeof AuthenticatedDataRoute
@@ -313,6 +320,7 @@ export interface FileRoutesByTo {
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/coach': typeof AuthenticatedCoachRoute
   '/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/data': typeof AuthenticatedDataRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/_authenticated/brainstorm': typeof AuthenticatedBrainstormRoute
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
+  '/_authenticated/coach': typeof AuthenticatedCoachRoute
   '/_authenticated/counterparties': typeof AuthenticatedCounterpartiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/data': typeof AuthenticatedDataRoute
@@ -399,6 +408,7 @@ export interface FileRouteTypes {
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
+    | '/coach'
     | '/counterparties'
     | '/dashboard'
     | '/data'
@@ -440,6 +450,7 @@ export interface FileRouteTypes {
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
+    | '/coach'
     | '/counterparties'
     | '/dashboard'
     | '/data'
@@ -482,6 +493,7 @@ export interface FileRouteTypes {
     | '/_authenticated/brainstorm'
     | '/_authenticated/budgets'
     | '/_authenticated/calendar'
+    | '/_authenticated/coach'
     | '/_authenticated/counterparties'
     | '/_authenticated/dashboard'
     | '/_authenticated/data'
@@ -721,6 +733,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCounterpartiesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/coach': {
+      id: '/_authenticated/coach'
+      path: '/coach'
+      fullPath: '/coach'
+      preLoaderRoute: typeof AuthenticatedCoachRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/calendar': {
       id: '/_authenticated/calendar'
       path: '/calendar'
@@ -816,6 +835,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedBrainstormRoute: typeof AuthenticatedBrainstormRoute
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
+  AuthenticatedCoachRoute: typeof AuthenticatedCoachRoute
   AuthenticatedCounterpartiesRoute: typeof AuthenticatedCounterpartiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDataRoute: typeof AuthenticatedDataRoute
@@ -849,6 +869,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedBrainstormRoute: AuthenticatedBrainstormRoute,
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
+  AuthenticatedCoachRoute: AuthenticatedCoachRoute,
   AuthenticatedCounterpartiesRoute: AuthenticatedCounterpartiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDataRoute: AuthenticatedDataRoute,
@@ -893,13 +914,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
