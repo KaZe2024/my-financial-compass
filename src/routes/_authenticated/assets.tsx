@@ -17,6 +17,7 @@ import { fmtDate, fmtMoney, toISODate } from "@/lib/format";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/fetch-all";
 import { computeAssetTotals, computeAssetValue } from "@/lib/finance";
+import { assetPerformance, irrVerdict } from "@/lib/irr";
 
 /** Linear depreciation: returns {months, cumul, vnc, pct} for a given asset. */
 function computeAmortization(a: any, refDate = new Date()) {
@@ -189,7 +190,7 @@ function AssetsPage() {
 
       <Panel title={`${visible.length} actifs`}>
         <div className="scroll-thin -mx-4 overflow-x-auto">
-          <table className="w-full min-w-[1120px] text-sm">
+          <table className="w-full min-w-[1260px] text-sm">
             <thead className="text-left font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-2">Nom</th><th className="px-4 py-2">Type</th><th className="px-4 py-2">Achat</th>
@@ -198,7 +199,9 @@ function AssetsPage() {
                 <th className="px-4 py-2 text-right">VNC</th>
                 <th className="px-4 py-2 text-right">Valeur</th>
                 <th className="px-4 py-2 text-right">PV/MV revente</th>
-                <th className="px-4 py-2 text-right">Δ coût</th><th className="px-4 py-2">Statut</th><th className="px-4 py-2 w-28"></th>
+                <th className="px-4 py-2 text-right">Δ coût</th>
+                <th className="px-4 py-2 text-right">TRI annualisé</th>
+                <th className="px-4 py-2">Statut</th><th className="px-4 py-2 w-28"></th>
               </tr>
             </thead>
             {subtotalsByCurrency.length > 0 && (
@@ -212,7 +215,7 @@ function AssetsPage() {
                     <td className="num px-4 py-2 text-right">{fmtMoney(t.marketValue, cur)}</td>
                     <td className={`num px-4 py-2 text-right ${t.resaleGain >= 0 ? "text-positive" : "text-negative"}`}>{t.resaleGain ? fmtMoney(t.resaleGain, cur, { sign: true }) : "—"}</td>
                     <td className={`num px-4 py-2 text-right ${t.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(t.variation, cur, { sign: true })}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 ))}
               </tbody>
@@ -222,6 +225,11 @@ function AssetsPage() {
                 const value = computeAssetValue(a, assetEvents.data ?? [], { transactions: assetTx.data ?? [] });
                 const amo = computeAmortization(a);
                 const resaleGain = value.resaleGain;
+                const perf = assetPerformance(txByAsset.get(a.id) ?? [], {
+                  residualValue: value.marketValue,
+                  sold: value.sold,
+                });
+                const verdict = irrVerdict(perf.irr);
                 return (
                   <tr key={a.id} className={`border-t border-border/60 ${a.archived ? "opacity-50" : ""}`}>
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
@@ -237,6 +245,12 @@ function AssetsPage() {
                       {value.sold ? fmtMoney(resaleGain, a.currency, { sign: true }) : "—"}
                     </td>
                     <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
+                    <td
+                      className={`num px-4 py-2 text-right ${verdict.tone === "positive" ? "text-positive" : verdict.tone === "warning" ? "text-warning" : verdict.tone === "negative" ? "text-negative" : "text-muted-foreground"}`}
+                      title={`${verdict.label} · investi ${fmtMoney(perf.invested, a.currency)} · encaissé ${fmtMoney(perf.realized, a.currency)}${perf.residual ? ` · valeur résiduelle ${fmtMoney(perf.residual, a.currency)}` : ""} · détention ${perf.holdingYears.toFixed(1)} an(s)${perf.moic != null ? ` · multiple ×${perf.moic.toFixed(2)}` : ""}`}
+                    >
+                      {perf.irr == null ? "—" : `${(perf.irr * 100).toFixed(1)} %`}
+                    </td>
                     <td className="px-4 py-2"><span className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase">{a.archived ? "archivé" : a.status}</span></td>
                     <td className="px-2 py-2 text-right">
                       <div className="flex items-center justify-end gap-0.5 text-muted-foreground">
@@ -256,7 +270,7 @@ function AssetsPage() {
                   </tr>
                 );
               })}
-              {visible.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun actif</td></tr>}
+              {visible.length === 0 && <tr><td colSpan={12} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucun actif</td></tr>}
             </tbody>
           </table>
         </div>
