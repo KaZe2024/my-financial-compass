@@ -352,26 +352,42 @@ function SimulatorPage() {
           >
             {drifts.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aucun poste ne dérive significativement sur les 3 derniers mois. Le train de vie est stable.
+                Aucun poste ne dérive significativement. Les pics isolés sont ignorés : seules les hausses
+                installées ou les anomalies franches (au-delà de 3 écarts robustes) sont retenues.
               </p>
             ) : (
               <div className="space-y-2">
                 {drifts.slice(0, 6).map((c) => (
                   <div key={c.key} className="flex items-center justify-between gap-3 rounded-sm border border-border bg-card/40 px-3 py-2">
                     <div className="min-w-0">
-                      <div className="truncate text-sm">{c.label}</div>
-                      <div className="font-mono text-[10px] text-muted-foreground">
-                        {fmtMoney(c.monthly)} / mois · {c.share.toFixed(0)} % du train de vie
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm">{c.label}</span>
+                        {c.structural && (
+                          <span className="rounded-sm bg-negative/15 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-negative">structurel</span>
+                        )}
+                        {!c.structural && c.zScore != null && Math.abs(c.zScore) >= 3 && (
+                          <span className="rounded-sm bg-warning/15 px-1 py-0.5 font-mono text-[8px] uppercase tracking-widest text-warning">pic isolé</span>
+                        )}
                       </div>
+                      <div className="font-mono text-[10px] text-muted-foreground">
+                        {fmtMoney(c.monthly)} / mois · {c.share.toFixed(0)} % du train de vie · médiane {fmtMoney(c.median)}
+                      </div>
+                      <div className="font-mono text-[10px] text-muted-foreground">{explainDrift(c)}</div>
                     </div>
-                    <div className={cn("flex items-center gap-1.5 font-mono text-xs", c.driftAmount > 0 ? "text-negative" : "text-positive")}>
-                      {c.driftAmount > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                      {c.drift! > 0 ? "+" : "−"}{Math.abs(c.drift!).toFixed(0)} %
+                    <div className={cn("flex shrink-0 flex-col items-end gap-0.5 font-mono text-xs", c.driftAmount > 0 ? "text-negative" : "text-positive")}>
+                      <div className="flex items-center gap-1.5">
+                        {c.driftAmount > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                        {c.drift != null ? `${c.drift > 0 ? "+" : "−"}${Math.abs(c.drift).toFixed(0)} %` : fmtMoney(c.driftAmount, "MGA", { sign: true })}
+                      </div>
+                      <span className="text-[9px] text-muted-foreground">
+                        {c.driftAmount > 0 ? "+" : "−"}{fmtMoney(Math.abs(c.driftAmount), "MGA", { compact: true })}/mois
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
           </Panel>
         </div>
       </div>
