@@ -1423,6 +1423,57 @@ export type Database = {
           },
         ]
       }
+      life_domains: {
+        Row: {
+          archived: boolean
+          color: string
+          created_at: string
+          id: string
+          keywords: string[]
+          label: string
+          match_project_ids: string[]
+          match_tag_ids: string[]
+          match_type_ids: string[]
+          notes: string | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          label: string
+          match_project_ids?: string[]
+          match_tag_ids?: string[]
+          match_type_ids?: string[]
+          notes?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          weight?: number
+        }
+        Update: {
+          archived?: boolean
+          color?: string
+          created_at?: string
+          id?: string
+          keywords?: string[]
+          label?: string
+          match_project_ids?: string[]
+          match_tag_ids?: string[]
+          match_type_ids?: string[]
+          notes?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          weight?: number
+        }
+        Relationships: []
+      }
       loan_amortizations: {
         Row: {
           balance_after: number
@@ -2993,6 +3044,60 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      weekly_reviews: {
+        Row: {
+          alignment_score: number | null
+          completed_at: string | null
+          created_at: string
+          execution_score: number | null
+          finance_note: string | null
+          finance_score: number | null
+          id: string
+          lessons: string | null
+          life_score: number | null
+          misses: string | null
+          next_focus: string | null
+          updated_at: string
+          user_id: string
+          week_start: string
+          wins: string | null
+        }
+        Insert: {
+          alignment_score?: number | null
+          completed_at?: string | null
+          created_at?: string
+          execution_score?: number | null
+          finance_note?: string | null
+          finance_score?: number | null
+          id?: string
+          lessons?: string | null
+          life_score?: number | null
+          misses?: string | null
+          next_focus?: string | null
+          updated_at?: string
+          user_id: string
+          week_start: string
+          wins?: string | null
+        }
+        Update: {
+          alignment_score?: number | null
+          completed_at?: string | null
+          created_at?: string
+          execution_score?: number | null
+          finance_note?: string | null
+          finance_score?: number | null
+          id?: string
+          lessons?: string | null
+          life_score?: number | null
+          misses?: string | null
+          next_focus?: string | null
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+          wins?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
