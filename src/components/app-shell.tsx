@@ -22,7 +22,7 @@ const NAV = [
     { to: "/coach", label: "Coach & rapports", icon: Bot },
     { to: "/simulator", label: "Simulateur", icon: FlaskConical },
     { to: "/life", label: "Priorités de vie", icon: HeartPulse },
-    { to: "/ai", label: "Assistant CFO", icon: Sparkles },
+    { to: "/ai", label: "Assistant CFO", icon: Sparkles, onlineOnly: true },
     { to: "/alerts", label: "Alertes", icon: Bell },
     { to: "/calendar", label: "Calendrier", icon: CalendarDays },
   ]},
