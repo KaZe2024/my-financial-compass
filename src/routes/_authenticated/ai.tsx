@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/ai")({
 
 function AiPage() {
   const qc = useQueryClient();
+  const { online } = useNetworkStatus();
   const listFn = useServerFn(listConversations);
   const createFn = useServerFn(createConversation);
   const deleteFn = useServerFn(deleteConversation);
