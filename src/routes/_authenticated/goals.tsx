@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,10 @@ import { NodePicker } from "@/components/node-picker";
 import { budgetNodesQO, walletsQO } from "@/lib/queries";
 import {
   computeGoalProgress, GOAL_TYPE_LABELS, GOAL_TYPES_NEED_NODE, GOAL_TYPES_NEED_PERIOD,
-  type GoalType, type ProgressInput,
+  deriveGoalStatus, GOAL_STATUS_LABELS, GOAL_STATUS_TONE,
+  type GoalType, type GoalStatus, type ProgressInput, type ProgressResult,
 } from "@/lib/goal-progress";
+
 import { logAudit } from "@/lib/audit";
 import { fetchAllRows } from "@/lib/fetch-all";
 
@@ -86,19 +88,72 @@ function GoalsPage() {
     queryKey: ["goals"],
     queryFn: async () => (await supabase.from("financial_goals").select("*").order("target_date", { nullsFirst: false })).data ?? [],
   });
-  const visible = (goals.data ?? []).filter((g: any) => showArchived || !g.archived);
   const [editing, setEditing] = useState<any | null>(null);
+  const syncedRef = useRef<string>("");
 
-  // Sync current_amount silently to keep legacy readers coherent.
-  useEffect(() => {
-    if (!goals.data) return;
-    for (const g of goals.data) {
+  // Progression + statut dérivé pour chaque objectif (source de vérité unique).
+  type GoalRow = { goal: any; progress: ProgressResult; status: GoalStatus };
+  const rows = useMemo<GoalRow[]>(() => {
+    return (goals.data ?? []).map((g: any): GoalRow => {
       const p = computeGoalProgress(g, progressData);
-      if (Math.abs(Number(g.current_amount ?? 0) - p.current) > 0.5) {
-        supabase.from("financial_goals").update({ current_amount: p.current } as any).eq("id", g.id);
-      }
-    }
+      return { goal: g, progress: p, status: deriveGoalStatus(g, p) };
+    });
   }, [goals.data, progressData]);
+
+
+  const visible = rows.filter((r) => showArchived || !r.goal.archived);
+  const achievedCount = rows.filter((r) => !r.goal.archived && r.status === "achieved").length;
+  const trackedCount = rows.filter((r) => !r.goal.archived).length;
+
+  // Persistance fiable de current_amount + status : une passe, attendue, puis rafraîchie.
+  useEffect(() => {
+    if (!goals.data || !goals.data.length) return;
+    if (!progressData.wallets.length && !progressData.txs.length) return;
+
+    const stale = rows.filter(
+      (r) =>
+        Math.abs(Number(r.goal.current_amount ?? 0) - r.progress.current) > 0.5 ||
+        (r.goal.status ?? "active") !== r.status,
+    );
+    if (!stale.length) return;
+
+    const signature = stale.map((r) => `${r.goal.id}:${Math.round(r.progress.current)}:${r.status}`).join("|");
+    if (syncedRef.current === signature) return;
+    syncedRef.current = signature;
+
+    (async () => {
+      const results = await Promise.all(
+        stale.map((r) =>
+          supabase
+            .from("financial_goals")
+            .update({ current_amount: r.progress.current, status: r.status } as any)
+            .eq("id", r.goal.id),
+        ),
+      );
+      const failed = results.filter((res: any) => res?.error);
+      if (failed.length) {
+        console.warn("[goals] sync failed", failed.map((f: any) => f.error?.message));
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ["goals"] });
+    })();
+  }, [goals.data, progressData, rows, qc]);
+
+  const setPaused = useMutation({
+    mutationFn: async ({ id, paused }: { id: string; paused: boolean }) => {
+      const { error } = await supabase
+        .from("financial_goals")
+        .update({ status: paused ? "paused" : "active" } as any)
+        .eq("id", id);
+      if (error) throw error;
+      await logAudit("goal", id, "update", { status: paused ? "paused" : "active" });
+    },
+    onSuccess: () => {
+      syncedRef.current = "";
+      qc.invalidateQueries({ queryKey: ["goals"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <div className="space-y-6">
@@ -106,7 +161,14 @@ function GoalsPage() {
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Planification</p>
           <h1 className="mt-1 text-2xl font-semibold">Objectifs financiers</h1>
-          <p className="mt-1 text-sm text-muted-foreground">La progression est calculée automatiquement à partir de vos transactions et données réelles.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            La progression et le statut sont calculés automatiquement à partir de vos transactions et données réelles.
+          </p>
+          {trackedCount > 0 && (
+            <p className="num mt-1 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+              {achievedCount} atteint{achievedCount > 1 ? "s" : ""} sur {trackedCount}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)}>{showArchived ? "Masquer" : "Voir"} archivés</Button>
@@ -115,8 +177,7 @@ function GoalsPage() {
       </header>
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {visible.map((g: any) => {
-          const p = computeGoalProgress(g, progressData);
+        {visible.map(({ goal: g, progress: p, status }) => {
           const typeLabel = GOAL_TYPE_LABELS[(g.goal_type ?? "savings_balance") as GoalType];
           return (
             <div key={g.id} className={`rounded-md border border-border bg-card p-4 ${g.archived ? "opacity-60" : ""}`}>
@@ -124,7 +185,10 @@ function GoalsPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold"><Target className="h-4 w-4 text-primary" /> {g.name}</div>
                 <RowActions table="financial_goals" id={g.id} archived={g.archived} onEdit={() => setEditing(g)} />
               </div>
-              <div className="mt-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{typeLabel}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">{typeLabel}</span>
+                <GoalStatusBadge status={status} />
+              </div>
               <div className="num mt-3 text-2xl font-semibold">
                 {g.goal_type === "savings_rate" ? fmtPct(p.current) : fmtMoney(p.current, g.currency)}
               </div>
@@ -132,10 +196,25 @@ function GoalsPage() {
                 {p.inverse ? "vers ≤ " : "sur "} {g.goal_type === "savings_rate" ? fmtPct(p.target) : fmtMoney(p.target, g.currency)} · {fmtPct(p.pct)}
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div className={`h-full ${p.inverse ? "bg-warning" : "bg-primary"}`} style={{ width: `${Math.min(100, p.pct)}%` }} />
+                <div
+                  className={`h-full ${status === "achieved" ? "bg-positive" : p.inverse ? "bg-warning" : "bg-primary"}`}
+                  style={{ width: `${Math.min(100, p.pct)}%` }}
+                />
               </div>
               <div className="mt-2 text-[10px] text-muted-foreground">{p.label}</div>
-              {g.target_date && <div className="mt-2 text-xs text-muted-foreground">Échéance · {fmtDate(g.target_date)}</div>}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                {g.target_date ? <div className="text-xs text-muted-foreground">Échéance · {fmtDate(g.target_date)}</div> : <span />}
+                {!g.archived && (
+                  <button
+                    type="button"
+                    disabled={setPaused.isPending}
+                    onClick={() => setPaused.mutate({ id: g.id, paused: status !== "paused" })}
+                    className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                  >
+                    {status === "paused" ? "Reprendre" : "Mettre en pause"}
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -150,6 +229,21 @@ function GoalsPage() {
     </div>
   );
 }
+
+function GoalStatusBadge({ status }: { status: GoalStatus }) {
+  const tone = GOAL_STATUS_TONE[status];
+  const cls =
+    tone === "positive" ? "bg-positive/15 text-positive"
+    : tone === "warning" ? "bg-warning/15 text-warning"
+    : tone === "negative" ? "bg-negative/15 text-negative"
+    : "bg-primary/15 text-primary";
+  return (
+    <span className={`rounded-sm px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest ${cls}`}>
+      {GOAL_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 
 function GoalDialog({ editing, nodes, onDone, onClose }: { editing?: any; nodes: any[]; onDone: () => void; onClose?: () => void }) {
   const [open, setOpen] = useState(!editing ? false : true);

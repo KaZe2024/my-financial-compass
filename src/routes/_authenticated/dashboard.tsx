@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { simulateCashflow, breachVerdict, type McBand } from "@/lib/montecarlo";
+
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { StatCard, Panel } from "@/components/stat-card";
 import { fmtMoney, fmtDate, fmtMonth, fmtPct, toISODate } from "@/lib/format";
@@ -23,7 +25,7 @@ import {
   monthlyCashflowFromTransactions,
   sumAvailableCash,
 } from "@/lib/finance";
-import { computeGoalProgress, type ProgressInput } from "@/lib/goal-progress";
+import { computeGoalProgress, isGoalOpen, type ProgressInput } from "@/lib/goal-progress";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -131,9 +133,10 @@ function Dashboard() {
     queryFn: async () => (await supabase.from("monthly_snapshots").select("snapshot_month, net_worth, cash_position, total_assets, total_debt, total_receivables").order("snapshot_month", { ascending: true })).data ?? [],
   });
   const goals = useQuery({
-    queryKey: ["goals", "active"],
-    queryFn: async () => (await supabase.from("financial_goals").select("*").eq("status","active").order("target_date", { ascending: true })).data ?? [],
+    queryKey: ["goals", "not-archived"],
+    queryFn: async () => (await supabase.from("financial_goals").select("*").eq("archived", false).order("target_date", { ascending: true })).data ?? [],
   });
+
   const recentTx = useQuery({
     queryKey: ["tx", "recent"],
     queryFn: async () => {
@@ -254,10 +257,31 @@ function Dashboard() {
   const plannedMonths = baselines.filter((b) => b.planned).length;
   const baseline0 = baselines[0];
 
+  // Scénarios probabilistes (Monte Carlo) : volatilité calibrée sur les 12 derniers
+  // mois réalisés + aléa de réalisation/timing sur chaque flux ponctuel.
+  const histNet = monthlyCashflowFromTransactions(txRows, toISODate(twelveAgo), todayISO)
+    .map((r: any) => Number(r.income) - Number(r.expense));
+  const mc = useMemo(
+    () => simulateCashflow({
+      startingCash: cashToday,
+      baselines,
+      items: items.map((i: any) => ({ amount: i.amount, date: i.date, confidence: i.confidence })),
+      historicalMonthlyNet: histNet,
+      iterations: 400,
+    }, 365),
+    [cashToday, JSON.stringify(baselines), JSON.stringify(items), JSON.stringify(histNet)],
+  );
+  const mcVerdict = breachVerdict(mc.probBreach);
+  const mcByDay = new Map<number, McBand>(mc.bands.map((b: McBand) => [b.day, b]));
+
   const forecastChart = forecast.filter((_, i) => i % 7 === 0).map(p => ({
     day: p.day, label: `J+${p.day}`, balance: p.balance,
+    p10: mcByDay.get(p.day)?.p10 ?? p.balance,
+    p50: mcByDay.get(p.day)?.p50 ?? p.balance,
+    p90: mcByDay.get(p.day)?.p90 ?? p.balance,
   }));
   const horizons = [30, 60, 90, 180, 365];
+
 
 
   // Health
@@ -303,32 +327,36 @@ function Dashboard() {
     { month: periodTo >= todayISO ? "Auj." : fmtMonth(periodTo), net: netWorth },
   ];
 
-  // Goal forecast
-  const goalForecasts = (goals.data ?? []).slice(0, 4).map((g: any) => {
-    const progressData: ProgressInput = {
-      txs: txRows,
-      wallets: wallets.data ?? [],
-      debts: debtsRows.data ?? [],
-      assets: assetsRows.data ?? [],
-      assetEvents: assetEvents.data ?? [],
-      receivables: recRows.data ?? [],
-      nodes: nodesQ.data ?? [],
-    };
-    const computed = computeGoalProgress(g, progressData);
-    const currentAmount = computed.current;
-    const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
-    const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
-    const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
-    const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
-    const monthlyCapacity = (savings / periodDays) * 30;
-    const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
-    const eta = monthsAtCurrentPace
-      ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
-      : null;
-    const onTrack = monthlyNeeded != null && monthlyCapacity >= monthlyNeeded;
-    const progress = computed.pct;
-    return { ...g, current_amount: currentAmount, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
-  });
+  // Goal forecast — on ne garde que les objectifs réellement en cours (statut dérivé).
+  const goalProgressData: ProgressInput = {
+    txs: txRows,
+    wallets: wallets.data ?? [],
+    debts: debtsRows.data ?? [],
+    assets: assetsRows.data ?? [],
+    assetEvents: assetEvents.data ?? [],
+    receivables: recRows.data ?? [],
+    nodes: nodesQ.data ?? [],
+  };
+  const goalForecasts = (goals.data ?? [])
+    .map((g: any) => ({ g, computed: computeGoalProgress(g, goalProgressData) }))
+    .filter(({ g, computed }: any) => isGoalOpen(g, computed))
+    .slice(0, 4)
+    .map(({ g, computed }: any) => {
+      const currentAmount = computed.current;
+      const remaining = Math.max(0, Number(g.target_amount) - currentAmount);
+      const monthsToTarget = g.target_date ? Math.max(1, (new Date(g.target_date).getTime() - now.getTime()) / (30 * 86_400_000)) : null;
+      const monthlyNeeded = monthsToTarget ? remaining / monthsToTarget : null;
+      const periodDays = Math.max(1, Math.ceil((resolved.to.getTime() - resolved.from.getTime()) / 86_400_000) + 1);
+      const monthlyCapacity = (savings / periodDays) * 30;
+      const monthsAtCurrentPace = monthlyCapacity > 0 ? remaining / monthlyCapacity : null;
+      const eta = monthsAtCurrentPace
+        ? new Date(now.getFullYear(), now.getMonth() + Math.ceil(monthsAtCurrentPace), 1)
+        : null;
+      const onTrack = monthlyNeeded != null && monthlyCapacity >= monthlyNeeded;
+      const progress = computed.pct;
+      return { ...g, current_amount: currentAmount, remaining, monthlyNeeded, monthlyCapacity, eta, onTrack, progress };
+    });
+
 
   const cfChart = monthlyCashflowFromTransactions(txRows, toISODate(twelveAgo), toISODate(now)).map((r: any) => ({
     month: fmtMonth(r.month), income: Number(r.income), expense: Number(r.expense),
@@ -503,6 +531,33 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Scénarios probabilistes */}
+          <div className="mb-3 grid gap-2 sm:grid-cols-4">
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Probabilité de rupture</div>
+              <div className={`num text-sm font-semibold ${mcVerdict.tone === "positive" ? "text-positive" : mcVerdict.tone === "warning" ? "text-warning" : "text-negative"}`}>
+                {fmtPct(mc.probBreach * 100)}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">{mcVerdict.label}</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Pessimiste (P10) · 365 j</div>
+              <div className={`num text-sm font-semibold ${mc.endP10 >= 0 ? "text-foreground" : "text-negative"}`}>{fmtMoney(mc.endP10, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">1 chance sur 10 d'être en dessous</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Médian (P50) · 365 j</div>
+              <div className="num text-sm font-semibold">{fmtMoney(mc.endP50, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">scénario le plus probable</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Optimiste (P90) · 365 j</div>
+              <div className="num text-sm font-semibold text-positive">{fmtMoney(mc.endP90, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">volatilité mensuelle ±{fmtMoney(mc.monthlySigma, cur, { compact: true })}</div>
+            </div>
+          </div>
+
           <div className="mb-3 h-56">
             <ResponsiveContainer>
               <LineChart data={forecastChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -510,10 +565,14 @@ function Dashboard() {
                 <XAxis dataKey="label" stroke="#6b7280" fontSize={10} interval={6} />
                 <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => new Intl.NumberFormat("fr-FR", { notation: "compact" }).format(v)} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Solde projeté" />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Line type="monotone" dataKey="p90" stroke="#22c55e" strokeWidth={1} strokeDasharray="4 3" dot={false} name="Optimiste P90" />
+                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Scénario central" />
+                <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={1} strokeDasharray="4 3" dot={false} name="Pessimiste P10" />
               </LineChart>
             </ResponsiveContainer>
           </div>
+
 
           <div className="rounded-sm border border-border bg-background/40 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
@@ -544,6 +603,15 @@ function Dashboard() {
                 4. Prudence : les créances sont pondérées à 85 % et les factures à émettre à 60–90 % selon leur statut ;
                 toute échéance déjà dépassée est replacée à J+7 (régularisation) au lieu d'être ignorée.
               </li>
+              <li>
+                5. Scénarios probabilistes : {mc.iterations} trajectoires simulées (Monte Carlo). La volatilité mensuelle
+                (±{fmtMoney(mc.monthlySigma, cur, { compact: true })}) est calibrée sur l'écart-type de vos 12 derniers nets mensuels ;
+                chaque flux daté peut se réaliser ou non (selon sa pondération) et glisser de quelques jours.
+                P10 / P50 / P90 = solde dépassé dans 90 % / 50 % / 10 % des trajectoires.
+                Probabilité de rupture = part des trajectoires passant au moins un jour sous zéro
+                ({fmtPct(mc.probBreach * 100)}).
+              </li>
+
             </ol>
           </div>
 

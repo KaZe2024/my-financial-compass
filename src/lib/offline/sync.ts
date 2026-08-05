@@ -30,6 +30,8 @@ export type SyncPushResult = {
   applied: number;
   failed: number;
   errors: string[];
+  appliedIds: string[];
+  failedIds: string[];
 };
 
 export const pullSync = createServerFn({ method: "POST" })
@@ -50,17 +52,27 @@ export const pullSync = createServerFn({ method: "POST" })
     await Promise.all(
       SYNCED_TABLES.map(async (table) => {
         try {
-          const q = (supabase as any)
-            .from(table as string)
-            .select("*")
-            .eq("user_id", userId)
-            .gte("updated_at", since);
-          const { data: rows, error } = await q;
-          if (error) {
-            console.error(`[offline pull] ${table}:`, error);
-            return;
+          // Pagination obligatoire : PostgREST plafonne à 1000 lignes par requête,
+          // sans quoi une synchro complète perdrait silencieusement des données.
+          const PAGE = 1000;
+          const rows: any[] = [];
+          for (let from = 0; ; from += PAGE) {
+            const { data: page, error } = await (supabase as any)
+              .from(table as string)
+              .select("*")
+              .eq("user_id", userId)
+              .gte("updated_at", since)
+              .order("updated_at", { ascending: true })
+              .range(from, from + PAGE - 1);
+            if (error) {
+              console.error(`[offline pull] ${table}:`, error);
+              return;
+            }
+            const chunk = page ?? [];
+            rows.push(...chunk);
+            if (chunk.length < PAGE) break;
           }
-          result[table] = (rows ?? []).map((r: any) => ({
+          result[table] = rows.map((r: any) => ({
             id: r.id as string,
             data: r as Record<string, Json>,
             updatedAt: r.updated_at as string,
@@ -86,6 +98,8 @@ export const pushSync = createServerFn({ method: "POST" })
     let applied = 0;
     let failed = 0;
     const errors: string[] = [];
+    const appliedIds: string[] = [];
+    const failedIds: string[] = [];
 
     for (const mutation of data) {
       try {
@@ -95,6 +109,7 @@ export const pushSync = createServerFn({ method: "POST" })
           const { error } = await (supabase as any).from(table).insert(payload);
           if (error) throw error;
           applied++;
+          appliedIds.push(mutation.id);
         } else if (mutation.op === "update") {
           const id = payload.id;
           if (!id) throw new Error("Missing id for update");
@@ -102,23 +117,26 @@ export const pushSync = createServerFn({ method: "POST" })
           const { error } = await (supabase as any).from(table).update(payload).eq("id", id);
           if (error) throw error;
           applied++;
+          appliedIds.push(mutation.id);
         } else if (mutation.op === "delete") {
           const id = payload.id;
           if (!id) throw new Error("Missing id for delete");
           const { error } = await (supabase as any).from(table).delete().eq("id", id);
           if (error) throw error;
           applied++;
+          appliedIds.push(mutation.id);
         } else {
           throw new Error(`Unknown op ${mutation.op}`);
         }
       } catch (e: any) {
         failed++;
+        failedIds.push(mutation.id);
         errors.push(`${mutation.table}/${mutation.id}: ${e.message}`);
         console.error(`[offline push] ${mutation.table}/${mutation.id}:`, e);
       }
     }
 
-    return { applied, failed, errors } as SyncPushResult;
+    return { applied, failed, errors, appliedIds, failedIds } as SyncPushResult;
   });
 
 export async function queueMutation(
@@ -156,22 +174,21 @@ export async function performPull(): Promise<SyncPullResult> {
 
 export async function flushPendingMutations(): Promise<SyncPushResult> {
   const mutations = await offlineDb.pendingMutations.orderBy("createdAt").toArray();
-  if (mutations.length === 0) return { applied: 0, failed: 0, errors: [] };
+  if (mutations.length === 0) return { applied: 0, failed: 0, errors: [], appliedIds: [], failedIds: [] };
 
   const result = await pushSync({ data: mutations });
 
-  const appliedIds = mutations.slice(0, result.applied).map((m) => m.id);
-  await offlineDb.pendingMutations.bulkDelete(appliedIds);
+  // On supprime exactement les mutations confirmées par le serveur (plus de
+  // supposition « les N premières ont réussi », qui pouvait perdre des saisies).
+  await offlineDb.pendingMutations.bulkDelete(result.appliedIds ?? []);
 
-  for (const error of result.errors) {
-    const mutationId = error.split(":")[0]?.trim();
-    if (!mutationId) continue;
-    const m = await offlineDb.pendingMutations.get(mutationId);
-    if (m) {
-      m.retryCount += 1;
-      m.error = error;
-      await offlineDb.pendingMutations.put(m);
-    }
+  const failedIds = result.failedIds ?? [];
+  for (let i = 0; i < failedIds.length; i++) {
+    const m = await offlineDb.pendingMutations.get(failedIds[i]!);
+    if (!m) continue;
+    m.retryCount += 1;
+    m.error = result.errors[i] ?? "Erreur de synchronisation";
+    await offlineDb.pendingMutations.put(m);
   }
 
   return result;

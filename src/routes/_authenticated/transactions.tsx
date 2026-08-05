@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useState, Fragment, useRef } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { walletsQO, budgetNodesQO, counterpartiesQO, projectsQO } from "@/lib/queries";
 import { NodePicker } from "@/components/node-picker";
@@ -337,12 +337,42 @@ function TxPage() {
       });
   }, [filtered, f.walletId]);
 
+  // Rendu progressif : on n'injecte dans le DOM qu'une fenêtre de lignes, agrandie
+  // automatiquement quand on atteint le bas. Les totaux restent calculés sur TOUT.
+  const PAGE_ROWS = 200;
+  const [renderLimit, setRenderLimit] = useState(PAGE_ROWS);
+  useEffect(() => { setRenderLimit(PAGE_ROWS); }, [filtered]);
+
+  const renderedGroups = useMemo(() => {
+    let budget = renderLimit;
+    const out: typeof grouped = [];
+    for (const g of grouped) {
+      if (budget <= 0) break;
+      out.push(budget >= g.rows.length ? g : { ...g, rows: g.rows.slice(0, budget) });
+      budget -= g.rows.length;
+    }
+    return out;
+  }, [grouped, renderLimit]);
+  const renderedCount = renderedGroups.reduce((s, g) => s + g.rows.length, 0);
+  const hasMoreRows = renderedCount < filtered.length;
+
+  const sentinelRef = useRef<HTMLTableRowElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMoreRows) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setRenderLimit((n) => n + PAGE_ROWS);
+    }, { rootMargin: "600px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMoreRows, renderedCount]);
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
     for (const g of grouped) { inflow += g.inflow; outflow += g.outflow; }
     return { inflow, outflow, net: inflow - outflow };
   }, [grouped]);
+
 
   const allVisibleIds = useMemo(() => filtered.map((t: any) => t.id), [filtered]);
   const allSelected = allVisibleIds.length > 0 && allVisibleIds.every((id: string) => selected.has(id));
@@ -491,7 +521,7 @@ function TxPage() {
               </tr>
             </thead>
             <tbody>
-              {grouped.map((g) => (
+              {renderedGroups.map((g) => (
                 <Fragment key={g.month}>
                   <tr key={`h-${g.month}`} className="border-t border-border bg-muted/40">
                     <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -576,6 +606,16 @@ function TxPage() {
                   })}
                 </Fragment>
               ))}
+              {hasMoreRows && (
+                <tr ref={sentinelRef}>
+                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {renderedCount} / {filtered.length} lignes affichées ·{" "}
+                    <button type="button" onClick={() => setRenderLimit((n) => n + 1000)} className="underline hover:text-foreground">
+                      afficher 1000 de plus
+                    </button>
+                  </td>
+                </tr>
+              )}
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
             </tbody>
           </table>

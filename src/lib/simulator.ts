@@ -20,7 +20,24 @@ export type CategoryCost = {
   drift: number | null;
   /** Montant mensuel de la dérive (positif = alourdissement). */
   driftAmount: number;
+  /** Médiane mensuelle du poste — référence robuste aux mois exceptionnels. */
+  median: number;
+  /** Écart absolu médian (MAD) → dispersion robuste. */
+  mad: number;
+  /** Dernier mois observé. */
+  lastMonth: number;
+  /** Écart du dernier mois vs médiane, en nombre de MAD (score d'anomalie robuste). */
+  zScore: number | null;
+  /** Pente de tendance (montant/mois) par régression linéaire sur la fenêtre. */
+  trendSlope: number;
+  /** Coefficient de variation robuste (MAD / médiane), 0..n. */
+  volatility: number;
+  /** Nombre de mois où le poste a été mouvementé (régularité). */
+  activeMonths: number;
+  /** true si le poste dépasse durablement sa médiane (dérive structurelle, pas un pic isolé). */
+  structural: boolean;
 };
+
 
 export type LifestyleCost = {
   monthlyExpense: number;
@@ -54,9 +71,39 @@ export function monthlyFromCycle(amount: number, cycle: string | null | undefine
   return amount;
 }
 
+/* ---- statistiques robustes (insensibles aux mois exceptionnels) ---- */
+
+export function median(xs: number[]): number {
+  if (!xs.length) return 0;
+  const s = xs.slice().sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** Écart absolu médian, remis à l'échelle d'un écart-type (×1,4826). */
+export function mad(xs: number[], med = median(xs)): number {
+  if (!xs.length) return 0;
+  return median(xs.map((x) => Math.abs(x - med))) * 1.4826;
+}
+
+/** Pente de régression linéaire simple (unité : montant par mois). */
+export function slope(xs: number[]): number {
+  const n = xs.length;
+  if (n < 2) return 0;
+  const mx = (n - 1) / 2;
+  const my = xs.reduce((s, x) => s + x, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - mx) * (xs[i] - my);
+    den += (i - mx) ** 2;
+  }
+  return den ? num / den : 0;
+}
+
 function addMonths(ref: Date, delta: number) {
   return new Date(ref.getFullYear(), ref.getMonth() + delta, 1);
 }
+
 
 function monthList(ref: Date, count: number) {
   const out: string[] = [];
@@ -121,6 +168,24 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
       const p = previous.length === 3 ? avg(previous) : null;
       const driftAmount = p == null ? 0 : r - p;
       const drift = p == null || p <= 0 ? null : (driftAmount / p) * 100;
+
+      // Statistiques robustes sur la série mensuelle complète (0 inclus).
+      const series = keys.map((m) => row.byMonth.get(m) ?? 0);
+      const med = median(series);
+      const madVal = mad(series, med);
+      const lastMonth = series[series.length - 1] ?? 0;
+      const zScore = madVal > 0 ? (lastMonth - med) / madVal : null;
+      const trendSlope = slope(series);
+      const activeMonths = series.filter((v) => v > 0).length;
+      // Dérive structurelle : les 3 derniers mois sont tous au-dessus de la médiane
+      // ET la moyenne récente dépasse la médiane de plus de 10 %.
+      const lastThree = series.slice(-3);
+      const structural =
+        lastThree.length === 3 &&
+        med > 0 &&
+        lastThree.every((v) => v > med) &&
+        r > med * 1.1;
+
       return {
         key,
         label: row.label,
@@ -128,9 +193,18 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
         share: monthlyExpense > 0 ? (monthly / monthlyExpense) * 100 : 0,
         drift,
         driftAmount,
+        median: med,
+        mad: madVal,
+        lastMonth,
+        zScore,
+        trendSlope,
+        volatility: med > 0 ? madVal / med : 0,
+        activeMonths,
+        structural,
       };
     })
     .sort((a, b) => b.monthly - a.monthly);
+
 
   const committedMonthly = input.subscriptions
     .filter((s) => s.active)
@@ -149,14 +223,56 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
   };
 }
 
-/** Postes dont la dérive récente est significative — base des alertes prédictives. */
-export function detectDrifts(cost: LifestyleCost, opts: { minAmount?: number; minPct?: number } = {}) {
+/**
+ * Postes dont la dérive récente est significative — base des alertes prédictives.
+ *
+ * Un pic isolé n'est pas une dérive. On ne retient donc un poste que si :
+ *  - la variation 3 mois vs 3 mois précédents est matérielle (montant ET %), ou
+ *  - la dérive est structurelle (3 mois consécutifs au-dessus de la médiane), ou
+ *  - le dernier mois est une anomalie robuste (> 3 MAD de la médiane).
+ * Les postes très volatils par nature (MAD > médiane) exigent un seuil plus élevé.
+ */
+export function detectDrifts(
+  cost: LifestyleCost,
+  opts: { minAmount?: number; minPct?: number; minZ?: number } = {},
+) {
   const minAmount = opts.minAmount ?? Math.max(1, cost.monthlyExpense * 0.03);
   const minPct = opts.minPct ?? 15;
+  const minZ = opts.minZ ?? 3;
+
   return cost.categories
-    .filter((c) => c.drift != null && Math.abs(c.drift) >= minPct && Math.abs(c.driftAmount) >= minAmount)
-    .sort((a, b) => Math.abs(b.driftAmount) - Math.abs(a.driftAmount));
+    .filter((c) => {
+      if (Math.abs(c.driftAmount) < minAmount) return false;
+      // Poste erratique : on exige une dérive structurelle ou une anomalie franche.
+      const noisy = c.volatility > 1;
+      const pctThreshold = noisy ? minPct * 2 : minPct;
+      const materialPct = c.drift != null && Math.abs(c.drift) >= pctThreshold;
+      const anomaly = c.zScore != null && Math.abs(c.zScore) >= minZ;
+      if (noisy) return c.structural || anomaly;
+      return materialPct || c.structural || anomaly;
+    })
+    .sort((a, b) => driftSeverity(b) - driftSeverity(a));
 }
+
+/** Gravité d'une dérive : montant, pondéré par la persistance. */
+export function driftSeverity(c: CategoryCost): number {
+  const persistence = c.structural ? 1.5 : 1;
+  const trend = c.trendSlope > 0 ? 1.2 : 1;
+  return Math.abs(c.driftAmount) * persistence * trend;
+}
+
+/** Explication lisible d'une dérive, à afficher tel quel. */
+export function explainDrift(c: CategoryCost): string {
+  const parts: string[] = [];
+  if (c.structural) parts.push("hausse installée sur 3 mois consécutifs");
+  else if (c.zScore != null && Math.abs(c.zScore) >= 3) parts.push("dernier mois atypique (pic isolé)");
+  if (c.trendSlope > 0) parts.push("tendance haussière");
+  else if (c.trendSlope < 0) parts.push("tendance baissière");
+  if (c.volatility > 1) parts.push("poste très irrégulier");
+  if (c.activeMonths <= 2) parts.push("poste ponctuel");
+  return parts.length ? parts.join(" · ") : "écart matériel vs période précédente";
+}
+
 
 /* ------------------------------------------------------------------ */
 /* Simulateur what-if                                                  */
