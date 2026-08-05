@@ -1,120 +1,79 @@
-# OPTIS — Axes d'amélioration suivants (après les 4 vagues)
+# Objectifs cohérents, scénarios probabilistes, IRR, train de vie avancé, performance
 
-Les 4 vagues du conseiller optimisateur de vie sont en place : briefing quotidien, recommandations, score de vie, suivi des conseils, simulateur, priorités de vie, revue hebdomadaire, coach IA, rapports et notifications. L'application est complète sur le périmètre "tableau de bord + conseiller individuel".
+## 1. Statuts des objectifs — incohérence confirmée
 
-Voici les axes d'amélioration suivants, classés par impact et risque, sans remettre en cause ce qui fonctionne.
+Vérifications faites en base et dans le code :
 
-## Vague 5 — Connectivité et automatisation (fort impact, risque moyen)
+- Les 4 objectifs existants ont tous `status = active` et `current_amount = 0.00`, alors que la progression réelle est calculée à l'écran.
+- La page Objectifs n'écrit jamais le statut : le formulaire (`goals.tsx`) n'envoie pas `status`, il reste donc à sa valeur par défaut à vie.
+- La page Objectifs filtre sur `archived`, mais le Dashboard filtre sur `status = active`. Deux sources de vérité différentes pour « objectif actif ».
+- Le bloc de synchronisation de `current_amount` part sans attendre le résultat ni rafraîchir le cache : c'est pour ça que la base reste à 0.
 
-1. **Import bancaire intelligent**
-   - Support CSV / OFX / QIF (la plupart des banques exportent au moins CSV).
-   - Mapping de colonnes personnalisable par fichier.
-   - Détection automatique des doublons par date + montant + libellé avant insertion.
-   - Apprendre la catégorie / tiers / budget_node depuis l'historique existant.
+Ce qui sera fait :
 
-2. **Règles de catégorisation automatique**
-   - Table `transaction_rules` : patterns (libellé, montant, compte, contrepartie) → catégorie, tags, projet, type.
-   - Appliquées à l'import et à la saisie manuelle.
-   - Score de confiance affiché pour chaque suggestion.
+- **Statut dérivé, plus jamais saisi à la main** : un objectif est `achieved` quand la progression atteint la cible (ou passe sous le plafond pour les objectifs inversés), `active` sinon, `cancelled` quand il est archivé. La règle vit dans une fonction pure à côté du calcul de progression existant.
+- **Un seul filtre partout** : le Dashboard et la page Objectifs utilisent la même notion d'objectif actif (non archivé et non atteint), pour que les deux écrans ne se contredisent plus.
+- **Synchronisation fiable** : `current_amount` et `status` sont écrits en une passe, en attendant le résultat, avec rafraîchissement du cache — plus de valeurs à 0 en base.
+- **Affichage** : un badge de statut sur chaque carte (Actif / Atteint / En pause / Annulé) et un compteur « X atteints sur Y » en tête de page. Possibilité de mettre manuellement un objectif « En pause » (le seul statut qui reste manuel, il ne peut pas être déduit).
 
-3. **Transactions récurrentes et modèles**
-   - Modèles de transaction enregistrés (ex: "Facture électricité", "Salaire").
-   - Génération automatique des occurrences à venir via `transaction_templates`.
-   - Possibilité d'éditer / reporter une occurrence sans toucher au modèle.
+## 2. Scénarios probabilistes (Monte Carlo)
 
-4. **Notifications push / rappels programmés**
-   - Utiliser les web-push pour échéances, habitudes non faites, budgets dépassés.
-   - Local notifications quand l'app est ouverte hors ligne.
+Nouveau fichier de calcul dédié, à côté de la prévision experte existante — celle-ci n'est pas modifiée, elle sert de trajectoire centrale.
 
-## Vague 6 — Qualité des données et confiance (fort impact, risque faible)
+- Simulation de plusieurs milliers de trajectoires sur la fenêtre de prévision, avec tirages aléatoires sur : revenus (volatilité mesurée sur l'historique réel), dépenses (idem), retards d'encaissement des créances et de règlement des dettes.
+- Sortie : bandes **p10 / p50 / p90** par jour, probabilité de rupture de trésorerie, date de rupture au pire cas raisonnable (p10), trésorerie médiane à 30 / 90 / 365 jours.
+- Affichage : bande de confiance en aire sur le graphique de prévision (Simulateur et Dashboard), avec une phrase d'explication en clair (« 9 chances sur 10 de rester au-dessus de X »).
+- Les paramètres de volatilité sont déduits des transactions réelles, avec des curseurs pour les ajuster. Aucune écriture en base.
 
-5. **Rapprochement bancaire**
-   - Comparer le solde d'un portefeuille avec un solde importé/relevé.
-   - Table `reconciliation_snapshots` : date, solde attendu, solde relevé, écart.
-   - Liste des transactions non rapprochées avec filtre rapide.
+## 3. Rendement et optimisation patrimoniale
 
-6. **Détection d'anomalies et doublons**
-   - Algorithme de détection des doublons dans les transactions (même montant ± 1 jour).
-   - Transactions suspectes : montant anormalement élevé, libellé vide, devise sans taux.
-   - Page de validation en lot.
+- **IRR par actif** : taux interne de retour annualisé calculé sur les flux réels liés à l'actif (achat, amortissements, réévaluations, revente), par recherche de racine numérique. Nouvelle colonne dans le tableau des Actifs, avec le détail dans l'historique.
+- **IRR par type d'actif et global** : agrégation des flux de tous les actifs d'un type pour un rendement de « portefeuille ».
+- **Actif vs liquidité vs objectif** : panneau de comparaison qui met en regard le rendement des actifs, le rendement implicite de la trésorerie dormante et le rythme requis par les objectifs, pour dire où placer l'euro suivant.
+- **Vendre maintenant vs garder** : pour un actif non vendu, comparaison de deux scénarios sur un horizon paramétrable — vendre à la valeur actuelle et libérer la trésorerie, ou garder en subissant les amortissements restants. Affiche l'écart de patrimoine net et le point de bascule.
 
-7. **Audit renforcé et traçabilité**
-   - Étendre `audit_log` à toutes les tables (y compris planification, documents, brainstorming).
-   - Afficher l'historique complet d'une entité (qui a fait quoi, quand, depuis quel appareil).
-   - Possibilité de restaurer une version précédente (soft delete / snapshot).
+## 4. Analyse du train de vie avancée
 
-8. **Sauvegarde automatique chiffrée**
-   - Export complet automatique (cloud storage) périodique.
-   - Chiffrement côté client avant envoi.
-   - Restauration depuis une sauvegarde datée.
+Extension de l'analyse existante du coût du train de vie :
 
-## Vague 7 — Analyse et décision avancée (impact moyen, risque moyen)
+- **Dérive sur 3 / 6 / 12 mois** avec sélecteur de fenêtre, et qualification de tendance par catégorie (accélération, hausse, stable, baisse) plutôt qu'un simple pourcentage.
+- **Postes anormaux** : détection par écart à la médiane historique de la catégorie (méthode robuste, insensible aux mois exceptionnels), avec la liste des transactions responsables.
+- **Coût réel mensualisé** des abonnements et engagements : tous les cycles ramenés au mois, cumul annuel, part dans les dépenses, et repérage des abonnements sans transaction récente.
 
-9. **Scénarios probabilistes**
-   - Ajouter Monte Carlo sur la prévision de trésorerie : intervalles de confiance (p10/p50/p90).
-   - Variables aléatoires sur revenus, dépenses, retards de paiement.
+## 5. Virtualisation des grandes listes
 
-10. **Rendement et optimisation patrimoniale**
-    - Calcul de IRR (Taux Interne de Retour) par actif et par portefeuille.
-    - Comparaison actif vs liquidité vs objectif.
-    - Simulation "vendre maintenant vs garder".
+- Ajout du rendu virtualisé sur les trois tableaux volumineux : Transactions, grille de Budgets, liste de Planification — seules les lignes visibles sont rendues, l'entête et les sous-totaux collants restent en place.
+- Chargement progressif (pagination infinie) sur Transactions pour éviter de tout monter d'un coup, tout en gardant les totaux calculés sur l'intégralité des données.
+- Les filtres, la sélection multiple et l'édition en lot continuent de fonctionner à l'identique.
 
-11. **Analyse du train de vie avancée**
-    - Dérive par catégorie sur 3 / 6 / 12 mois avec détection de tendance.
-    - Postes de dépense anormaux par rapport à la médiane historique.
-    - Affichage du "coût réel" mensualisé des abonnements et engagements.
+## 6. Cache et synchronisation optimisée
 
-12. **Tableaux de bord personnalisables**
-    - L'utilisateur peut choisir les cartes affichées sur le dashboard.
-    - Sauvegarde de plusieurs "vues" (finance, vie, projets).
-    - Widgets réordonnables par drag & drop.
+Corrections vérifiées dans le moteur de synchronisation actuel :
 
-## Vague 8 — Multi-utilisateur et collaboration (impact moyen, risque élevé)
+- La récupération par table n'est pas paginée : au-delà de la limite de l'API, des lignes sont silencieusement absentes du cache local. À corriger avec une récupération par pages.
+- Les suppressions ne se propagent pas d'un appareil à l'autre : la détection repose sur une colonne de suppression douce que la plupart des tables n'ont pas.
+- Le vidage de la file d'attente suppose que les N premières mutations ont réussi ; en cas d'échec intercalé, une mutation réussie peut être rejouée ou une mutation échouée oubliée.
 
-13. **Compte conjoint / familial**
-    - Invitations par email entre comptes.
-    - Permissions : lecture, saisie, admin.
-    - Données partagées (portefeuilles communs, budgets communs) vs données privées.
-    - Nécessite une refonte des RLS et des politiques de propriété.
+Ce qui sera fait :
 
-14. **API publique documentée**
-    - Clés d'API par utilisateur avec scopes.
-    - Endpoints `/api/public/v1/*` pour lectures et écritures contrôlées.
-    - Documentation OpenAPI / Swagger intégrée.
+- **Récupération delta paginée** par table, en ne demandant que les lignes modifiées depuis la dernière synchronisation (déjà le principe, mais rendu fiable et complet).
+- **Propagation des suppressions** via un journal de suppressions, pour que supprimer sur un appareil supprime bien partout.
+- **File d'attente fiable** : chaque mutation reçoit un résultat individuel (réussie / échouée avec sa raison), les réussies seules sont retirées, les échecs sont réessayés avec un plafond et deviennent visibles dans l'indicateur hors ligne.
+- **Résolution de conflits** : quand deux appareils modifient la même ligne, comparaison des horodatages champ par champ pour fusionner ce qui ne s'oppose pas, et conservation du plus récent sur les champs en conflit, avec trace dans le journal d'audit.
+- **Cache des agrégats lourds** dans le stockage local, avec invalidation par table modifiée : le Dashboard, le Coach et le Briefing ne recalculent plus tout à chaque visite.
 
-## Vague 9 — Expérience mobile et confort (impact moyen, risque faible)
+## Détails techniques
 
-15. **Application mobile native (PWA améliorée)**
-    - Écran d'accueil avec widgets (solde, tâches du jour, habitudes).
-    - Mode saisie rapide depuis le mobile : photo de facture, géolocalisation.
-    - Navigation gestuelle.
+- Nouveaux fichiers de logique pure : `src/lib/montecarlo.ts` (trajectoires et percentiles), `src/lib/irr.ts` (flux et taux interne de retour), `src/lib/aggregate-cache.ts` (cache des agrégats). `analytics.ts`, `finance.ts` et `simulator.ts` ne sont étendus que par ajout de fonctions.
+- Statut des objectifs : nouvelle fonction dans `src/lib/goal-progress.ts` (`deriveGoalStatus`), consommée par `goals.tsx` et `dashboard.tsx`. Aucun changement de schéma nécessaire, la colonne et l'énumération existent déjà.
+- Virtualisation : ajout de `@tanstack/react-virtual`, appliqué aux corps de tableaux sans toucher aux calculs ni aux filtres.
+- Synchronisation : refonte interne de `src/lib/offline/sync.ts` (pagination, résultats par mutation, fusion) et de `src/lib/offline/db.ts` (journal de suppressions, métadonnées de conflit). Une migration ajoute une table de journal des suppressions avec RLS et GRANT, plus un déclencheur d'enregistrement.
+- Monte Carlo tourne côté navigateur sur les données déjà chargées, avec un nombre d'itérations plafonné pour rester fluide et fonctionner hors ligne.
 
-16. **Saisie rapide universelle**
-    - Barre de commande globale (Cmd+K / Ctrl+K) pour créer une transaction, une tâche, un projet.
-    - Saisie en langage naturel : "dépense 50€ courses demain".
-    - Suggestions contextuelles selon l'heure et le jour.
+## Ordre de livraison
 
-17. **Accessibilité et internationalisation**
-    - Audit a11y (contrastes, navigation clavier, lecteurs d'écran).
-    - i18n : anglais, espagnol, allemand au minimum.
-    - Formats de date et de devise locaux.
-
-## Vague 10 — Performance et robustesse (impact élevé, risque faible)
-
-18. **Virtualisation des grandes listes**
-    - Transactions, budgets, planning : virtualisation React pour maintenir 60 fps à 10 000+ lignes.
-    - Pagination infinie là où c'est pertinent.
-
-19. **Cache et synchronisation optimisée**
-    - Cache des agrégats lourds dans IndexedDB avec invalidation par table.
-    - Sync delta (seulement les lignes modifiées depuis last_sync).
-    - Gestion des conflits de fusion (merge) quand plusieurs appareils éditent la même ligne.
-
-20. **Tests automatisés et monitoring**
-    - Tests unitaires sur `finance.ts`, `analytics.ts`, `advisor.ts`, `life-score.ts`.
-    - Tests E2E sur les parcours critiques : saisie transaction, clôture mensuelle, coach.
-    - Dashboard de qualité (couverture, erreurs, temps de sync).
-
-## Ordre recommandé
-
-Vague 5 (import + règles + automatisation) puis Vague 6 (qualité des données) car elles augmentent la valeur de toutes les données déjà saisies. Vague 9 (confort mobile) peut être menée en parallèle. Vague 10 devient prioritaire dès que les volumes de données atteignent quelques milliers de lignes. Vague 8 (multi-utilisateur) reste en dernier car elle touche aux fondations sécuritaires.
+1. Statuts des objectifs (correction de cohérence, indépendante).
+2. Fiabilité de la synchronisation et cache des agrégats (protège toutes les données existantes).
+3. Virtualisation et chargement progressif (confort immédiat).
+4. Train de vie avancé, puis IRR et arbitrages patrimoniaux.
+5. Monte Carlo sur la prévision.
