@@ -138,6 +138,24 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
       const p = previous.length === 3 ? avg(previous) : null;
       const driftAmount = p == null ? 0 : r - p;
       const drift = p == null || p <= 0 ? null : (driftAmount / p) * 100;
+
+      // Statistiques robustes sur la série mensuelle complète (0 inclus).
+      const series = keys.map((m) => row.byMonth.get(m) ?? 0);
+      const med = median(series);
+      const madVal = mad(series, med);
+      const lastMonth = series[series.length - 1] ?? 0;
+      const zScore = madVal > 0 ? (lastMonth - med) / madVal : null;
+      const trendSlope = slope(series);
+      const activeMonths = series.filter((v) => v > 0).length;
+      // Dérive structurelle : les 3 derniers mois sont tous au-dessus de la médiane
+      // ET la moyenne récente dépasse la médiane de plus de 10 %.
+      const lastThree = series.slice(-3);
+      const structural =
+        lastThree.length === 3 &&
+        med > 0 &&
+        lastThree.every((v) => v > med) &&
+        r > med * 1.1;
+
       return {
         key,
         label: row.label,
@@ -145,9 +163,18 @@ export function computeLifestyleCost(input: LifestyleInput): LifestyleCost {
         share: monthlyExpense > 0 ? (monthly / monthlyExpense) * 100 : 0,
         drift,
         driftAmount,
+        median: med,
+        mad: madVal,
+        lastMonth,
+        zScore,
+        trendSlope,
+        volatility: med > 0 ? madVal / med : 0,
+        activeMonths,
+        structural,
       };
     })
     .sort((a, b) => b.monthly - a.monthly);
+
 
   const committedMonthly = input.subscriptions
     .filter((s) => s.active)
