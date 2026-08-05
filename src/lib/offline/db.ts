@@ -82,9 +82,25 @@ export const SYNCED_TABLES = [
 
 export type SyncedTable = (typeof SYNCED_TABLES)[number];
 
+/**
+ * Accusé de réception d'une mutation : trace locale permettant d'identifier
+ * les saisies confirmées par le serveur et celles restées coincées.
+ */
+export type SyncAck = {
+  mutationId: string;
+  table: string;
+  op: PendingMutation["op"];
+  rowId: string | null;
+  status: "applied" | "failed";
+  ackedAt: number;
+  error: string | null;
+  attempts: number;
+};
+
 class OfflineDatabase extends Dexie {
   syncMeta!: Table<SyncMeta, string>;
   pendingMutations!: Table<PendingMutation, string>;
+  syncAcks!: Table<SyncAck, string>;
 
   // Dynamic tables for synced data
   constructor() {
@@ -92,6 +108,12 @@ class OfflineDatabase extends Dexie {
     this.version(1).stores({
       syncMeta: "id",
       pendingMutations: "id, table, createdAt, retryCount",
+    });
+    // Migration additive : le cache existant est conservé.
+    this.version(2).stores({
+      syncMeta: "id",
+      pendingMutations: "id, table, createdAt, retryCount",
+      syncAcks: "mutationId, ackedAt, status, table",
     });
   }
 
