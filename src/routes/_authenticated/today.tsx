@@ -23,7 +23,8 @@ import {
   type Recommendation, type AdvisorSeverity,
 } from "@/lib/advisor";
 import { computeGoalProgress, type ProgressInput } from "@/lib/goal-progress";
-import { occurrencesInRange, isClosed, ymd, addDays, parseYmd, fmtTimeRange, statusMeta, priorityMeta, type PlanItem } from "@/lib/planning";
+import { occurrencesInRange, isClosed, ymd, addDays, parseYmd, fmtTimeRange, statusMeta, priorityMeta, planItemTagsQO, type PlanItem, type PlanItemTag } from "@/lib/planning";
+import { computeDomainTime, type LifeDomain } from "@/lib/life";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/today")({
@@ -118,6 +119,12 @@ function useBriefingData() {
     queryFn: async () => (await (supabase as any).from("advisor_actions").select("*")).data ?? [],
   });
 
+  const lifeDomains = useQuery({
+    queryKey: ["life_domains", "briefing"],
+    queryFn: async () => (await supabase.from("life_domains").select("*").eq("archived", false)).data ?? [],
+  });
+  const planItemTags = useQuery(planItemTagsQO);
+
   const loading =
     wallets.isLoading || txs.isLoading || planItems.isLoading || assets.isLoading || debts.isLoading;
 
@@ -137,6 +144,8 @@ function useBriefingData() {
     planItems: (planItems.data as PlanItem[]) ?? [],
     planTypes: (planTypes.data as any[]) ?? [],
     advisorActions: (advisorActions.data as any[]) ?? [],
+    lifeDomains: (lifeDomains.data as LifeDomain[]) ?? [],
+    planItemTags: (planItemTags.data as PlanItemTag[]) ?? [],
   };
 }
 
@@ -217,7 +226,11 @@ function TodayPage() {
 
     // Exécution
     const execution = computeExecutionScore(d.planItems, today, 30);
-    const alignment = computeAlignmentScore({ priorities: [], actualMinutes: {} });
+    const domainTime = computeDomainTime(d.planItems, d.lifeDomains, d.planItemTags, addDays(today, -27), today);
+    const alignment = computeAlignmentScore({
+      priorities: d.lifeDomains.map((x) => ({ key: x.id, label: x.label, weight: Number(x.weight) || 0 })),
+      actualMinutes: Object.fromEntries(domainTime.rows.map((r) => [r.id, r.minutes])),
+    });
     const life = computeLifeScore(health.score, execution.score, alignment?.score ?? null);
 
     // Agenda du jour + arriéré
