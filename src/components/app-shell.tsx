@@ -103,13 +103,19 @@ function Sidebar({ onNav }: { onNav: () => void }) {
             {group.items.map(it => {
               const active = pathname === it.to;
               const Icon = it.icon;
+              const onlineOnly = "onlineOnly" in it && it.onlineOnly;
               return (
                 <Link key={it.to} to={it.to} onClick={onNav} className={cn(
                   "flex items-center gap-2.5 rounded-sm px-3 py-1.5 text-sm transition-colors",
                   active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/60"
                 )}>
                   <Icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-                  {it.label}
+                  <span className="flex-1">{it.label}</span>
+                  {onlineOnly && !online && (
+                    <span title="Connexion requise" className="shrink-0 rounded-full bg-amber-500/15 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider text-amber-500">
+                      en ligne
+                    </span>
+                  )}
                 </Link>
               );
             })}
