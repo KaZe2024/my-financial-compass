@@ -531,6 +531,33 @@ function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Scénarios probabilistes */}
+          <div className="mb-3 grid gap-2 sm:grid-cols-4">
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Probabilité de rupture</div>
+              <div className={`num text-sm font-semibold ${mcVerdict.tone === "positive" ? "text-positive" : mcVerdict.tone === "warning" ? "text-warning" : "text-negative"}`}>
+                {fmtPct(mc.probBreach * 100)}
+              </div>
+              <div className="font-mono text-[9px] text-muted-foreground">{mcVerdict.label}</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Pessimiste (P10) · 365 j</div>
+              <div className={`num text-sm font-semibold ${mc.endP10 >= 0 ? "text-foreground" : "text-negative"}`}>{fmtMoney(mc.endP10, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">1 chance sur 10 d'être en dessous</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Médian (P50) · 365 j</div>
+              <div className="num text-sm font-semibold">{fmtMoney(mc.endP50, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">scénario le plus probable</div>
+            </div>
+            <div className="rounded-sm border border-border bg-background/40 p-2">
+              <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">Optimiste (P90) · 365 j</div>
+              <div className="num text-sm font-semibold text-positive">{fmtMoney(mc.endP90, cur, { compact: true })}</div>
+              <div className="font-mono text-[9px] text-muted-foreground">volatilité mensuelle ±{fmtMoney(mc.monthlySigma, cur, { compact: true })}</div>
+            </div>
+          </div>
+
           <div className="mb-3 h-56">
             <ResponsiveContainer>
               <LineChart data={forecastChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -538,10 +565,14 @@ function Dashboard() {
                 <XAxis dataKey="label" stroke="#6b7280" fontSize={10} interval={6} />
                 <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => new Intl.NumberFormat("fr-FR", { notation: "compact" }).format(v)} />
                 <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => fmtMoney(v, cur)} />
-                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Solde projeté" />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Line type="monotone" dataKey="p90" stroke="#22c55e" strokeWidth={1} strokeDasharray="4 3" dot={false} name="Optimiste P90" />
+                <Line type="monotone" dataKey="balance" stroke="#06b6d4" strokeWidth={2} dot={false} name="Scénario central" />
+                <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={1} strokeDasharray="4 3" dot={false} name="Pessimiste P10" />
               </LineChart>
             </ResponsiveContainer>
           </div>
+
 
           <div className="rounded-sm border border-border bg-background/40 p-3">
             <div className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Comment c'est calculé</div>
