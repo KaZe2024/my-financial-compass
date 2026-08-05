@@ -15,7 +15,7 @@ import {
   computeAssetTotals, computeObligationTotalAsOf,
 } from "@/lib/finance";
 import {
-  computeLifestyleCost, detectDrifts, simulate, suggestLevers, DEFAULT_LEVERS, type SimLevers,
+  computeLifestyleCost, detectDrifts, explainDrift, simulate, suggestLevers, DEFAULT_LEVERS, type SimLevers,
 } from "@/lib/simulator";
 import {
   FlaskConical, TrendingDown, TrendingUp, RotateCcw, ArrowRight, Wand2, Gauge,
