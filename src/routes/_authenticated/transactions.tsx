@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, Fragment } from "react";
+import { useEffect, useMemo, useState, Fragment, useRef } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { walletsQO, budgetNodesQO, counterpartiesQO, projectsQO } from "@/lib/queries";
 import { NodePicker } from "@/components/node-picker";
@@ -521,7 +521,7 @@ function TxPage() {
               </tr>
             </thead>
             <tbody>
-              {grouped.map((g) => (
+              {renderedGroups.map((g) => (
                 <Fragment key={g.month}>
                   <tr key={`h-${g.month}`} className="border-t border-border bg-muted/40">
                     <td colSpan={8} className="px-4 py-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -606,6 +606,16 @@ function TxPage() {
                   })}
                 </Fragment>
               ))}
+              {hasMoreRows && (
+                <tr ref={sentinelRef}>
+                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {renderedCount} / {filtered.length} lignes affichées ·{" "}
+                    <button type="button" onClick={() => setRenderLimit((n) => n + 1000)} className="underline hover:text-foreground">
+                      afficher 1000 de plus
+                    </button>
+                  </td>
+                </tr>
+              )}
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
             </tbody>
           </table>
