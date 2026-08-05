@@ -176,23 +176,57 @@ export async function flushPendingMutations(): Promise<SyncPushResult> {
   const mutations = await offlineDb.pendingMutations.orderBy("createdAt").toArray();
   if (mutations.length === 0) return { applied: 0, failed: 0, errors: [], appliedIds: [], failedIds: [] };
 
+  const byId = new Map(mutations.map((m) => [m.id, m]));
   const result = await pushSync({ data: mutations });
+  const ackedAt = Date.now();
+  const acks: SyncAck[] = [];
+
+  const appliedIds = result.appliedIds ?? [];
+  for (const id of appliedIds) {
+    const m = byId.get(id);
+    if (!m) continue;
+    acks.push({
+      mutationId: id,
+      table: m.table,
+      op: m.op,
+      rowId: (m.payload?.id as string) ?? null,
+      status: "applied",
+      ackedAt,
+      error: null,
+      attempts: m.retryCount + 1,
+    });
+  }
 
   // On supprime exactement les mutations confirmées par le serveur (plus de
   // supposition « les N premières ont réussi », qui pouvait perdre des saisies).
-  await offlineDb.pendingMutations.bulkDelete(result.appliedIds ?? []);
+  await offlineDb.pendingMutations.bulkDelete(appliedIds);
 
   const failedIds = result.failedIds ?? [];
   for (let i = 0; i < failedIds.length; i++) {
-    const m = await offlineDb.pendingMutations.get(failedIds[i]!);
+    const id = failedIds[i]!;
+    const m = await offlineDb.pendingMutations.get(id);
     if (!m) continue;
     m.retryCount += 1;
     m.error = result.errors[i] ?? "Erreur de synchronisation";
     await offlineDb.pendingMutations.put(m);
+    acks.push({
+      mutationId: id,
+      table: m.table,
+      op: m.op,
+      rowId: (m.payload?.id as string) ?? null,
+      status: "failed",
+      ackedAt,
+      error: m.error,
+      attempts: m.retryCount,
+    });
   }
+
+  await recordSyncAcks(acks);
+  await pruneSyncAcks();
 
   return result;
 }
+
 
 export async function fullSync(): Promise<{ pulled: number; pushed: SyncPushResult }> {
   const pullResult = await performPull();
