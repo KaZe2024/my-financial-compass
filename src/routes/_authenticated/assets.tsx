@@ -122,7 +122,21 @@ function AssetsPage() {
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [visible, assetEvents.data, assetTx.data]);
 
+  // Écritures groupées par actif → base des calculs de rendement (TRI / MOIC).
+  const txByAsset = useMemo(() => {
+    const m = new Map<string, any[]>();
+    for (const t of assetTx.data ?? []) {
+      const id = t.asset_id ?? (t.source_kind === "asset" ? t.source_id : null);
+      if (!id) continue;
+      const arr = m.get(id) ?? [];
+      arr.push(t);
+      m.set(id, arr);
+    }
+    return m;
+  }, [assetTx.data]);
+
   const [editing, setEditing] = useState<any | null>(null);
+
   const [amortizing, setAmortizing] = useState<any | null>(null);
   const [revaluing, setRevaluing] = useState<any | null>(null);
   const [selling, setSelling] = useState<any | null>(null);
