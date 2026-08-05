@@ -73,6 +73,10 @@ export const SYNCED_TABLES = [
   "advisor_actions",
   "life_domains",
   "weekly_reviews",
+  "coach_plans",
+  "coach_plan_items",
+  "periodic_reports",
+  "notifications",
 
 ] as const;
 

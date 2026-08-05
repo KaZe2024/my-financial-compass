@@ -866,6 +866,113 @@ export type Database = {
           },
         ]
       }
+      coach_plan_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          detail: string | null
+          done_at: string | null
+          due_date: string | null
+          effort: string | null
+          id: string
+          impact: number
+          module_to: string | null
+          order_index: number
+          plan_id: string
+          rec_key: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          detail?: string | null
+          done_at?: string | null
+          due_date?: string | null
+          effort?: string | null
+          id?: string
+          impact?: number
+          module_to?: string | null
+          order_index?: number
+          plan_id: string
+          rec_key?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          detail?: string | null
+          done_at?: string | null
+          due_date?: string | null
+          effort?: string | null
+          id?: string
+          impact?: number
+          module_to?: string | null
+          order_index?: number
+          plan_id?: string
+          rec_key?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_plan_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "coach_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coach_plans: {
+        Row: {
+          archived: boolean
+          created_at: string
+          focus: string | null
+          id: string
+          period_month: string
+          source: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          focus?: string | null
+          id?: string
+          period_month: string
+          source?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          focus?: string | null
+          id?: string
+          period_month?: string
+          source?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       counterparties: {
         Row: {
           archived: boolean
@@ -1670,6 +1777,93 @@ export type Database = {
           total_debt?: number
           total_investments?: number
           total_receivables?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          dedupe_key: string
+          dismissed_at: string | null
+          due_date: string | null
+          id: string
+          kind: string
+          link_to: string | null
+          read_at: string | null
+          severity: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          dedupe_key: string
+          dismissed_at?: string | null
+          due_date?: string | null
+          id?: string
+          kind?: string
+          link_to?: string | null
+          read_at?: string | null
+          severity?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          dedupe_key?: string
+          dismissed_at?: string | null
+          due_date?: string | null
+          id?: string
+          kind?: string
+          link_to?: string | null
+          read_at?: string | null
+          severity?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      periodic_reports: {
+        Row: {
+          commentary: string | null
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          metrics: Json
+          period_end: string
+          period_start: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          commentary?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          metrics?: Json
+          period_end: string
+          period_start: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          commentary?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          metrics?: Json
+          period_end?: string
+          period_start?: string
           updated_at?: string
           user_id?: string
         }

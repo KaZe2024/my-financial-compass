@@ -3,11 +3,11 @@ import { useState, type ReactNode } from "react";
 import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
-  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass, FlaskConical, HeartPulse,
+  Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass, FlaskConical, HeartPulse, Bot,
 } from "lucide-react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { AVAILABLE_THEMES, useTheme } from "@/lib/theme";
 import {
@@ -19,6 +19,7 @@ const NAV = [
   { group: "Vue d'ensemble", items: [
     { to: "/today", label: "Briefing du jour", icon: Compass },
     { to: "/dashboard", label: "Dashboard", icon: Activity },
+    { to: "/coach", label: "Coach & rapports", icon: Bot },
     { to: "/simulator", label: "Simulateur", icon: FlaskConical },
     { to: "/life", label: "Priorités de vie", icon: HeartPulse },
     { to: "/ai", label: "Assistant CFO", icon: Sparkles },
@@ -151,11 +152,31 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <NotifBell />
         <OfflineIndicator />
         <ThemeMenu />
         <CalendarRange className="hidden h-4 w-4 text-muted-foreground md:block" />
       </div>
     </header>
+  );
+}
+
+function NotifBell() {
+  const { data } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => (await (supabase as any).from("notifications").select("*")).data ?? [],
+    staleTime: 60_000,
+  });
+  const count = ((data as any[]) ?? []).filter((n) => !n.dismissed_at && !n.read_at).length;
+  return (
+    <Link to="/coach" aria-label="Notifications" className="relative grid h-8 w-8 place-items-center rounded-sm border border-border text-muted-foreground hover:bg-surface-2 hover:text-foreground">
+      <Bell className="h-4 w-4" />
+      {count > 0 && (
+        <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </Link>
   );
 }
 
