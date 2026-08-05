@@ -20,7 +20,24 @@ export type CategoryCost = {
   drift: number | null;
   /** Montant mensuel de la dérive (positif = alourdissement). */
   driftAmount: number;
+  /** Médiane mensuelle du poste — référence robuste aux mois exceptionnels. */
+  median: number;
+  /** Écart absolu médian (MAD) → dispersion robuste. */
+  mad: number;
+  /** Dernier mois observé. */
+  lastMonth: number;
+  /** Écart du dernier mois vs médiane, en nombre de MAD (score d'anomalie robuste). */
+  zScore: number | null;
+  /** Pente de tendance (montant/mois) par régression linéaire sur la fenêtre. */
+  trendSlope: number;
+  /** Coefficient de variation robuste (MAD / médiane), 0..n. */
+  volatility: number;
+  /** Nombre de mois où le poste a été mouvementé (régularité). */
+  activeMonths: number;
+  /** true si le poste dépasse durablement sa médiane (dérive structurelle, pas un pic isolé). */
+  structural: boolean;
 };
+
 
 export type LifestyleCost = {
   monthlyExpense: number;
