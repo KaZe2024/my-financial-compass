@@ -28,6 +28,7 @@ import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedPlanningRouteImport } from './routes/_authenticated/planning'
 import { Route as AuthenticatedPlanProjectsRouteImport } from './routes/_authenticated/plan-projects'
+import { Route as AuthenticatedLifeRouteImport } from './routes/_authenticated/life'
 import { Route as AuthenticatedGoalsRouteImport } from './routes/_authenticated/goals'
 import { Route as AuthenticatedFxRouteImport } from './routes/_authenticated/fx'
 import { Route as AuthenticatedFridgeRouteImport } from './routes/_authenticated/fridge'
@@ -147,6 +148,11 @@ const AuthenticatedPlanProjectsRoute =
     path: '/plan-projects',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedLifeRoute = AuthenticatedLifeRouteImport.update({
+  id: '/life',
+  path: '/life',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedGoalsRoute = AuthenticatedGoalsRouteImport.update({
   id: '/goals',
   path: '/goals',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
+  '/life': typeof AuthenticatedLifeRoute
   '/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/planning': typeof AuthenticatedPlanningRoute
   '/products': typeof AuthenticatedProductsRoute
@@ -314,6 +321,7 @@ export interface FileRoutesByTo {
   '/fridge': typeof AuthenticatedFridgeRoute
   '/fx': typeof AuthenticatedFxRoute
   '/goals': typeof AuthenticatedGoalsRoute
+  '/life': typeof AuthenticatedLifeRoute
   '/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/planning': typeof AuthenticatedPlanningRoute
   '/products': typeof AuthenticatedProductsRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/_authenticated/fridge': typeof AuthenticatedFridgeRoute
   '/_authenticated/fx': typeof AuthenticatedFxRoute
   '/_authenticated/goals': typeof AuthenticatedGoalsRoute
+  '/_authenticated/life': typeof AuthenticatedLifeRoute
   '/_authenticated/plan-projects': typeof AuthenticatedPlanProjectsRoute
   '/_authenticated/planning': typeof AuthenticatedPlanningRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/fridge'
     | '/fx'
     | '/goals'
+    | '/life'
     | '/plan-projects'
     | '/planning'
     | '/products'
@@ -438,6 +448,7 @@ export interface FileRouteTypes {
     | '/fridge'
     | '/fx'
     | '/goals'
+    | '/life'
     | '/plan-projects'
     | '/planning'
     | '/products'
@@ -479,6 +490,7 @@ export interface FileRouteTypes {
     | '/_authenticated/fridge'
     | '/_authenticated/fx'
     | '/_authenticated/goals'
+    | '/_authenticated/life'
     | '/_authenticated/plan-projects'
     | '/_authenticated/planning'
     | '/_authenticated/products'
@@ -646,6 +658,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPlanProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/life': {
+      id: '/_authenticated/life'
+      path: '/life'
+      fullPath: '/life'
+      preLoaderRoute: typeof AuthenticatedLifeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/goals': {
       id: '/_authenticated/goals'
       path: '/goals'
@@ -805,6 +824,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFridgeRoute: typeof AuthenticatedFridgeRoute
   AuthenticatedFxRoute: typeof AuthenticatedFxRoute
   AuthenticatedGoalsRoute: typeof AuthenticatedGoalsRoute
+  AuthenticatedLifeRoute: typeof AuthenticatedLifeRoute
   AuthenticatedPlanProjectsRoute: typeof AuthenticatedPlanProjectsRoute
   AuthenticatedPlanningRoute: typeof AuthenticatedPlanningRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
@@ -837,6 +857,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFridgeRoute: AuthenticatedFridgeRoute,
   AuthenticatedFxRoute: AuthenticatedFxRoute,
   AuthenticatedGoalsRoute: AuthenticatedGoalsRoute,
+  AuthenticatedLifeRoute: AuthenticatedLifeRoute,
   AuthenticatedPlanProjectsRoute: AuthenticatedPlanProjectsRoute,
   AuthenticatedPlanningRoute: AuthenticatedPlanningRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
