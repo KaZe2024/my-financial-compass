@@ -529,7 +529,7 @@ function TxPage() {
       <Panel
         title={`${filtered.length} mouvements`}
         action={
-          selected.size > 0 ? (
+          selected.size > 0 && online ? (
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
               <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
