@@ -14,7 +14,7 @@
  *                   rejouées automatiquement au retour du réseau.
  */
 import { supabase as realSupabase } from "@/integrations/supabase/client";
-import { checkOnlineWithHeartbeat } from "./network-status";
+import { checkOnlineWithHeartbeat, markNetworkFailure } from "./network-status";
 import {
   applyLocalMutation,
   getSyncedRows,
@@ -534,8 +534,10 @@ class OfflineBuilder implements PromiseLike<Result> {
         const msg = String(res.error?.message ?? "");
         const networkish = /fetch|network|Failed to fetch|timeout|offline/i.test(msg);
         if (!networkish) return res;
+        markNetworkFailure();
       } catch (e: any) {
         // exception réseau → bascule hors ligne
+        markNetworkFailure();
         console.warn(`[offline] ${this.table} requête en ligne échouée, bascule locale`, e);
       }
     }
