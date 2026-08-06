@@ -10,7 +10,6 @@ import { buildTree, flattenTree, pathLabel } from "@/lib/budget-nodes";
 import { Panel } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -90,7 +89,14 @@ function normalizeCompleteDate(s: string): string | null {
 }
 
 function DateInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  return <DatePicker value={value} onChange={onChange} />;
+  return (
+    <Input
+      type="date"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="tabular-nums"
+    />
+  );
 }
 
 function baseAmount(t: any) {
