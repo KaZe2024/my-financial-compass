@@ -890,16 +890,9 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
       const transactionId = txRes.id;
       if (!transactionId) throw new Error("Identifiant de transaction manquant");
-       if (form.tag_ids.length) await syncTags(transactionId, userId, form.tag_ids, txRes.queued);
-      if (!txRes.queued) {
-        // Audit non bloquant : ne retarde pas la fermeture du formulaire.
-        void import("@/lib/audit").then(({ logAudit }) =>
-          logAudit("transaction", transactionId, "create", { type: form.type, amount: amt }),
-        ).catch(() => {});
-      }
       const fromWallet = wallets.find((w: any) => w.id === txRow.wallet_id);
       const toWallet = wallets.find((w: any) => w.id === txRow.to_wallet_id);
-      return {
+      const created = {
         row: {
           ...txRow,
           id: transactionId,
@@ -910,8 +903,24 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         },
         tagIds: form.tag_ids,
       };
+
+      // La transaction est déjà validée : l'afficher immédiatement. Les tags et
+      // l'audit sont secondaires et ne doivent jamais bloquer ou masquer la ligne.
+      onDone(created);
+      if (form.tag_ids.length) {
+        void syncTags(transactionId, userId, form.tag_ids, txRes.queued).catch((error) => {
+          console.error("[transactions] synchronisation des tags différée", error);
+          toast.warning("Transaction ajoutée, synchronisation des tags en attente");
+        });
+      }
+      if (!txRes.queued) {
+        void import("@/lib/audit").then(({ logAudit }) =>
+          logAudit("transaction", transactionId, "create", { type: form.type, amount: amt }),
+        ).catch(() => {});
+      }
+      return created;
     },
-    onSuccess: (res) => { toast.success("Transaction ajoutée"); setOpen(false); onDone(res); },
+    onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); },
 
     onError: (e: Error) => toast.error(e.message),
   });
