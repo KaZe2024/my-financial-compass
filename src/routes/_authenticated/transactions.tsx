@@ -668,8 +668,8 @@ function TxPage() {
   );
 }
 
-async function syncTags(txId: string, userId: string, newIds: string[]) {
-  await syncTagsOffline(txId, newIds);
+async function syncTags(txId: string, userId: string, newIds: string[], forceQueue = false) {
+  await syncTagsOffline(txId, newIds, forceQueue);
 }
 
 type FormState = {
@@ -780,7 +780,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
       const transactionId = txRes.id;
       if (!transactionId) throw new Error("Identifiant de transaction manquant");
-      if (form.tag_ids.length) await syncTags(transactionId, userId, form.tag_ids);
+       if (form.tag_ids.length) await syncTags(transactionId, userId, form.tag_ids, txRes.queued);
       if (!txRes.queued) {
         const { logAudit } = await import("@/lib/audit");
         await logAudit("transaction", transactionId, "create", { type: form.type, amount: amt });
