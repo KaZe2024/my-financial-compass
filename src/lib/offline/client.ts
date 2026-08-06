@@ -358,27 +358,16 @@ class OfflineBuilder implements PromiseLike<Result> {
       q = q[m](...args);
     }
     const res = await q;
-    // mirroring du cache pour les lectures
+    // Miroir du cache local : en tâche de fond (ne doit jamais retarder l'UI).
     if (this.mode === "read" && !res.error && isSynced(this.table)) {
       const rows = Array.isArray(res.data) ? res.data : res.data ? [res.data] : [];
       const clean = rows.filter((r: any) => r && typeof r.id === "string");
-      if (clean.length) {
-        try {
-          await upsertSyncedRows(
-            this.table as SyncedTable,
-            clean.map((r: any) => ({
-              id: r.id,
-              data: r,
-              updatedAt: (r.updated_at as string) ?? new Date().toISOString(),
-            })),
-          );
-        } catch {
-          /* best effort */
-        }
-      }
+      if (clean.length) scheduleMirror(this.table as SyncedTable, clean);
     }
     return res;
   }
+
+
 
   private finishRead(rows: any[]): Result<any> {
     let out = rows;
