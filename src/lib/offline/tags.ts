@@ -31,7 +31,18 @@ export async function syncTagsOffline(txId: string, newIds: string[], forceQueue
       const { error } = await supabase
         .from("transaction_tags")
         .insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
-      if (error) throw error;
+      if (error) {
+        // La transaction peut avoir basculé dans la file locale entre les deux
+        // requêtes. Dans ce cas, conserver les tags avec elle au lieu de bloquer
+        // le formulaire avec une erreur de clé étrangère.
+        if ((error as any).code !== "23503") throw error;
+        for (const tag_id of toAdd) {
+          const id = uuidv4();
+          const row = { id, transaction_id: txId, tag_id, user_id: userId };
+          await applyLocalMutation("transaction_tags", "insert", row);
+          await queueMutation("transaction_tags", "insert", row);
+        }
+      }
     }
     return;
   }
