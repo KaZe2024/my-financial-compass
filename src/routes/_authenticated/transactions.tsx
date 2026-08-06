@@ -161,30 +161,50 @@ function TxPage() {
       ),
   });
 
+  // Page serveur bornée : on ne charge qu'une fenêtre de mouvements (les plus
+  // récents), agrandissable à la demande. Cela rend la saisie instantanée car un
+  // rechargement ne relit plus des milliers de lignes.
+  const [fetchLimit, setFetchLimit] = useState(500);
+  useEffect(() => { setFetchLimit(500); }, [f.type, f.fromDate, f.toDate, f.walletId]);
+
   const txs = useQuery({
-    queryKey: ["transactions", f.type, f.fromDate, f.toDate, f.walletId],
+    queryKey: ["transactions", f.type, f.fromDate, f.toDate, f.walletId, fetchLimit],
+    placeholderData: (prev) => prev,
     queryFn: async () => {
-      return await fetchAllRows<any>((from, to) => {
-        let q = supabase.from("transactions")
-          .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
-          .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
-          .range(from, to);
-        if (f.type !== "all") q = q.eq("type", f.type as any);
-        if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
-        if (f.toDate) q = q.lte("occurred_on", f.toDate);
-        if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
-        return q;
-      });
+      let q = supabase.from("transactions")
+        .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
+        .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
+        .limit(fetchLimit);
+      if (f.type !== "all") q = q.eq("type", f.type as any);
+      if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
+      if (f.toDate) q = q.lte("occurred_on", f.toDate);
+      if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
+  const txIds = useMemo<string[]>(() => (txs.data ?? []).map((t: any) => t.id), [txs.data]);
+  const txIdsKey = txIds.length ? `${txIds.length}:${txIds[0]}:${txIds[txIds.length - 1]}` : "empty";
+
+  // Tags : uniquement ceux des mouvements chargés (au lieu de toute la table).
   const txTags = useQuery({
-    queryKey: ["tx_tags_all"],
-    queryFn: async () =>
-      await fetchAllRows<{ transaction_id: string; tag_id: string }>((from, to) =>
-        supabase.from("transaction_tags").select("transaction_id,tag_id").range(from, to),
-      ),
+    queryKey: ["tx_tags_all", txIdsKey],
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const out: { transaction_id: string; tag_id: string }[] = [];
+      for (let i = 0; i < txIds.length; i += 200) {
+        const slice = txIds.slice(i, i + 200);
+        const { data, error } = await supabase
+          .from("transaction_tags").select("transaction_id,tag_id").in("transaction_id", slice);
+        if (error) throw error;
+        out.push(...((data ?? []) as any[]));
+      }
+      return out;
+    },
   });
+
 
   const tagIdsByTx = useMemo(() => {
     const m = new Map<string, string[]>();
