@@ -127,6 +127,27 @@ function invalidateTx(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ refetchType: "none" });
 }
 
+/** Affichage immédiat : on injecte la ligne créée dans le cache avant le refetch. */
+function prependTxOptimistic(
+  qc: ReturnType<typeof useQueryClient>,
+  row: any,
+  tagIds: string[],
+) {
+  if (!row?.id) return;
+  qc.setQueriesData<any[]>({ queryKey: ["transactions"] }, (prev) => {
+    const list = Array.isArray(prev) ? prev : [];
+    if (list.some((t: any) => t?.id === row.id)) return list;
+    return [row, ...list];
+  });
+  if (tagIds.length) {
+    qc.setQueriesData<{ transaction_id: string; tag_id: string }[]>({ queryKey: ["tx_tags_all"] }, (prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return [...list, ...tagIds.map((tag_id) => ({ transaction_id: row.id, tag_id }))];
+    });
+  }
+}
+
+
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
