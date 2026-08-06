@@ -176,8 +176,34 @@ export async function performPull(): Promise<SyncPullResult> {
 }
 
 export async function flushPendingMutations(): Promise<SyncPushResult> {
-  const mutations = await offlineDb.pendingMutations.orderBy("createdAt").toArray();
+  const queued = await offlineDb.pendingMutations.orderBy("createdAt").toArray();
+
+  // Purge des mutations irrécupérables (identifiant "undefined"/vide) : elles
+  // échoueraient indéfiniment côté Postgres avec « invalid input syntax for type uuid ».
+  const invalid = queued.filter((m) => {
+    if (m.op === "insert") return false;
+    const id = m.payload?.id;
+    return typeof id !== "string" || !id.trim() || id === "undefined" || id === "null";
+  });
+  if (invalid.length > 0) {
+    await offlineDb.pendingMutations.bulkDelete(invalid.map((m) => m.id));
+    await recordSyncAcks(
+      invalid.map((m) => ({
+        mutationId: m.id,
+        table: m.table,
+        op: m.op,
+        rowId: null,
+        status: "failed" as const,
+        ackedAt: Date.now(),
+        error: "Mutation abandonnée : identifiant invalide",
+        attempts: m.retryCount + 1,
+      })),
+    );
+  }
+
+  const mutations = queued.filter((m) => !invalid.includes(m));
   if (mutations.length === 0) return { applied: 0, failed: 0, errors: [], appliedIds: [], failedIds: [] };
+
 
   const byId = new Map(mutations.map((m) => [m.id, m]));
   const result = await pushSync({ data: mutations });
