@@ -352,6 +352,13 @@ class OfflineBuilder implements PromiseLike<Result> {
   throwOnError() { return this.push("throwOnError"); }
 
   // ---- execution
+
+  /**
+   * Recopie des lignes lues vers Dexie, en arrière-plan et sans doublon :
+   * une ligne déjà miroir avec le même updated_at est ignorée, et les écritures
+   * sont regroupées puis exécutées quand le navigateur est libre.
+   */
+
   private async runOnline(): Promise<Result<any>> {
     let q: any = (realSupabase as any).from(this.table);
     for (const { m, args } of this.chain) {
