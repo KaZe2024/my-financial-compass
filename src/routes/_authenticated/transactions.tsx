@@ -110,6 +110,23 @@ function signedCashImpact(t: any, walletId: string | null) {
   return CASH_IN_TYPES.has(t.type) ? mga : -mga;
 }
 
+/** Invalidation ciblée : recharger tout le cache de l'app rendait la saisie très lente. */
+const TX_AFFECTED_KEYS = [
+  "transactions",
+  "tx_tags_all",
+  "wallets",
+  "debts",
+  "receivables",
+  "counterparties",
+];
+function invalidateTx(qc: ReturnType<typeof useQueryClient>) {
+  for (const key of TX_AFFECTED_KEYS) {
+    qc.invalidateQueries({ queryKey: [key], refetchType: "active" });
+  }
+  // Les autres modules (dashboard, budgets…) se rafraîchiront à leur prochain montage.
+  qc.invalidateQueries({ refetchType: "none" });
+}
+
 function TxPage() {
   const qc = useQueryClient();
   const wallets = useQuery(walletsQO);
@@ -218,7 +235,7 @@ function TxPage() {
       const { logAudit } = await import("@/lib/audit");
       if (!res.queued) await logAudit("transaction", id, "delete");
     },
-    onSuccess: () => { qc.invalidateQueries(); toast.success("Supprimé"); },
+    onSuccess: () => { invalidateTx(qc); toast.success("Supprimé"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -235,7 +252,7 @@ function TxPage() {
         if (!res.ok) throw new Error(res.error ?? "Erreur suppression");
       }
     },
-    onSuccess: (_d, ids) => { qc.invalidateQueries(); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
+    onSuccess: (_d, ids) => { invalidateTx(qc); toast.success(`${ids.length} supprimées`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -246,7 +263,7 @@ function TxPage() {
         if (!res.ok) throw new Error(res.error ?? "Erreur mise à jour");
       }
     },
-    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
+    onSuccess: (_d, v) => { invalidateTx(qc); toast.success(`${v.ids.length} ${v.archived ? "archivée(s)" : "désarchivée(s)"}`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -262,7 +279,7 @@ function TxPage() {
         }
       }
     },
-    onSuccess: (_d, v) => { qc.invalidateQueries(); toast.success(`${v.ids.length} modifiée(s)`); setSelected(new Set()); setBulkEditOpen(false); },
+    onSuccess: (_d, v) => { invalidateTx(qc); toast.success(`${v.ids.length} modifiée(s)`); setSelected(new Set()); setBulkEditOpen(false); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -304,7 +321,7 @@ function TxPage() {
       }
       return { ids: insIds.map((r) => r.id), count: clones.length };
     },
-    onSuccess: (r) => { qc.invalidateQueries(); toast.success(`${r.count} dupliquée(s)`); setSelected(new Set()); },
+    onSuccess: (r) => { invalidateTx(qc); toast.success(`${r.count} dupliquée(s)`); setSelected(new Set()); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -391,7 +408,7 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
-        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={() => qc.invalidateQueries()} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={() => invalidateTx(qc)} />
       </header>
 
       <Panel
@@ -632,7 +649,7 @@ function TxPage() {
           projects={projects.data ?? []}
           currentTagIds={(txTags.data ?? []).filter((r: any) => r.transaction_id === editingTx.id).map((r: any) => r.tag_id)}
           onClose={() => setEditingTx(null)}
-          onDone={() => { setEditingTx(null); qc.invalidateQueries(); }}
+          onDone={() => { setEditingTx(null); invalidateTx(qc); }}
         />
       )}
 
@@ -656,7 +673,7 @@ function TxPage() {
           tags={tags.data ?? []}
           cps={cps.data ?? []}
           projects={projects.data ?? []}
-          onDone={() => { setDupForm(null); qc.invalidateQueries(); }}
+          onDone={() => { setDupForm(null); invalidateTx(qc); }}
           initialForm={dupForm}
           open={!!dupForm}
           onOpenChange={(v) => !v && setDupForm(null)}
@@ -782,8 +799,10 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       if (!transactionId) throw new Error("Identifiant de transaction manquant");
        if (form.tag_ids.length) await syncTags(transactionId, userId, form.tag_ids, txRes.queued);
       if (!txRes.queued) {
-        const { logAudit } = await import("@/lib/audit");
-        await logAudit("transaction", transactionId, "create", { type: form.type, amount: amt });
+        // Audit non bloquant : ne retarde pas la fermeture du formulaire.
+        void import("@/lib/audit").then(({ logAudit }) =>
+          logAudit("transaction", transactionId, "create", { type: form.type, amount: amt }),
+        ).catch(() => {});
       }
     },
     onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
