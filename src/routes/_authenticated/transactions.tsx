@@ -127,8 +127,31 @@ function invalidateTx(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ refetchType: "none" });
 }
 
+/** Affichage immédiat : on injecte la ligne créée dans le cache avant le refetch. */
+function prependTxOptimistic(
+  qc: ReturnType<typeof useQueryClient>,
+  row: any,
+  tagIds: string[],
+) {
+  if (!row?.id) return;
+  qc.setQueriesData<any[]>({ queryKey: ["transactions"] }, (prev) => {
+    const list = Array.isArray(prev) ? prev : [];
+    if (list.some((t: any) => t?.id === row.id)) return list;
+    return [row, ...list];
+  });
+  if (tagIds.length) {
+    qc.setQueriesData<{ transaction_id: string; tag_id: string }[]>({ queryKey: ["tx_tags_all"] }, (prev) => {
+      const list = Array.isArray(prev) ? prev : [];
+      return [...list, ...tagIds.map((tag_id) => ({ transaction_id: row.id, tag_id }))];
+    });
+  }
+}
+
+
 function TxPage() {
   const qc = useQueryClient();
+  // Hors ligne : la page transactions passe en lecture seule (consultation only).
+  const online = useOnlineStatus();
   const wallets = useQuery(walletsQO);
   const nodesQ = useQuery(budgetNodesQO);
   const cps = useQuery(counterpartiesQO);
@@ -161,30 +184,50 @@ function TxPage() {
       ),
   });
 
+  // Page serveur bornée : on ne charge qu'une fenêtre de mouvements (les plus
+  // récents), agrandissable à la demande. Cela rend la saisie instantanée car un
+  // rechargement ne relit plus des milliers de lignes.
+  const [fetchLimit, setFetchLimit] = useState(500);
+  useEffect(() => { setFetchLimit(500); }, [f.type, f.fromDate, f.toDate, f.walletId]);
+
   const txs = useQuery({
-    queryKey: ["transactions", f.type, f.fromDate, f.toDate, f.walletId],
+    queryKey: ["transactions", f.type, f.fromDate, f.toDate, f.walletId, fetchLimit],
+    placeholderData: (prev) => prev,
     queryFn: async () => {
-      return await fetchAllRows<any>((from, to) => {
-        let q = supabase.from("transactions")
-          .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
-          .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
-          .range(from, to);
-        if (f.type !== "all") q = q.eq("type", f.type as any);
-        if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
-        if (f.toDate) q = q.lte("occurred_on", f.toDate);
-        if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
-        return q;
-      });
+      let q = supabase.from("transactions")
+        .select("*, wallets:wallet_id(name), to:to_wallet_id(name)")
+        .order("occurred_on", { ascending: false }).order("created_at", { ascending: false })
+        .limit(fetchLimit);
+      if (f.type !== "all") q = q.eq("type", f.type as any);
+      if (f.fromDate) q = q.gte("occurred_on", f.fromDate);
+      if (f.toDate) q = q.lte("occurred_on", f.toDate);
+      if (f.walletId !== "all") q = q.or(`wallet_id.eq.${f.walletId},to_wallet_id.eq.${f.walletId}`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
+  const txIds = useMemo<string[]>(() => (txs.data ?? []).map((t: any) => t.id), [txs.data]);
+  const txIdsKey = txIds.length ? `${txIds.length}:${txIds[0]}:${txIds[txIds.length - 1]}` : "empty";
+
+  // Tags : uniquement ceux des mouvements chargés (au lieu de toute la table).
   const txTags = useQuery({
-    queryKey: ["tx_tags_all"],
-    queryFn: async () =>
-      await fetchAllRows<{ transaction_id: string; tag_id: string }>((from, to) =>
-        supabase.from("transaction_tags").select("transaction_id,tag_id").range(from, to),
-      ),
+    queryKey: ["tx_tags_all", txIdsKey],
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const out: { transaction_id: string; tag_id: string }[] = [];
+      for (let i = 0; i < txIds.length; i += 200) {
+        const slice = txIds.slice(i, i + 200);
+        const { data, error } = await supabase
+          .from("transaction_tags").select("transaction_id,tag_id").in("transaction_id", slice);
+        if (error) throw error;
+        out.push(...((data ?? []) as any[]));
+      }
+      return out;
+    },
   });
+
 
   const tagIdsByTx = useMemo(() => {
     const m = new Map<string, string[]>();
@@ -408,7 +451,13 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
-        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={() => invalidateTx(qc)} />
+        {online ? (
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }} />
+        ) : (
+          <span className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Hors ligne · lecture seule
+          </span>
+        )}
       </header>
 
       <Panel
@@ -480,7 +529,7 @@ function TxPage() {
       <Panel
         title={`${filtered.length} mouvements`}
         action={
-          selected.size > 0 ? (
+          selected.size > 0 && online ? (
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
               <Button variant="outline" size="sm" onClick={() => setBulkEditOpen(true)}>
@@ -587,6 +636,7 @@ function TxPage() {
                         <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex justify-end gap-0.5 text-muted-foreground">
+                            {online && (<>
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -616,6 +666,7 @@ function TxPage() {
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
+                            </>)}
                           </div>
                         </td>
                       </tr>
@@ -633,7 +684,18 @@ function TxPage() {
                   </td>
                 </tr>
               )}
+              {!hasMoreRows && (txs.data?.length ?? 0) >= fetchLimit && (
+                <tr>
+                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {fetchLimit} mouvements chargés ·{" "}
+                    <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
+                      charger 500 de plus
+                    </button>
+                  </td>
+                </tr>
+              )}
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
+
             </tbody>
           </table>
         </div>
@@ -673,7 +735,7 @@ function TxPage() {
           tags={tags.data ?? []}
           cps={cps.data ?? []}
           projects={projects.data ?? []}
-          onDone={() => { setDupForm(null); invalidateTx(qc); }}
+          onDone={(created) => { setDupForm(null); if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }}
           initialForm={dupForm}
           open={!!dupForm}
           onOpenChange={(v) => !v && setDupForm(null)}
@@ -712,7 +774,7 @@ async function fetchDebtOrReceivable(userId: string, kind: "debts" | "receivable
   return data ?? [];
 }
 
-function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
+function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: (created?: { row: any; tagIds: string[] }) => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
   const [openInner, setOpenInner] = useState(false);
   const isControlled = openProp !== undefined;
   const open = isControlled ? !!openProp : openInner;
@@ -804,8 +866,22 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
           logAudit("transaction", transactionId, "create", { type: form.type, amount: amt }),
         ).catch(() => {});
       }
+      const fromWallet = wallets.find((w: any) => w.id === txRow.wallet_id);
+      const toWallet = wallets.find((w: any) => w.id === txRow.to_wallet_id);
+      return {
+        row: {
+          ...txRow,
+          id: transactionId,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          wallets: fromWallet ? { name: fromWallet.name } : null,
+          to: toWallet ? { name: toWallet.name } : null,
+        },
+        tagIds: form.tag_ids,
+      };
     },
-    onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
+    onSuccess: (res) => { toast.success("Transaction ajoutée"); setOpen(false); onDone(res); },
+
     onError: (e: Error) => toast.error(e.message),
   });
 
