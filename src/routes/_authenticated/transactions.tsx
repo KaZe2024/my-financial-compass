@@ -684,7 +684,18 @@ function TxPage() {
                   </td>
                 </tr>
               )}
+              {!hasMoreRows && (txs.data?.length ?? 0) >= fetchLimit && (
+                <tr>
+                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {fetchLimit} mouvements chargés ·{" "}
+                    <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
+                      charger 500 de plus
+                    </button>
+                  </td>
+                </tr>
+              )}
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
+
             </tbody>
           </table>
         </div>
