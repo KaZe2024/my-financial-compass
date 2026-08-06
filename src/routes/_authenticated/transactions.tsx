@@ -845,8 +845,22 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
           logAudit("transaction", transactionId, "create", { type: form.type, amount: amt }),
         ).catch(() => {});
       }
+      const fromWallet = wallets.find((w: any) => w.id === txRow.wallet_id);
+      const toWallet = wallets.find((w: any) => w.id === txRow.to_wallet_id);
+      return {
+        row: {
+          ...txRow,
+          id: transactionId,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          wallets: fromWallet ? { name: fromWallet.name } : null,
+          to: toWallet ? { name: toWallet.name } : null,
+        },
+        tagIds: form.tag_ids,
+      };
     },
-    onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
+    onSuccess: (res) => { toast.success("Transaction ajoutée"); setOpen(false); onDone(res); },
+
     onError: (e: Error) => toast.error(e.message),
   });
 
