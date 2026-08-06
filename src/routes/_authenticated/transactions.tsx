@@ -660,26 +660,27 @@ function TxPage() {
                   })}
                 </Fragment>
               ))}
-              {hasMoreRows && (
-                <tr ref={sentinelRef}>
-                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {renderedCount} / {filtered.length} lignes affichées ·{" "}
-                    <button type="button" onClick={() => setRenderLimit((n) => n + 1000)} className="underline hover:text-foreground">
-                      afficher 1000 de plus
-                    </button>
-                  </td>
-                </tr>
-              )}
-              {!hasMoreRows && (txs.data?.length ?? 0) >= fetchLimit && (
-                <tr>
-                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {fetchLimit} mouvements chargés ·{" "}
-                    <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
-                      charger 500 de plus
-                    </button>
-                  </td>
-                </tr>
-              )}
+              <tr>
+                <td colSpan={11} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <span>
+                      {renderedCount ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–{(currentPage - 1) * PAGE_SIZE + renderedCount} / {filtered.length} lignes
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button type="button" disabled={currentPage <= 1} onClick={() => setPage(1)} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">««</button>
+                      <button type="button" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">‹ préc.</button>
+                      <span className="px-2">page {currentPage} / {pageCount}</span>
+                      <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">suiv. ›</button>
+                      <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(pageCount)} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">»»</button>
+                    </div>
+                    {(txs.data?.length ?? 0) >= fetchLimit && (
+                      <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
+                        charger 500 mouvements de plus
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
 
             </tbody>
