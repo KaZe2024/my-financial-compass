@@ -449,7 +449,7 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
-        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={() => invalidateTx(qc)} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }} />
       </header>
 
       <Panel
@@ -714,7 +714,7 @@ function TxPage() {
           tags={tags.data ?? []}
           cps={cps.data ?? []}
           projects={projects.data ?? []}
-          onDone={() => { setDupForm(null); invalidateTx(qc); }}
+          onDone={(created) => { setDupForm(null); if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }}
           initialForm={dupForm}
           open={!!dupForm}
           onOpenChange={(v) => !v && setDupForm(null)}
@@ -753,7 +753,7 @@ async function fetchDebtOrReceivable(userId: string, kind: "debts" | "receivable
   return data ?? [];
 }
 
-function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: () => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
+function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm, open: openProp, onOpenChange, hideTrigger, title }: { wallets: any[]; nodes: any[]; tags: any[]; cps: Counterparty[]; projects: any[]; onDone: (created?: { row: any; tagIds: string[] }) => void; initialForm?: FormState; open?: boolean; onOpenChange?: (v: boolean) => void; hideTrigger?: boolean; title?: string }) {
   const [openInner, setOpenInner] = useState(false);
   const isControlled = openProp !== undefined;
   const open = isControlled ? !!openProp : openInner;
