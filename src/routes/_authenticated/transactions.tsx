@@ -375,10 +375,10 @@ function TxPage() {
 
   // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
   // When a wallet filter is active, transfers count with their sign for that wallet.
-  const grouped = useMemo(() => {
-    const walletFilter = f.walletId !== "all" ? f.walletId : null;
+  const walletFilterId = f.walletId !== "all" ? f.walletId : null;
+  const groupByMonth = useCallback((rows: any[]) => {
     const groups = new Map<string, any[]>();
-    for (const t of filtered) {
+    for (const t of rows) {
       const k = String(t.occurred_on).slice(0, 7);
       const arr = groups.get(k) ?? [];
       arr.push(t);
@@ -386,46 +386,32 @@ function TxPage() {
     }
     return Array.from(groups.entries())
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([month, rows]) => {
+      .map(([month, rs]) => {
         let inflow = 0, outflow = 0;
-        for (const t of rows) {
-          const signedCash = signedCashImpact(t, walletFilter);
+        for (const t of rs) {
+          const signedCash = signedCashImpact(t, walletFilterId);
           if (signedCash > 0) inflow += signedCash;
           else if (signedCash < 0) outflow += Math.abs(signedCash);
         }
-        return { month, rows, inflow, outflow, net: inflow - outflow };
+        return { month, rows: rs, inflow, outflow, net: inflow - outflow };
       });
-  }, [filtered, f.walletId]);
+  }, [walletFilterId]);
 
-  // Rendu progressif : on n'injecte dans le DOM qu'une fenêtre de lignes, agrandie
-  // automatiquement quand on atteint le bas. Les totaux restent calculés sur TOUT.
-  const PAGE_ROWS = 200;
-  const [renderLimit, setRenderLimit] = useState(PAGE_ROWS);
-  useEffect(() => { setRenderLimit(PAGE_ROWS); }, [filtered]);
+  // Totaux calculés sur TOUTES les lignes filtrées (pas seulement la page).
+  const grouped = useMemo(() => groupByMonth(filtered), [filtered, groupByMonth]);
 
-  const renderedGroups = useMemo(() => {
-    let budget = renderLimit;
-    const out: typeof grouped = [];
-    for (const g of grouped) {
-      if (budget <= 0) break;
-      out.push(budget >= g.rows.length ? g : { ...g, rows: g.rows.slice(0, budget) });
-      budget -= g.rows.length;
-    }
-    return out;
-  }, [grouped, renderLimit]);
-  const renderedCount = renderedGroups.reduce((s, g) => s + g.rows.length, 0);
-  const hasMoreRows = renderedCount < filtered.length;
-
-  const sentinelRef = useRef<HTMLTableRowElement | null>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasMoreRows) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setRenderLimit((n) => n + PAGE_ROWS);
-    }, { rootMargin: "600px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [hasMoreRows, renderedCount]);
+  // Pagination : 100 lignes par page.
+  const PAGE_SIZE = 100;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  useEffect(() => { setPage(1); }, [filtered.length, f]);
+  const pageRows = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
+  const renderedGroups = useMemo(() => groupByMonth(pageRows), [pageRows, groupByMonth]);
+  const renderedCount = pageRows.length;
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
