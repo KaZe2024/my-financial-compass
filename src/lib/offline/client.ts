@@ -248,7 +248,62 @@ async function projectRows(rows: any[], sel: string): Promise<any[]> {
   });
 }
 
+// ------------------------------------------------- miroir du cache local
+//
+// Recopier chaque lecture dans Dexie coûtait plusieurs milliers d'écritures
+// IndexedDB par requête, ce qui bloquait la saisie. On regroupe désormais les
+// écritures, on ignore les lignes déjà à jour, et tout se fait en arrière-plan.
+
+const mirrorSeen = new Map<string, string>();
+const mirrorQueue = new Map<SyncedTable, Map<string, any>>();
+let mirrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleMirror(table: SyncedTable, rows: any[]) {
+  let bucket = mirrorQueue.get(table);
+  for (const r of rows) {
+    const stamp = String(r.updated_at ?? r.created_at ?? "");
+    const key = `${table}:${r.id}`;
+    if (stamp && mirrorSeen.get(key) === stamp) continue;
+    if (stamp) mirrorSeen.set(key, stamp);
+    if (!bucket) {
+      bucket = new Map();
+      mirrorQueue.set(table, bucket);
+    }
+    bucket.set(r.id, r);
+  }
+  if (!mirrorQueue.size || mirrorTimer) return;
+  mirrorTimer = setTimeout(() => {
+    mirrorTimer = null;
+    void flushMirror();
+  }, 400);
+}
+
+async function flushMirror() {
+  const entries = [...mirrorQueue.entries()];
+  mirrorQueue.clear();
+  for (const [table, bucket] of entries) {
+    const rows = [...bucket.values()];
+    for (let i = 0; i < rows.length; i += 500) {
+      const slice = rows.slice(i, i + 500);
+      try {
+        await upsertSyncedRows(
+          table,
+          slice.map((r: any) => ({
+            id: r.id,
+            data: r,
+            updatedAt: (r.updated_at as string) ?? new Date().toISOString(),
+          })),
+        );
+      } catch {
+        /* best effort */
+      }
+      await new Promise((res) => setTimeout(res, 0));
+    }
+  }
+}
+
 // ----------------------------------------------------------- builder
+
 
 type Chain = { m: string; args: any[] };
 
