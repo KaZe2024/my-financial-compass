@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, Fragment, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { walletsQO, budgetNodesQO, counterpartiesQO, projectsQO } from "@/lib/queries";
 import { NodePicker } from "@/components/node-picker";
@@ -375,10 +375,10 @@ function TxPage() {
 
   // Group rows by month with per-month and grand totals (MGA base_amount, signed by tx type).
   // When a wallet filter is active, transfers count with their sign for that wallet.
-  const grouped = useMemo(() => {
-    const walletFilter = f.walletId !== "all" ? f.walletId : null;
+  const walletFilterId = f.walletId !== "all" ? f.walletId : null;
+  const groupByMonth = useCallback((rows: any[]) => {
     const groups = new Map<string, any[]>();
-    for (const t of filtered) {
+    for (const t of rows) {
       const k = String(t.occurred_on).slice(0, 7);
       const arr = groups.get(k) ?? [];
       arr.push(t);
@@ -386,46 +386,32 @@ function TxPage() {
     }
     return Array.from(groups.entries())
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
-      .map(([month, rows]) => {
+      .map(([month, rs]) => {
         let inflow = 0, outflow = 0;
-        for (const t of rows) {
-          const signedCash = signedCashImpact(t, walletFilter);
+        for (const t of rs) {
+          const signedCash = signedCashImpact(t, walletFilterId);
           if (signedCash > 0) inflow += signedCash;
           else if (signedCash < 0) outflow += Math.abs(signedCash);
         }
-        return { month, rows, inflow, outflow, net: inflow - outflow };
+        return { month, rows: rs, inflow, outflow, net: inflow - outflow };
       });
-  }, [filtered, f.walletId]);
+  }, [walletFilterId]);
 
-  // Rendu progressif : on n'injecte dans le DOM qu'une fenêtre de lignes, agrandie
-  // automatiquement quand on atteint le bas. Les totaux restent calculés sur TOUT.
-  const PAGE_ROWS = 200;
-  const [renderLimit, setRenderLimit] = useState(PAGE_ROWS);
-  useEffect(() => { setRenderLimit(PAGE_ROWS); }, [filtered]);
+  // Totaux calculés sur TOUTES les lignes filtrées (pas seulement la page).
+  const grouped = useMemo(() => groupByMonth(filtered), [filtered, groupByMonth]);
 
-  const renderedGroups = useMemo(() => {
-    let budget = renderLimit;
-    const out: typeof grouped = [];
-    for (const g of grouped) {
-      if (budget <= 0) break;
-      out.push(budget >= g.rows.length ? g : { ...g, rows: g.rows.slice(0, budget) });
-      budget -= g.rows.length;
-    }
-    return out;
-  }, [grouped, renderLimit]);
-  const renderedCount = renderedGroups.reduce((s, g) => s + g.rows.length, 0);
-  const hasMoreRows = renderedCount < filtered.length;
-
-  const sentinelRef = useRef<HTMLTableRowElement | null>(null);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasMoreRows) return;
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setRenderLimit((n) => n + PAGE_ROWS);
-    }, { rootMargin: "600px" });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [hasMoreRows, renderedCount]);
+  // Pagination : 100 lignes par page.
+  const PAGE_SIZE = 100;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  useEffect(() => { setPage(1); }, [filtered.length, f]);
+  const pageRows = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
+  const renderedGroups = useMemo(() => groupByMonth(pageRows), [pageRows, groupByMonth]);
+  const renderedCount = pageRows.length;
 
   const totals = useMemo(() => {
     let inflow = 0, outflow = 0;
@@ -674,26 +660,27 @@ function TxPage() {
                   })}
                 </Fragment>
               ))}
-              {hasMoreRows && (
-                <tr ref={sentinelRef}>
-                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {renderedCount} / {filtered.length} lignes affichées ·{" "}
-                    <button type="button" onClick={() => setRenderLimit((n) => n + 1000)} className="underline hover:text-foreground">
-                      afficher 1000 de plus
-                    </button>
-                  </td>
-                </tr>
-              )}
-              {!hasMoreRows && (txs.data?.length ?? 0) >= fetchLimit && (
-                <tr>
-                  <td colSpan={11} className="px-4 py-4 text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {fetchLimit} mouvements chargés ·{" "}
-                    <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
-                      charger 500 de plus
-                    </button>
-                  </td>
-                </tr>
-              )}
+              <tr>
+                <td colSpan={11} className="px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    <span>
+                      {renderedCount ? (currentPage - 1) * PAGE_SIZE + 1 : 0}–{(currentPage - 1) * PAGE_SIZE + renderedCount} / {filtered.length} lignes
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button type="button" disabled={currentPage <= 1} onClick={() => setPage(1)} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">««</button>
+                      <button type="button" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">‹ préc.</button>
+                      <span className="px-2">page {currentPage} / {pageCount}</span>
+                      <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((p) => Math.min(pageCount, p + 1))} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">suiv. ›</button>
+                      <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage(pageCount)} className="rounded-sm border border-border px-2 py-1 disabled:opacity-40 hover:text-foreground">»»</button>
+                    </div>
+                    {(txs.data?.length ?? 0) >= fetchLimit && (
+                      <button type="button" onClick={() => setFetchLimit((n) => n + 500)} className="underline hover:text-foreground">
+                        charger 500 mouvements de plus
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
               {filtered.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-muted-foreground">Aucune transaction</td></tr>}
 
             </tbody>

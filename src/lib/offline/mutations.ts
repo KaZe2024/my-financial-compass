@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { checkOnlineWithHeartbeat } from "./network-status";
+import { checkOnlineWithHeartbeat, markNetworkFailure } from "./network-status";
 import { applyLocalMutation, type SyncedTable } from "./db";
 import { queueMutation, flushPendingMutations } from "./sync";
 import { v4 as uuidv4 } from "uuid";
@@ -75,6 +75,7 @@ export async function offlineInsert(table: SyncedTable, payload: Record<string, 
       console.error(`[offline] ${table} insert rejeté (données invalides)`, e);
       return { ok: false, queued: false, error: e.message ?? "Données invalides" };
     }
+    markNetworkFailure();
     console.warn(`[offline] ${table} insert failed online, queuing`, e);
   }
   await applyLocalMutation(table, "insert", row);
@@ -102,6 +103,7 @@ export async function offlineUpdate(table: SyncedTable, id: string, payload: Rec
       console.error(`[offline] ${table} update rejeté (données invalides)`, e);
       return { ok: false, queued: false, error: e.message ?? "Données invalides" };
     }
+    markNetworkFailure();
     console.warn(`[offline] ${table} update failed online, queuing`, e);
   }
   await applyLocalMutation(table, "update", row);
@@ -127,6 +129,7 @@ export async function offlineDelete(table: SyncedTable, id: string): Promise<Mut
       console.error(`[offline] ${table} delete rejeté (données invalides)`, e);
       return { ok: false, queued: false, error: e.message ?? "Données invalides" };
     }
+    markNetworkFailure();
     console.warn(`[offline] ${table} delete failed online, queuing`, e);
   }
   await applyLocalMutation(table, "delete", { id: rowId });

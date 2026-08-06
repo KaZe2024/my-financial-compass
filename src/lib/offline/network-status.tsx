@@ -25,35 +25,24 @@ export function useNetworkStatus() {
   return { online, setOnline };
 }
 
-// Un HEAD réseau par mutation ralentissait chaque saisie : on met le résultat
-// en cache quelques secondes (et on partage la requête en cours).
-let hbCache: { at: number; value: boolean } | null = null;
-let hbInflight: Promise<boolean> | null = null;
-const HB_TTL = 5000;
+// Historique : un HEAD "/" avant chaque écriture. Problème : ce ping passe par le
+// service worker et peut échouer/mettre en cache un faux « hors ligne », si bien que
+// les saisies partaient en file d'attente alors que le réseau était disponible (il
+// fallait cliquer sur « synchroniser » pour les voir). On se fie désormais à
+// navigator.onLine : si la requête réelle échoue, le client bascule tout seul en local.
+let lastFailureAt = 0;
+const FAILURE_TTL = 3000;
+
+/** À appeler quand une vraie requête réseau échoue : évite de réessayer en boucle. */
+export function markNetworkFailure() {
+  lastFailureAt = Date.now();
+}
 
 export async function checkOnlineWithHeartbeat(): Promise<boolean> {
-  if (typeof navigator === "undefined" || navigator.onLine === false) {
-    hbCache = null;
-    return false;
-  }
-  if (hbCache && Date.now() - hbCache.at < HB_TTL) return hbCache.value;
-  if (hbInflight) return hbInflight;
-  hbInflight = (async () => {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      await fetch("/", { method: "HEAD", signal: controller.signal, cache: "no-store" });
-      clearTimeout(timeout);
-      return true;
-    } catch {
-      return false;
-    }
-  })().then((value) => {
-    hbCache = { at: Date.now(), value };
-    hbInflight = null;
-    return value;
-  });
-  return hbInflight;
+  if (typeof navigator === "undefined") return true;
+  if (navigator.onLine === false) return false;
+  if (lastFailureAt && Date.now() - lastFailureAt < FAILURE_TTL) return false;
+  return true;
 }
 
 
