@@ -167,6 +167,7 @@ function prependTxOptimistic(
 
 function TxPage() {
   const qc = useQueryClient();
+  const [pendingCreated, setPendingCreated] = useState<Array<{ row: any; tagIds: string[] }>>([]);
   // Hors ligne : la page transactions passe en lecture seule (consultation only).
   const online = useOnlineStatus();
   const wallets = useQuery(walletsQO);
@@ -225,7 +226,32 @@ function TxPage() {
     },
   });
 
-  const txIds = useMemo<string[]>(() => (txs.data ?? []).map((t: any) => t.id), [txs.data]);
+  // Une requête transactions déjà en vol peut terminer après l'ajout optimiste et
+  // réécrire son cache avec l'ancienne liste. Garder les créations localement tant
+  // que le serveur ne les a pas confirmées garantit leur affichage immédiat.
+  const visibleTransactions = useMemo(() => {
+    const serverRows = txs.data ?? [];
+    const serverIds = new Set(serverRows.map((row: any) => row.id));
+    const localRows = pendingCreated
+      .map((entry) => entry.row)
+      .filter((row) => !serverIds.has(row.id));
+    return [...localRows, ...serverRows].sort((a: any, b: any) => {
+      const byDate = String(b.occurred_on ?? "").localeCompare(String(a.occurred_on ?? ""));
+      if (byDate) return byDate;
+      return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+    });
+  }, [txs.data, pendingCreated]);
+
+  const handleCreated = useCallback((created?: { row: any; tagIds: string[] }) => {
+    if (created?.row?.id) {
+      setPendingCreated((current) => [created, ...current.filter((entry) => entry.row.id !== created.row.id)]);
+      prependTxOptimistic(qc, created.row, created.tagIds);
+      setPage(1);
+    }
+    markRelatedDataStaleAfterCreate(qc);
+  }, [qc]);
+
+  const txIds = useMemo<string[]>(() => visibleTransactions.map((t: any) => t.id), [visibleTransactions]);
   const txIdsKey = txIds.length ? `${txIds.length}:${txIds[0]}:${txIds[txIds.length - 1]}` : "empty";
 
   // Tags : uniquement ceux des mouvements chargés (au lieu de toute la table).
@@ -253,8 +279,9 @@ function TxPage() {
       arr.push(r.tag_id);
       m.set(r.transaction_id, arr);
     }
+    for (const entry of pendingCreated) m.set(entry.row.id, entry.tagIds);
     return m;
-  }, [txTags.data]);
+  }, [txTags.data, pendingCreated]);
   const tagNameById = useMemo(() => new Map<string, string>((tags.data ?? []).map((t: any) => [t.id as string, t.name as string])), [tags.data]);
 
   const filtered = useMemo(() => {
@@ -263,7 +290,7 @@ function TxPage() {
     const cpKw = f.counterparty.trim().toLowerCase();
     const minV = f.amountMin ? Number(f.amountMin) : null;
     const maxV = f.amountMax ? Number(f.amountMax) : null;
-    return (txs.data ?? []).filter((t: any) => {
+    return visibleTransactions.filter((t: any) => {
       if (f.nodeId && t.budget_node_id !== f.nodeId) return false;
       if (f.lineId) {
         const info = t.budget_node_id ? nodeInfo.get(t.budget_node_id) : null;
@@ -286,7 +313,7 @@ function TxPage() {
       if (maxV != null && mga > maxV) return false;
       return true;
     });
-  }, [txs.data, f, nodeInfo, tagIdsByTx, cpById]);
+  }, [visibleTransactions, f, nodeInfo, tagIdsByTx, cpById]);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -455,7 +482,7 @@ function TxPage() {
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
         {online ? (
-        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) { prependTxOptimistic(qc, created.row, created.tagIds); setPage(1); } markRelatedDataStaleAfterCreate(qc); }} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={handleCreated} />
         ) : (
           <span className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             Hors ligne · lecture seule
@@ -739,7 +766,7 @@ function TxPage() {
           tags={tags.data ?? []}
           cps={cps.data ?? []}
           projects={projects.data ?? []}
-          onDone={(created) => { setDupForm(null); if (created) { prependTxOptimistic(qc, created.row, created.tagIds); setPage(1); } markRelatedDataStaleAfterCreate(qc); }}
+          onDone={(created) => { setDupForm(null); handleCreated(created); }}
           initialForm={dupForm}
           open={!!dupForm}
           onOpenChange={(v) => !v && setDupForm(null)}
