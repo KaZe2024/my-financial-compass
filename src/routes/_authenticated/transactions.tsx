@@ -150,6 +150,8 @@ function prependTxOptimistic(
 
 function TxPage() {
   const qc = useQueryClient();
+  // Hors ligne : la page transactions passe en lecture seule (consultation only).
+  const online = useOnlineStatus();
   const wallets = useQuery(walletsQO);
   const nodesQ = useQuery(budgetNodesQO);
   const cps = useQuery(counterpartiesQO);
@@ -449,7 +451,13 @@ function TxPage() {
           <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">Trésorerie</p>
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
+        {online ? (
         <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }} />
+        ) : (
+          <span className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Hors ligne · lecture seule
+          </span>
+        )}
       </header>
 
       <Panel
@@ -628,6 +636,7 @@ function TxPage() {
                         <td className="px-4 py-2 text-xs text-muted-foreground max-w-[240px] truncate" title={t.notes ?? ""}>{t.notes ?? "—"}</td>
                         <td className="px-2 py-2 text-right">
                           <div className="flex justify-end gap-0.5 text-muted-foreground">
+                            {online && (<>
                             <button title="Modifier" onClick={() => setEditingTx(t)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground">
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -657,6 +666,7 @@ function TxPage() {
                             <button title="Supprimer" onClick={() => confirm("Supprimer ?") && del.mutate(t.id)} className="rounded-sm p-1 hover:bg-muted hover:text-negative">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
+                            </>)}
                           </div>
                         </td>
                       </tr>
