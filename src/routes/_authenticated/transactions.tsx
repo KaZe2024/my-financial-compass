@@ -728,6 +728,8 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
   const m = useMutation({
     mutationFn: async () => {
       const { data: u } = await supabase.auth.getUser();
+      const userId = u.user?.id;
+      if (!userId) throw new Error("Utilisateur non authentifié");
       const amt = Number(form.amount);
       const xr = Number(form.exchange_rate || 1);
       const cpId = form.counterparty.trim() ? await ensureCounterparty(form.counterparty, cps) : null;
@@ -744,12 +746,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         };
         const res = await offlineInsert("debts", debtRow);
         if (!res.ok) throw new Error(res.error ?? "Erreur création dette");
-        if (res.queued) debtId = debtRow.id as string;
-        else {
-          const { data: d, error: dErr } = await supabase.from("debts").insert({ ...debtRow, user_id: u.user!.id } as any).select().single();
-          if (dErr) throw dErr;
-          debtId = d?.id ?? null;
-        }
+        debtId = res.id ?? null;
       }
       if (form.type === "creance" && !recId) {
         const recRow: any = {
@@ -759,12 +756,7 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
         };
         const res = await offlineInsert("receivables", recRow);
         if (!res.ok) throw new Error(res.error ?? "Erreur création créance");
-        if (res.queued) recId = recRow.id as string;
-        else {
-          const { data: r, error: rErr } = await supabase.from("receivables").insert({ ...recRow, user_id: u.user!.id } as any).select().single();
-          if (rErr) throw rErr;
-          recId = r?.id ?? null;
-        }
+        recId = res.id ?? null;
       }
       const txRow: any = {
         type: form.type,
@@ -786,14 +778,12 @@ function AddTxDialog({ wallets, nodes, tags, cps, projects, onDone, initialForm,
       };
       const txRes = await offlineInsert("transactions", txRow);
       if (!txRes.ok) throw new Error(txRes.error ?? "Erreur création transaction");
-      if (txRes.queued) {
-        if (form.tag_ids.length) await syncTags(txRow.id as string, u.user!.id, form.tag_ids);
-      } else {
-        const { data: ins, error } = await supabase.from("transactions").insert({ ...txRow, user_id: u.user!.id } as any).select().single();
-        if (error) throw error;
-        if (form.tag_ids.length) await syncTags(ins.id, u.user!.id, form.tag_ids);
+      const transactionId = txRes.id;
+      if (!transactionId) throw new Error("Identifiant de transaction manquant");
+      if (form.tag_ids.length) await syncTags(transactionId, userId, form.tag_ids);
+      if (!txRes.queued) {
         const { logAudit } = await import("@/lib/audit");
-        await logAudit("transaction", ins?.id ?? null, "create", { type: form.type, amount: amt });
+        await logAudit("transaction", transactionId, "create", { type: form.type, amount: amt });
       }
     },
     onSuccess: () => { toast.success("Transaction ajoutée"); setOpen(false); onDone(); },
