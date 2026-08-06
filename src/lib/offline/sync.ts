@@ -103,6 +103,7 @@ export const pushSync = createServerFn({ method: "POST" })
     const errors: string[] = [];
     const appliedIds: string[] = [];
     const failedIds: string[] = [];
+    const confirmedTransactionIds = new Set<string>();
 
     // Les lignes parentes doivent être créées avant leurs tables de liaison.
     // Cela sécurise aussi les anciennes files où transaction_tags avait été
@@ -117,8 +118,23 @@ export const pushSync = createServerFn({ method: "POST" })
         const payload = { ...mutation.payload, user_id: userId, updated_at: new Date().toISOString() } as any;
         const table = mutation.table as string;
         if (mutation.op === "insert") {
+          if (table === "transaction_tags") {
+            const transactionId = payload.transaction_id;
+            if (!transactionId) throw new Error("Identifiant de transaction manquant pour le tag");
+            if (!confirmedTransactionIds.has(transactionId)) {
+              const { data: parent, error: parentError } = await (supabase as any)
+                .from("transactions")
+                .select("id")
+                .eq("id", transactionId)
+                .maybeSingle();
+              if (parentError) throw parentError;
+              if (!parent) throw new Error("Transaction parente pas encore synchronisée");
+              confirmedTransactionIds.add(transactionId);
+            }
+          }
           const { error } = await (supabase as any).from(table).insert(payload);
           if (error) throw error;
+          if (table === "transactions" && payload.id) confirmedTransactionIds.add(payload.id);
           applied++;
           appliedIds.push(mutation.id);
         } else if (mutation.op === "update") {
