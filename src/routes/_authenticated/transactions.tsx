@@ -127,6 +127,17 @@ function invalidateTx(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ refetchType: "none" });
 }
 
+/** Après une création, conserver la ligne optimiste affichée et seulement marquer
+ * les vues dérivées comme périmées. Un refetch actif des transactions écrasait la
+ * ligne tant qu'une écriture mise en file n'avait pas encore été synchronisée. */
+function markRelatedDataStaleAfterCreate(qc: ReturnType<typeof useQueryClient>) {
+  for (const key of TX_AFFECTED_KEYS) {
+    if (key === "transactions" || key === "tx_tags_all") continue;
+    qc.invalidateQueries({ queryKey: [key], refetchType: "none" });
+  }
+  qc.invalidateQueries({ refetchType: "none" });
+}
+
 /** Affichage immédiat : on injecte la ligne créée dans le cache avant le refetch. */
 function prependTxOptimistic(
   qc: ReturnType<typeof useQueryClient>,
@@ -438,7 +449,7 @@ function TxPage() {
           <h1 className="mt-1 text-2xl font-semibold">Transactions</h1>
         </div>
         {online ? (
-        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }} />
+        <AddTxDialog wallets={wallets.data ?? []} nodes={nodesQ.data ?? []} tags={tags.data ?? []} cps={cps.data ?? []} projects={projects.data ?? []} onDone={(created) => { if (created) { prependTxOptimistic(qc, created.row, created.tagIds); setPage(1); } markRelatedDataStaleAfterCreate(qc); }} />
         ) : (
           <span className="rounded-sm border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             Hors ligne · lecture seule
@@ -722,7 +733,7 @@ function TxPage() {
           tags={tags.data ?? []}
           cps={cps.data ?? []}
           projects={projects.data ?? []}
-          onDone={(created) => { setDupForm(null); if (created) prependTxOptimistic(qc, created.row, created.tagIds); invalidateTx(qc); }}
+          onDone={(created) => { setDupForm(null); if (created) { prependTxOptimistic(qc, created.row, created.tagIds); setPage(1); } markRelatedDataStaleAfterCreate(qc); }}
           initialForm={dupForm}
           open={!!dupForm}
           onOpenChange={(v) => !v && setDupForm(null)}
