@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState, Fragment, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment, useRef } from "react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { walletsQO, budgetNodesQO, counterpartiesQO, projectsQO } from "@/lib/queries";
 import { NodePicker } from "@/components/node-picker";
