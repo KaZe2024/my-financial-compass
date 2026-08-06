@@ -104,7 +104,15 @@ export const pushSync = createServerFn({ method: "POST" })
     const appliedIds: string[] = [];
     const failedIds: string[] = [];
 
-    for (const mutation of data) {
+    // Les lignes parentes doivent être créées avant leurs tables de liaison.
+    // Cela sécurise aussi les anciennes files où transaction_tags avait été
+    // enregistré avant la transaction correspondante.
+    const orderedMutations = [...data].sort((a, b) => {
+      const priority = (table: string) => table === "transaction_tags" ? 1 : 0;
+      return priority(a.table) - priority(b.table) || a.createdAt - b.createdAt;
+    });
+
+    for (const mutation of orderedMutations) {
       try {
         const payload = { ...mutation.payload, user_id: userId, updated_at: new Date().toISOString() } as any;
         const table = mutation.table as string;

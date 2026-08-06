@@ -4,13 +4,13 @@ import { getSyncedRows, applyLocalMutation, type SyncedTable } from "./db";
 import { queueMutation } from "./sync";
 import { v4 as uuidv4 } from "uuid";
 
-export async function syncTagsOffline(txId: string, newIds: string[]) {
+export async function syncTagsOffline(txId: string, newIds: string[], forceQueue = false) {
   const nextIds = Array.from(new Set(newIds));
   const user = await supabase.auth.getUser();
   const userId = user.data.user?.id;
   if (!userId) throw new Error("Utilisateur non authentifié");
 
-  const online = await checkOnlineWithHeartbeat();
+  const online = !forceQueue && await checkOnlineWithHeartbeat();
   let oldIds: string[] = [];
 
   if (online) {
@@ -26,10 +26,11 @@ export async function syncTagsOffline(txId: string, newIds: string[]) {
       const { error } = await supabase.from("transaction_tags").delete().eq("transaction_id", txId).in("tag_id", toRemove);
       if (error) throw error;
     }
-    if (nextIds.length) {
+    const toAdd = nextIds.filter((x) => !oldIds.includes(x));
+    if (toAdd.length) {
       const { error } = await supabase
         .from("transaction_tags")
-        .insert(nextIds.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
+        .insert(toAdd.map((tag_id) => ({ transaction_id: txId, tag_id, user_id: userId })));
       if (error) throw error;
     }
     return;
