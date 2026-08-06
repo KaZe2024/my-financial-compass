@@ -168,6 +168,7 @@ function prependTxOptimistic(
 function TxPage() {
   const qc = useQueryClient();
   const [pendingCreated, setPendingCreated] = useState<Array<{ row: any; tagIds: string[] }>>([]);
+  const [page, setPage] = useState(1);
   // Hors ligne : la page transactions passe en lecture seule (consultation only).
   const online = useOnlineStatus();
   const wallets = useQuery(walletsQO);
@@ -446,7 +447,6 @@ function TxPage() {
 
   // Pagination : 100 lignes par page.
   const PAGE_SIZE = 100;
-  const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   useEffect(() => { setPage(1); }, [filtered.length, f]);
