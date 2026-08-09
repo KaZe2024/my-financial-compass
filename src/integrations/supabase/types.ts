@@ -405,6 +405,158 @@ export type Database = {
         }
         Relationships: []
       }
+      bible_plans: {
+        Row: {
+          active: boolean
+          cadence: string
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          start_date: string
+          target_chapters: number
+          updated_at: string
+          user_id: string
+          version: string | null
+          whole_bible: boolean
+        }
+        Insert: {
+          active?: boolean
+          cadence?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          start_date?: string
+          target_chapters?: number
+          updated_at?: string
+          user_id: string
+          version?: string | null
+          whole_bible?: boolean
+        }
+        Update: {
+          active?: boolean
+          cadence?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          start_date?: string
+          target_chapters?: number
+          updated_at?: string
+          user_id?: string
+          version?: string | null
+          whole_bible?: boolean
+        }
+        Relationships: []
+      }
+      bible_reading_logs: {
+        Row: {
+          book: string
+          chapter_end: number
+          chapter_start: number
+          chapters: number
+          created_at: string
+          id: string
+          minutes: number
+          plan_id: string | null
+          read_on: string
+          reflection: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          book: string
+          chapter_end?: number
+          chapter_start?: number
+          chapters?: number
+          created_at?: string
+          id?: string
+          minutes?: number
+          plan_id?: string | null
+          read_on?: string
+          reflection?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          book?: string
+          chapter_end?: number
+          chapter_start?: number
+          chapters?: number
+          created_at?: string
+          id?: string
+          minutes?: number
+          plan_id?: string | null
+          read_on?: string
+          reflection?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bible_reading_logs_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "bible_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bible_studies: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          key_facts: string[]
+          kind: string
+          refs: string[]
+          status: string
+          studied_on: string
+          subject: string | null
+          summary: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          key_facts?: string[]
+          kind?: string
+          refs?: string[]
+          status?: string
+          studied_on?: string
+          subject?: string | null
+          summary?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          key_facts?: string[]
+          kind?: string
+          refs?: string[]
+          status?: string
+          studied_on?: string
+          subject?: string | null
+          summary?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       brainstorm_blocks: {
         Row: {
           action_done: boolean
@@ -2543,6 +2695,45 @@ export type Database = {
           },
         ]
       }
+      quiz_attempts: {
+        Row: {
+          answer: string | null
+          asked_on: string
+          correct: boolean
+          created_at: string
+          id: string
+          points: number
+          question: string
+          source: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answer?: string | null
+          asked_on?: string
+          correct?: boolean
+          created_at?: string
+          id?: string
+          points?: number
+          question: string
+          source?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answer?: string | null
+          asked_on?: string
+          correct?: boolean
+          created_at?: string
+          id?: string
+          points?: number
+          question?: string
+          source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       receivables: {
         Row: {
           archived: boolean
@@ -2690,6 +2881,69 @@ export type Database = {
           name?: string
           notes?: string | null
           type?: Database["public"]["Enums"]["scenario_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sermon_notes: {
+        Row: {
+          applications: string | null
+          big_idea: string | null
+          church: string | null
+          created_at: string
+          favorite: boolean
+          id: string
+          key_verses: string[]
+          main_text: string | null
+          outline: Json
+          prayer: string | null
+          preached_on: string
+          preacher: string | null
+          quotes: string | null
+          series: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applications?: string | null
+          big_idea?: string | null
+          church?: string | null
+          created_at?: string
+          favorite?: boolean
+          id?: string
+          key_verses?: string[]
+          main_text?: string | null
+          outline?: Json
+          prayer?: string | null
+          preached_on?: string
+          preacher?: string | null
+          quotes?: string | null
+          series?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applications?: string | null
+          big_idea?: string | null
+          church?: string | null
+          created_at?: string
+          favorite?: boolean
+          id?: string
+          key_verses?: string[]
+          main_text?: string | null
+          outline?: Json
+          prayer?: string | null
+          preached_on?: string
+          preacher?: string | null
+          quotes?: string | null
+          series?: string | null
+          tags?: string[]
+          title?: string
           updated_at?: string
           user_id?: string
         }
