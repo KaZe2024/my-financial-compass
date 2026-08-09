@@ -41,6 +41,7 @@ import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
 import { Route as AuthenticatedBrainstormRouteImport } from './routes/_authenticated/brainstorm'
+import { Route as AuthenticatedBibleRouteImport } from './routes/_authenticated/bible'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
@@ -215,6 +216,11 @@ const AuthenticatedBrainstormRoute = AuthenticatedBrainstormRouteImport.update({
   path: '/brainstorm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBibleRoute = AuthenticatedBibleRouteImport.update({
+  id: '/bible',
+  path: '/bible',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -275,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/bible': typeof AuthenticatedBibleRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -317,6 +324,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/bible': typeof AuthenticatedBibleRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -361,6 +369,7 @@ export interface FileRoutesById {
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/bible': typeof AuthenticatedBibleRoute
   '/_authenticated/brainstorm': typeof AuthenticatedBrainstormRoute
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -405,6 +414,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assets'
     | '/audit'
+    | '/bible'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -447,6 +457,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assets'
     | '/audit'
+    | '/bible'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -490,6 +501,7 @@ export interface FileRouteTypes {
     | '/_authenticated/alerts'
     | '/_authenticated/assets'
     | '/_authenticated/audit'
+    | '/_authenticated/bible'
     | '/_authenticated/brainstorm'
     | '/_authenticated/budgets'
     | '/_authenticated/calendar'
@@ -761,6 +773,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrainstormRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bible': {
+      id: '/_authenticated/bible'
+      path: '/bible'
+      fullPath: '/bible'
+      preLoaderRoute: typeof AuthenticatedBibleRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
@@ -832,6 +851,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedBibleRoute: typeof AuthenticatedBibleRoute
   AuthenticatedBrainstormRoute: typeof AuthenticatedBrainstormRoute
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
@@ -866,6 +886,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedBibleRoute: AuthenticatedBibleRoute,
   AuthenticatedBrainstormRoute: AuthenticatedBrainstormRoute,
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
