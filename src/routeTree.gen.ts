@@ -24,6 +24,7 @@ import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSermonsRouteImport } from './routes/_authenticated/sermons'
 import { Route as AuthenticatedReceivablesRouteImport } from './routes/_authenticated/receivables'
+import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedProvisionsRouteImport } from './routes/_authenticated/provisions'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
@@ -131,6 +132,11 @@ const AuthenticatedReceivablesRoute =
     path: '/receivables',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedQuizRoute = AuthenticatedQuizRouteImport.update({
+  id: '/quiz',
+  path: '/quiz',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProvisionsRoute = AuthenticatedProvisionsRouteImport.update({
   id: '/provisions',
   path: '/provisions',
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
+  '/quiz': typeof AuthenticatedQuizRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -358,6 +365,7 @@ export interface FileRoutesByTo {
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
+  '/quiz': typeof AuthenticatedQuizRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
   '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -405,6 +413,7 @@ export interface FileRoutesById {
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/provisions': typeof AuthenticatedProvisionsRoute
+  '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/receivables': typeof AuthenticatedReceivablesRoute
   '/_authenticated/sermons': typeof AuthenticatedSermonsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -452,6 +461,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/provisions'
+    | '/quiz'
     | '/receivables'
     | '/sermons'
     | '/settings'
@@ -497,6 +507,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/provisions'
+    | '/quiz'
     | '/receivables'
     | '/sermons'
     | '/settings'
@@ -543,6 +554,7 @@ export interface FileRouteTypes {
     | '/_authenticated/products'
     | '/_authenticated/projects'
     | '/_authenticated/provisions'
+    | '/_authenticated/quiz'
     | '/_authenticated/receivables'
     | '/_authenticated/sermons'
     | '/_authenticated/settings'
@@ -676,6 +688,13 @@ declare module '@tanstack/react-router' {
       path: '/receivables'
       fullPath: '/receivables'
       preLoaderRoute: typeof AuthenticatedReceivablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/quiz': {
+      id: '/_authenticated/quiz'
+      path: '/quiz'
+      fullPath: '/quiz'
+      preLoaderRoute: typeof AuthenticatedQuizRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/provisions': {
@@ -909,6 +928,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedProvisionsRoute: typeof AuthenticatedProvisionsRoute
+  AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedReceivablesRoute: typeof AuthenticatedReceivablesRoute
   AuthenticatedSermonsRoute: typeof AuthenticatedSermonsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -946,6 +966,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedProvisionsRoute: AuthenticatedProvisionsRoute,
+  AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedReceivablesRoute: AuthenticatedReceivablesRoute,
   AuthenticatedSermonsRoute: AuthenticatedSermonsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
