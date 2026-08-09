@@ -42,6 +42,7 @@ import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
 import { Route as AuthenticatedBrainstormRouteImport } from './routes/_authenticated/brainstorm'
+import { Route as AuthenticatedBibleStudyRouteImport } from './routes/_authenticated/bible-study'
 import { Route as AuthenticatedBibleRouteImport } from './routes/_authenticated/bible'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
@@ -222,6 +223,11 @@ const AuthenticatedBrainstormRoute = AuthenticatedBrainstormRouteImport.update({
   path: '/brainstorm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBibleStudyRoute = AuthenticatedBibleStudyRouteImport.update({
+  id: '/bible-study',
+  path: '/bible-study',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedBibleRoute = AuthenticatedBibleRouteImport.update({
   id: '/bible',
   path: '/bible',
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bible': typeof AuthenticatedBibleRoute
+  '/bible-study': typeof AuthenticatedBibleStudyRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
   '/bible': typeof AuthenticatedBibleRoute
+  '/bible-study': typeof AuthenticatedBibleStudyRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -378,6 +386,7 @@ export interface FileRoutesById {
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
   '/_authenticated/bible': typeof AuthenticatedBibleRoute
+  '/_authenticated/bible-study': typeof AuthenticatedBibleStudyRoute
   '/_authenticated/brainstorm': typeof AuthenticatedBrainstormRoute
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -424,6 +433,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/audit'
     | '/bible'
+    | '/bible-study'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/assets'
     | '/audit'
     | '/bible'
+    | '/bible-study'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -513,6 +524,7 @@ export interface FileRouteTypes {
     | '/_authenticated/assets'
     | '/_authenticated/audit'
     | '/_authenticated/bible'
+    | '/_authenticated/bible-study'
     | '/_authenticated/brainstorm'
     | '/_authenticated/budgets'
     | '/_authenticated/calendar'
@@ -792,6 +804,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrainstormRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bible-study': {
+      id: '/_authenticated/bible-study'
+      path: '/bible-study'
+      fullPath: '/bible-study'
+      preLoaderRoute: typeof AuthenticatedBibleStudyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/bible': {
       id: '/_authenticated/bible'
       path: '/bible'
@@ -871,6 +890,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
   AuthenticatedBibleRoute: typeof AuthenticatedBibleRoute
+  AuthenticatedBibleStudyRoute: typeof AuthenticatedBibleStudyRoute
   AuthenticatedBrainstormRoute: typeof AuthenticatedBrainstormRoute
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
@@ -907,6 +927,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
   AuthenticatedBibleRoute: AuthenticatedBibleRoute,
+  AuthenticatedBibleStudyRoute: AuthenticatedBibleStudyRoute,
   AuthenticatedBrainstormRoute: AuthenticatedBrainstormRoute,
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
