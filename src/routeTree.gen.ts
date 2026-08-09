@@ -22,6 +22,7 @@ import { Route as AuthenticatedSnapshotsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSimulatorRouteImport } from './routes/_authenticated/simulator'
 import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticated/shopping'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSermonsRouteImport } from './routes/_authenticated/sermons'
 import { Route as AuthenticatedReceivablesRouteImport } from './routes/_authenticated/receivables'
 import { Route as AuthenticatedProvisionsRouteImport } from './routes/_authenticated/provisions'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
@@ -116,6 +117,11 @@ const AuthenticatedShoppingRoute = AuthenticatedShoppingRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSermonsRoute = AuthenticatedSermonsRouteImport.update({
+  id: '/sermons',
+  path: '/sermons',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedReceivablesRoute =
@@ -301,6 +307,7 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
+  '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/simulator': typeof AuthenticatedSimulatorRoute
@@ -344,6 +351,7 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
+  '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/simulator': typeof AuthenticatedSimulatorRoute
@@ -389,6 +397,7 @@ export interface FileRoutesById {
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/provisions': typeof AuthenticatedProvisionsRoute
   '/_authenticated/receivables': typeof AuthenticatedReceivablesRoute
+  '/_authenticated/sermons': typeof AuthenticatedSermonsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping': typeof AuthenticatedShoppingRoute
   '/_authenticated/simulator': typeof AuthenticatedSimulatorRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/provisions'
     | '/receivables'
+    | '/sermons'
     | '/settings'
     | '/shopping'
     | '/simulator'
@@ -477,6 +487,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/provisions'
     | '/receivables'
+    | '/sermons'
     | '/settings'
     | '/shopping'
     | '/simulator'
@@ -521,6 +532,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projects'
     | '/_authenticated/provisions'
     | '/_authenticated/receivables'
+    | '/_authenticated/sermons'
     | '/_authenticated/settings'
     | '/_authenticated/shopping'
     | '/_authenticated/simulator'
@@ -638,6 +650,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sermons': {
+      id: '/_authenticated/sermons'
+      path: '/sermons'
+      fullPath: '/sermons'
+      preLoaderRoute: typeof AuthenticatedSermonsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/receivables': {
@@ -871,6 +890,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedProvisionsRoute: typeof AuthenticatedProvisionsRoute
   AuthenticatedReceivablesRoute: typeof AuthenticatedReceivablesRoute
+  AuthenticatedSermonsRoute: typeof AuthenticatedSermonsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShoppingRoute: typeof AuthenticatedShoppingRoute
   AuthenticatedSimulatorRoute: typeof AuthenticatedSimulatorRoute
@@ -906,6 +926,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedProvisionsRoute: AuthenticatedProvisionsRoute,
   AuthenticatedReceivablesRoute: AuthenticatedReceivablesRoute,
+  AuthenticatedSermonsRoute: AuthenticatedSermonsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShoppingRoute: AuthenticatedShoppingRoute,
   AuthenticatedSimulatorRoute: AuthenticatedSimulatorRoute,
