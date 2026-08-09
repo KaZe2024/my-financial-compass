@@ -4,6 +4,7 @@ import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
   Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass, FlaskConical, HeartPulse, Bot,
+  BookOpen, Mic, NotebookPen, Brain,
 } from "lucide-react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { toast } from "sonner";
