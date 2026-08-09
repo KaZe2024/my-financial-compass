@@ -22,7 +22,9 @@ import { Route as AuthenticatedSnapshotsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSimulatorRouteImport } from './routes/_authenticated/simulator'
 import { Route as AuthenticatedShoppingRouteImport } from './routes/_authenticated/shopping'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSermonsRouteImport } from './routes/_authenticated/sermons'
 import { Route as AuthenticatedReceivablesRouteImport } from './routes/_authenticated/receivables'
+import { Route as AuthenticatedQuizRouteImport } from './routes/_authenticated/quiz'
 import { Route as AuthenticatedProvisionsRouteImport } from './routes/_authenticated/provisions'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
@@ -41,6 +43,8 @@ import { Route as AuthenticatedCoachRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBudgetsRouteImport } from './routes/_authenticated/budgets'
 import { Route as AuthenticatedBrainstormRouteImport } from './routes/_authenticated/brainstorm'
+import { Route as AuthenticatedBibleStudyRouteImport } from './routes/_authenticated/bible-study'
+import { Route as AuthenticatedBibleRouteImport } from './routes/_authenticated/bible'
 import { Route as AuthenticatedAuditRouteImport } from './routes/_authenticated/audit'
 import { Route as AuthenticatedAssetsRouteImport } from './routes/_authenticated/assets'
 import { Route as AuthenticatedAlertsRouteImport } from './routes/_authenticated/alerts'
@@ -117,12 +121,22 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSermonsRoute = AuthenticatedSermonsRouteImport.update({
+  id: '/sermons',
+  path: '/sermons',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReceivablesRoute =
   AuthenticatedReceivablesRouteImport.update({
     id: '/receivables',
     path: '/receivables',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedQuizRoute = AuthenticatedQuizRouteImport.update({
+  id: '/quiz',
+  path: '/quiz',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProvisionsRoute = AuthenticatedProvisionsRouteImport.update({
   id: '/provisions',
   path: '/provisions',
@@ -215,6 +229,16 @@ const AuthenticatedBrainstormRoute = AuthenticatedBrainstormRouteImport.update({
   path: '/brainstorm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBibleStudyRoute = AuthenticatedBibleStudyRouteImport.update({
+  id: '/bible-study',
+  path: '/bible-study',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBibleRoute = AuthenticatedBibleRouteImport.update({
+  id: '/bible',
+  path: '/bible',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAuditRoute = AuthenticatedAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -275,6 +299,8 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/bible': typeof AuthenticatedBibleRoute
+  '/bible-study': typeof AuthenticatedBibleStudyRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -293,7 +319,9 @@ export interface FileRoutesByFullPath {
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
+  '/quiz': typeof AuthenticatedQuizRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
+  '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/simulator': typeof AuthenticatedSimulatorRoute
@@ -317,6 +345,8 @@ export interface FileRoutesByTo {
   '/alerts': typeof AuthenticatedAlertsRoute
   '/assets': typeof AuthenticatedAssetsRoute
   '/audit': typeof AuthenticatedAuditRoute
+  '/bible': typeof AuthenticatedBibleRoute
+  '/bible-study': typeof AuthenticatedBibleStudyRoute
   '/brainstorm': typeof AuthenticatedBrainstormRoute
   '/budgets': typeof AuthenticatedBudgetsRoute
   '/calendar': typeof AuthenticatedCalendarRoute
@@ -335,7 +365,9 @@ export interface FileRoutesByTo {
   '/products': typeof AuthenticatedProductsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/provisions': typeof AuthenticatedProvisionsRoute
+  '/quiz': typeof AuthenticatedQuizRoute
   '/receivables': typeof AuthenticatedReceivablesRoute
+  '/sermons': typeof AuthenticatedSermonsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/shopping': typeof AuthenticatedShoppingRoute
   '/simulator': typeof AuthenticatedSimulatorRoute
@@ -361,6 +393,8 @@ export interface FileRoutesById {
   '/_authenticated/alerts': typeof AuthenticatedAlertsRoute
   '/_authenticated/assets': typeof AuthenticatedAssetsRoute
   '/_authenticated/audit': typeof AuthenticatedAuditRoute
+  '/_authenticated/bible': typeof AuthenticatedBibleRoute
+  '/_authenticated/bible-study': typeof AuthenticatedBibleStudyRoute
   '/_authenticated/brainstorm': typeof AuthenticatedBrainstormRoute
   '/_authenticated/budgets': typeof AuthenticatedBudgetsRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
@@ -379,7 +413,9 @@ export interface FileRoutesById {
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/provisions': typeof AuthenticatedProvisionsRoute
+  '/_authenticated/quiz': typeof AuthenticatedQuizRoute
   '/_authenticated/receivables': typeof AuthenticatedReceivablesRoute
+  '/_authenticated/sermons': typeof AuthenticatedSermonsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/shopping': typeof AuthenticatedShoppingRoute
   '/_authenticated/simulator': typeof AuthenticatedSimulatorRoute
@@ -405,6 +441,8 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assets'
     | '/audit'
+    | '/bible'
+    | '/bible-study'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -423,7 +461,9 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/provisions'
+    | '/quiz'
     | '/receivables'
+    | '/sermons'
     | '/settings'
     | '/shopping'
     | '/simulator'
@@ -447,6 +487,8 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assets'
     | '/audit'
+    | '/bible'
+    | '/bible-study'
     | '/brainstorm'
     | '/budgets'
     | '/calendar'
@@ -465,7 +507,9 @@ export interface FileRouteTypes {
     | '/products'
     | '/projects'
     | '/provisions'
+    | '/quiz'
     | '/receivables'
+    | '/sermons'
     | '/settings'
     | '/shopping'
     | '/simulator'
@@ -490,6 +534,8 @@ export interface FileRouteTypes {
     | '/_authenticated/alerts'
     | '/_authenticated/assets'
     | '/_authenticated/audit'
+    | '/_authenticated/bible'
+    | '/_authenticated/bible-study'
     | '/_authenticated/brainstorm'
     | '/_authenticated/budgets'
     | '/_authenticated/calendar'
@@ -508,7 +554,9 @@ export interface FileRouteTypes {
     | '/_authenticated/products'
     | '/_authenticated/projects'
     | '/_authenticated/provisions'
+    | '/_authenticated/quiz'
     | '/_authenticated/receivables'
+    | '/_authenticated/sermons'
     | '/_authenticated/settings'
     | '/_authenticated/shopping'
     | '/_authenticated/simulator'
@@ -628,11 +676,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sermons': {
+      id: '/_authenticated/sermons'
+      path: '/sermons'
+      fullPath: '/sermons'
+      preLoaderRoute: typeof AuthenticatedSermonsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/receivables': {
       id: '/_authenticated/receivables'
       path: '/receivables'
       fullPath: '/receivables'
       preLoaderRoute: typeof AuthenticatedReceivablesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/quiz': {
+      id: '/_authenticated/quiz'
+      path: '/quiz'
+      fullPath: '/quiz'
+      preLoaderRoute: typeof AuthenticatedQuizRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/provisions': {
@@ -761,6 +823,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrainstormRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/bible-study': {
+      id: '/_authenticated/bible-study'
+      path: '/bible-study'
+      fullPath: '/bible-study'
+      preLoaderRoute: typeof AuthenticatedBibleStudyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/bible': {
+      id: '/_authenticated/bible'
+      path: '/bible'
+      fullPath: '/bible'
+      preLoaderRoute: typeof AuthenticatedBibleRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/audit': {
       id: '/_authenticated/audit'
       path: '/audit'
@@ -832,6 +908,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAlertsRoute: typeof AuthenticatedAlertsRoute
   AuthenticatedAssetsRoute: typeof AuthenticatedAssetsRoute
   AuthenticatedAuditRoute: typeof AuthenticatedAuditRoute
+  AuthenticatedBibleRoute: typeof AuthenticatedBibleRoute
+  AuthenticatedBibleStudyRoute: typeof AuthenticatedBibleStudyRoute
   AuthenticatedBrainstormRoute: typeof AuthenticatedBrainstormRoute
   AuthenticatedBudgetsRoute: typeof AuthenticatedBudgetsRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
@@ -850,7 +928,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedProvisionsRoute: typeof AuthenticatedProvisionsRoute
+  AuthenticatedQuizRoute: typeof AuthenticatedQuizRoute
   AuthenticatedReceivablesRoute: typeof AuthenticatedReceivablesRoute
+  AuthenticatedSermonsRoute: typeof AuthenticatedSermonsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedShoppingRoute: typeof AuthenticatedShoppingRoute
   AuthenticatedSimulatorRoute: typeof AuthenticatedSimulatorRoute
@@ -866,6 +946,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAlertsRoute: AuthenticatedAlertsRoute,
   AuthenticatedAssetsRoute: AuthenticatedAssetsRoute,
   AuthenticatedAuditRoute: AuthenticatedAuditRoute,
+  AuthenticatedBibleRoute: AuthenticatedBibleRoute,
+  AuthenticatedBibleStudyRoute: AuthenticatedBibleStudyRoute,
   AuthenticatedBrainstormRoute: AuthenticatedBrainstormRoute,
   AuthenticatedBudgetsRoute: AuthenticatedBudgetsRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
@@ -884,7 +966,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedProvisionsRoute: AuthenticatedProvisionsRoute,
+  AuthenticatedQuizRoute: AuthenticatedQuizRoute,
   AuthenticatedReceivablesRoute: AuthenticatedReceivablesRoute,
+  AuthenticatedSermonsRoute: AuthenticatedSermonsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedShoppingRoute: AuthenticatedShoppingRoute,
   AuthenticatedSimulatorRoute: AuthenticatedSimulatorRoute,

@@ -4,6 +4,7 @@ import {
   Activity, Wallet, ArrowLeftRight, PieChart, ShoppingCart, Package,
   HandCoins, Receipt, Target, Landmark, CalendarRange, Settings, Menu, LogOut, Sparkles, BarChart3, Users, TrendingUp, Database,
   Bell, CalendarDays, Repeat, Wallet2, Refrigerator, Palette, ListChecks, KanbanSquare, FileText, Lightbulb, Compass, FlaskConical, HeartPulse, Bot,
+  BookOpen, Mic, NotebookPen, Brain,
 } from "lucide-react";
 import { supabaseOffline as supabase } from "@/lib/offline/client";
 import { toast } from "sonner";
@@ -39,6 +40,12 @@ const NAV = [
     { to: "/plan-projects", label: "Projets planifiés", icon: KanbanSquare },
     { to: "/documents", label: "Suivi documents", icon: FileText },
     { to: "/brainstorm", label: "Brainstorming", icon: Lightbulb },
+  ]},
+  { group: "Spirituelle", items: [
+    { to: "/bible", label: "Lecture biblique", icon: BookOpen },
+    { to: "/sermons", label: "Notes de sermon", icon: Mic },
+    { to: "/bible-study", label: "Étude biblique", icon: NotebookPen },
+    { to: "/quiz", label: "Quiz & Learn fact", icon: Brain },
   ]},
   { group: "Planification", items: [
     { to: "/budgets", label: "Budgets", icon: PieChart },
