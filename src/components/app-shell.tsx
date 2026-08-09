@@ -40,6 +40,12 @@ const NAV = [
     { to: "/documents", label: "Suivi documents", icon: FileText },
     { to: "/brainstorm", label: "Brainstorming", icon: Lightbulb },
   ]},
+  { group: "Spirituelle", items: [
+    { to: "/bible", label: "Lecture biblique", icon: BookOpen },
+    { to: "/sermons", label: "Notes de sermon", icon: Mic },
+    { to: "/bible-study", label: "Étude biblique", icon: NotebookPen },
+    { to: "/quiz", label: "Quiz & Learn fact", icon: Brain },
+  ]},
   { group: "Planification", items: [
     { to: "/budgets", label: "Budgets", icon: PieChart },
     { to: "/projects", label: "Projets", icon: Sparkles },
