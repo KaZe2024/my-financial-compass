@@ -79,6 +79,13 @@ function eventDate(e: AssetEventLike) {
   return e.event_date ?? e.event_month ?? null;
 }
 
+/** Renvoie la valeur manuelle si elle est renseignée, sinon null. */
+function override(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function linkedToAsset(t: TransactionLike, assetId: string) {
   return t.asset_id === assetId || (t.source_kind === "asset" && t.source_id === assetId);
 }
