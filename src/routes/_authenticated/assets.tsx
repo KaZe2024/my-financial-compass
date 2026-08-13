@@ -97,7 +97,7 @@ function EditableAmountCell({
       title={manual ? "Valeur saisie manuellement — cliquer pour modifier" : (title ?? "Cliquer pour saisir manuellement")}
       onClick={() => { setDraft(String(value ?? 0)); setEditing(true); }}
     >
-      {fmtMoney(value, currency)}
+      {fmtMoney(value, currency ?? undefined)}
     </td>
   );
 }
