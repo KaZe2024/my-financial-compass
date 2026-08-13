@@ -37,6 +37,12 @@ export type AssetLike = {
   current_value?: number | string | null;
   status?: string | null;
   archived?: boolean | null;
+  /** Surcharges manuelles : si renseignées, elles remplacent le calcul automatique. */
+  manual_cost?: number | string | null;
+  manual_depreciation?: number | string | null;
+  manual_book_value?: number | string | null;
+  manual_market_value?: number | string | null;
+  manual_resale_gain?: number | string | null;
 };
 
 export type AssetEventLike = {
@@ -71,6 +77,13 @@ function inWindow(date: string | null | undefined, from?: string, to?: string) {
 
 function eventDate(e: AssetEventLike) {
   return e.event_date ?? e.event_month ?? null;
+}
+
+/** Renvoie la valeur manuelle si elle est renseignée, sinon null. */
+function override(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function linkedToAsset(t: TransactionLike, assetId: string) {
@@ -280,19 +293,29 @@ export function computeAssetValue(asset: AssetLike, events: AssetEventLike[], op
     .filter((e) => e.asset_id === asset.id)
     .filter((e) => !opts.through || !eventDate(e) || eventDate(e)! <= opts.through!);
   const soldEvent = relevant.find((e) => e.event_type === "sale");
-  const cost = num(asset.purchase_value);
+  const autoCost = num(asset.purchase_value);
   const history = opts.transactions
     ? assetHistoryAmounts(asset, opts.transactions, opts.through)
-    : { purchases: cost, depreciation: assetDepreciationFromEvents(asset, events, { through: opts.through }), sales: soldEvent ? Math.abs(num(soldEvent.amount)) : 0, vnc: cost - assetDepreciationFromEvents(asset, events, { through: opts.through }) };
+    : { purchases: autoCost, depreciation: assetDepreciationFromEvents(asset, events, { through: opts.through }), sales: soldEvent ? Math.abs(num(soldEvent.amount)) : 0, vnc: autoCost - assetDepreciationFromEvents(asset, events, { through: opts.through }) };
   const sold = history.sales > 0 || !!soldEvent || (!opts.through && (asset.status ?? "owned") === "sold");
   const saleAmount = history.sales || (soldEvent ? Math.abs(num(soldEvent.amount)) : 0);
-  const depreciation = history.depreciation;
-  const vnc = history.vnc;
-  const bookValue = sold ? 0 : vnc;
-  const marketValue = sold ? 0 : vnc;
+
+  const cost = override(asset.manual_cost) ?? autoCost;
+  const depreciation = override(asset.manual_depreciation) ?? history.depreciation;
+  const autoVnc = override(asset.manual_depreciation) != null ? cost - depreciation : history.vnc;
+  const vnc = override(asset.manual_book_value) ?? autoVnc;
+  const bookValue = override(asset.manual_book_value) ?? (sold ? 0 : vnc);
+  const marketValue = override(asset.manual_market_value) ?? (sold ? 0 : vnc);
   const variation = marketValue - cost;
-  const resaleGain = sold ? saleAmount - vnc : 0;
-  return { cost, depreciation, bookValue, marketValue, variation, sold, basis: history.purchases || cost, revaluedOn: null, saleAmount, resaleGain };
+  const resaleGain = override(asset.manual_resale_gain) ?? (sold ? saleAmount - vnc : 0);
+  const manual = {
+    cost: override(asset.manual_cost) != null,
+    depreciation: override(asset.manual_depreciation) != null,
+    bookValue: override(asset.manual_book_value) != null,
+    marketValue: override(asset.manual_market_value) != null,
+    resaleGain: override(asset.manual_resale_gain) != null,
+  };
+  return { cost, depreciation, bookValue, marketValue, variation, sold, basis: history.purchases || autoCost, revaluedOn: null, saleAmount, resaleGain, manual };
 }
 
 export function computeAssetTotals(assets: AssetLike[], events: AssetEventLike[], opts: { through?: string; transactions?: TransactionLike[] } = {}) {

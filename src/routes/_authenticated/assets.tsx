@@ -37,6 +37,71 @@ export const Route = createFileRoute("/_authenticated/assets")({
   component: AssetsPage,
 });
 
+/**
+ * Cellule montant éditable : permet de forcer manuellement une valeur du tableau
+ * (coût, amortissement cumulé, VNC, valeur, PV/MV). Une valeur forcée devient la
+ * référence pour toutes les analyses.
+ */
+function EditableAmountCell({
+  value, currency, manual, className, title, onSave,
+}: {
+  value: number;
+  currency?: string | null;
+  manual: boolean;
+  className?: string;
+  title?: string;
+  onSave: (v: number | null) => Promise<void> | void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const commit = async (raw: string | null) => {
+    setBusy(true);
+    try {
+      await onSave(raw === null || raw.trim() === "" ? null : Number(raw.replace(/\s/g, "").replace(",", ".")));
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <td className="px-2 py-1 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Input
+            autoFocus
+            className="h-7 w-28 text-right num"
+            value={draft}
+            disabled={busy}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void commit(draft);
+              if (e.key === "Escape") setEditing(false);
+            }}
+          />
+          <button title="Enregistrer" disabled={busy} onClick={() => void commit(draft)} className="rounded-sm p-1 hover:bg-muted hover:text-positive"><Check className="h-3.5 w-3.5" /></button>
+          <button title="Annuler" disabled={busy} onClick={() => setEditing(false)} className="rounded-sm p-1 hover:bg-muted hover:text-negative"><X className="h-3.5 w-3.5" /></button>
+          {manual && (
+            <button title="Revenir au calcul automatique" disabled={busy} onClick={() => void commit(null)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><RefreshCcw className="h-3.5 w-3.5" /></button>
+          )}
+        </div>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={`num px-4 py-2 text-right cursor-pointer hover:bg-muted/40 ${manual ? "underline decoration-dotted decoration-warning underline-offset-4" : ""} ${className ?? ""}`}
+      title={manual ? "Valeur saisie manuellement — cliquer pour modifier" : (title ?? "Cliquer pour saisir manuellement")}
+      onClick={() => { setDraft(String(value ?? 0)); setEditing(true); }}
+    >
+      {fmtMoney(value, currency ?? undefined)}
+    </td>
+  );
+}
+
 const DEFAULT_TYPE = "other";
 
 type FormShape = {
@@ -143,6 +208,18 @@ function AssetsPage() {
   const [selling, setSelling] = useState<any | null>(null);
   const [historyOf, setHistoryOf] = useState<any | null>(null);
 
+  /** Force (ou libère) une valeur du tableau ; toutes les analyses s'y alignent ensuite. */
+  const saveOverride = async (id: string, field: string, v: number | null) => {
+    const { error } = await supabase.from("assets").update({ [field]: v } as any).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(v === null ? "Valeur recalculée automatiquement" : "Valeur manuelle enregistrée");
+    await qc.invalidateQueries();
+  };
+
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -235,15 +312,25 @@ function AssetsPage() {
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
                     <td className="px-4 py-2 text-muted-foreground">{a.type}</td>
                     <td className="num px-4 py-2 text-muted-foreground">{fmtDate(a.purchase_date)}</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(value.cost, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground" title={amo ? `${amo.months}/${amo.life} mois théoriques (${Math.round(amo.pct * 100)}%)` : "Amortissements saisis"}>
-                      {value.depreciation ? fmtMoney(value.depreciation, a.currency) : "—"}
-                    </td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.marketValue, a.currency)}</td>
-                    <td className={`num px-4 py-2 text-right font-semibold ${value.sold ? (resaleGain >= 0 ? "text-positive" : "text-negative") : "text-muted-foreground"}`} title="Prix de vente − VNC à la date de vente">
-                      {value.sold ? fmtMoney(resaleGain, a.currency, { sign: true }) : "—"}
-                    </td>
+                    <EditableAmountCell value={value.cost} currency={a.currency} manual={value.manual.cost} onSave={(v) => saveOverride(a.id, "manual_cost", v)} />
+                    <EditableAmountCell
+                      value={value.depreciation}
+                      currency={a.currency}
+                      manual={value.manual.depreciation}
+                      className="text-muted-foreground"
+                      title={amo ? `${amo.months}/${amo.life} mois théoriques (${Math.round(amo.pct * 100)}%) — cliquer pour forcer` : "Cliquer pour saisir manuellement"}
+                      onSave={(v) => saveOverride(a.id, "manual_depreciation", v)}
+                    />
+                    <EditableAmountCell value={value.bookValue} currency={a.currency} manual={value.manual.bookValue} onSave={(v) => saveOverride(a.id, "manual_book_value", v)} />
+                    <EditableAmountCell value={value.marketValue} currency={a.currency} manual={value.manual.marketValue} className="font-semibold" onSave={(v) => saveOverride(a.id, "manual_market_value", v)} />
+                    <EditableAmountCell
+                      value={resaleGain}
+                      currency={a.currency}
+                      manual={value.manual.resaleGain}
+                      className={`font-semibold ${value.sold || value.manual.resaleGain ? (resaleGain >= 0 ? "text-positive" : "text-negative") : "text-muted-foreground"}`}
+                      title="Prix de vente − VNC à la date de vente — cliquer pour forcer"
+                      onSave={(v) => saveOverride(a.id, "manual_resale_gain", v)}
+                    />
                     <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
                     <td
                       className={`num px-4 py-2 text-right ${verdict.tone === "positive" ? "text-positive" : verdict.tone === "warning" ? "text-warning" : verdict.tone === "negative" ? "text-negative" : "text-muted-foreground"}`}

@@ -269,6 +269,11 @@ export type Database = {
           current_value: number
           id: string
           linked_transaction_id: string | null
+          manual_book_value: number | null
+          manual_cost: number | null
+          manual_depreciation: number | null
+          manual_market_value: number | null
+          manual_resale_gain: number | null
           name: string
           notes: string | null
           purchase_date: string | null
@@ -287,6 +292,11 @@ export type Database = {
           current_value?: number
           id?: string
           linked_transaction_id?: string | null
+          manual_book_value?: number | null
+          manual_cost?: number | null
+          manual_depreciation?: number | null
+          manual_market_value?: number | null
+          manual_resale_gain?: number | null
           name: string
           notes?: string | null
           purchase_date?: string | null
@@ -305,6 +315,11 @@ export type Database = {
           current_value?: number
           id?: string
           linked_transaction_id?: string | null
+          manual_book_value?: number | null
+          manual_cost?: number | null
+          manual_depreciation?: number | null
+          manual_market_value?: number | null
+          manual_resale_gain?: number | null
           name?: string
           notes?: string | null
           purchase_date?: string | null
