@@ -300,15 +300,25 @@ function AssetsPage() {
                     <td className="px-4 py-2 flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground" /> {a.name}</td>
                     <td className="px-4 py-2 text-muted-foreground">{a.type}</td>
                     <td className="num px-4 py-2 text-muted-foreground">{fmtDate(a.purchase_date)}</td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(value.cost, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground" title={amo ? `${amo.months}/${amo.life} mois théoriques (${Math.round(amo.pct * 100)}%)` : "Amortissements saisis"}>
-                      {value.depreciation ? fmtMoney(value.depreciation, a.currency) : "—"}
-                    </td>
-                    <td className="num px-4 py-2 text-right">{fmtMoney(value.bookValue, a.currency)}</td>
-                    <td className="num px-4 py-2 text-right font-semibold">{fmtMoney(value.marketValue, a.currency)}</td>
-                    <td className={`num px-4 py-2 text-right font-semibold ${value.sold ? (resaleGain >= 0 ? "text-positive" : "text-negative") : "text-muted-foreground"}`} title="Prix de vente − VNC à la date de vente">
-                      {value.sold ? fmtMoney(resaleGain, a.currency, { sign: true }) : "—"}
-                    </td>
+                    <EditableAmountCell value={value.cost} currency={a.currency} manual={value.manual.cost} onSave={(v) => saveOverride(a.id, "manual_cost", v)} />
+                    <EditableAmountCell
+                      value={value.depreciation}
+                      currency={a.currency}
+                      manual={value.manual.depreciation}
+                      className="text-muted-foreground"
+                      title={amo ? `${amo.months}/${amo.life} mois théoriques (${Math.round(amo.pct * 100)}%) — cliquer pour forcer` : "Cliquer pour saisir manuellement"}
+                      onSave={(v) => saveOverride(a.id, "manual_depreciation", v)}
+                    />
+                    <EditableAmountCell value={value.bookValue} currency={a.currency} manual={value.manual.bookValue} onSave={(v) => saveOverride(a.id, "manual_book_value", v)} />
+                    <EditableAmountCell value={value.marketValue} currency={a.currency} manual={value.manual.marketValue} className="font-semibold" onSave={(v) => saveOverride(a.id, "manual_market_value", v)} />
+                    <EditableAmountCell
+                      value={resaleGain}
+                      currency={a.currency}
+                      manual={value.manual.resaleGain}
+                      className={`font-semibold ${value.sold || value.manual.resaleGain ? (resaleGain >= 0 ? "text-positive" : "text-negative") : "text-muted-foreground"}`}
+                      title="Prix de vente − VNC à la date de vente — cliquer pour forcer"
+                      onSave={(v) => saveOverride(a.id, "manual_resale_gain", v)}
+                    />
                     <td className={`num px-4 py-2 text-right ${value.variation >= 0 ? "text-positive" : "text-negative"}`}>{fmtMoney(value.variation, a.currency, { sign: true })}</td>
                     <td
                       className={`num px-4 py-2 text-right ${verdict.tone === "positive" ? "text-positive" : verdict.tone === "warning" ? "text-warning" : verdict.tone === "negative" ? "text-negative" : "text-muted-foreground"}`}
