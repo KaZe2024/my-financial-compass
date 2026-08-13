@@ -208,6 +208,18 @@ function AssetsPage() {
   const [selling, setSelling] = useState<any | null>(null);
   const [historyOf, setHistoryOf] = useState<any | null>(null);
 
+  /** Force (ou libère) une valeur du tableau ; toutes les analyses s'y alignent ensuite. */
+  const saveOverride = async (id: string, field: string, v: number | null) => {
+    const { error } = await supabase.from("assets").update({ [field]: v } as any).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(v === null ? "Valeur recalculée automatiquement" : "Valeur manuelle enregistrée");
+    await qc.invalidateQueries();
+  };
+
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
