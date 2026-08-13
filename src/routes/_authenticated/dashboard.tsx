@@ -304,9 +304,11 @@ function Dashboard() {
     .filter((a: any) => !a.purchase_date || a.purchase_date <= periodTo)
     .map((a: any) => ({
       type: a.type || "autre",
-      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).marketValue,
+      // Aligné sur la colonne VNC du module Actifs (bookValue), overrides manuels inclus.
+      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).bookValue,
     }))
     .filter((r: any) => r.current_value > 0);
+
   const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);
 
