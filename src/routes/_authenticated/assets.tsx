@@ -37,6 +37,71 @@ export const Route = createFileRoute("/_authenticated/assets")({
   component: AssetsPage,
 });
 
+/**
+ * Cellule montant éditable : permet de forcer manuellement une valeur du tableau
+ * (coût, amortissement cumulé, VNC, valeur, PV/MV). Une valeur forcée devient la
+ * référence pour toutes les analyses.
+ */
+function EditableAmountCell({
+  value, currency, manual, className, title, onSave,
+}: {
+  value: number;
+  currency?: string | null;
+  manual: boolean;
+  className?: string;
+  title?: string;
+  onSave: (v: number | null) => Promise<void> | void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const commit = async (raw: string | null) => {
+    setBusy(true);
+    try {
+      await onSave(raw === null || raw.trim() === "" ? null : Number(raw.replace(/\s/g, "").replace(",", ".")));
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <td className="px-2 py-1 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Input
+            autoFocus
+            className="h-7 w-28 text-right num"
+            value={draft}
+            disabled={busy}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void commit(draft);
+              if (e.key === "Escape") setEditing(false);
+            }}
+          />
+          <button title="Enregistrer" disabled={busy} onClick={() => void commit(draft)} className="rounded-sm p-1 hover:bg-muted hover:text-positive"><Check className="h-3.5 w-3.5" /></button>
+          <button title="Annuler" disabled={busy} onClick={() => setEditing(false)} className="rounded-sm p-1 hover:bg-muted hover:text-negative"><X className="h-3.5 w-3.5" /></button>
+          {manual && (
+            <button title="Revenir au calcul automatique" disabled={busy} onClick={() => void commit(null)} className="rounded-sm p-1 hover:bg-muted hover:text-foreground"><RefreshCcw className="h-3.5 w-3.5" /></button>
+          )}
+        </div>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={`num px-4 py-2 text-right cursor-pointer hover:bg-muted/40 ${manual ? "underline decoration-dotted decoration-warning underline-offset-4" : ""} ${className ?? ""}`}
+      title={manual ? "Valeur saisie manuellement — cliquer pour modifier" : (title ?? "Cliquer pour saisir manuellement")}
+      onClick={() => { setDraft(String(value ?? 0)); setEditing(true); }}
+    >
+      {fmtMoney(value, currency)}
+    </td>
+  );
+}
+
 const DEFAULT_TYPE = "other";
 
 type FormShape = {
