@@ -37,6 +37,12 @@ export type AssetLike = {
   current_value?: number | string | null;
   status?: string | null;
   archived?: boolean | null;
+  /** Surcharges manuelles : si renseignées, elles remplacent le calcul automatique. */
+  manual_cost?: number | string | null;
+  manual_depreciation?: number | string | null;
+  manual_book_value?: number | string | null;
+  manual_market_value?: number | string | null;
+  manual_resale_gain?: number | string | null;
 };
 
 export type AssetEventLike = {
