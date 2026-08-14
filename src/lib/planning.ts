@@ -66,6 +66,16 @@ export type PlanItem = {
 
 export type PlanItemTag = { id: string; user_id: string; item_id: string; tag_id: string };
 
+/** Statut d'une occurrence précise d'un élément récurrent (une habitude, un jour donné). */
+export type PlanItemOccurrence = {
+  id: string;
+  user_id: string;
+  item_id: string;
+  occurrence_date: string;
+  status: PlanStatus;
+  completed_at: string | null;
+};
+
 export const STATUSES: { value: PlanStatus; label: string; className: string }[] = [
   { value: "todo", label: "À faire", className: "bg-muted text-muted-foreground" },
   { value: "in_progress", label: "En cours", className: "bg-sky-500/15 text-sky-400" },
@@ -244,6 +254,20 @@ export const planItemsQO = queryOptions({
       },
     )) as PlanItem[],
 });
+
+export const qkPlanItemOccurrences = ["plan_item_occurrences"] as const;
+export const planItemOccurrencesQO = queryOptions({
+  queryKey: qkPlanItemOccurrences,
+  queryFn: async () =>
+    (await offlineSelect<any>("plan_item_occurrences" as any, () =>
+      fetchAllRows<any>((from, to) => supabase.from("plan_item_occurrences").select("*").range(from, to)),
+    )) as PlanItemOccurrence[],
+});
+
+/** Vrai si l'élément se répète : son statut doit alors être suivi jour par jour. */
+export function isRecurring(item: { recurrence: PlanItem["recurrence"] }) {
+  return item.recurrence !== "none";
+}
 
 export const qkPlanItemTags = ["plan_item_tags"] as const;
 export const planItemTagsQO = queryOptions({
