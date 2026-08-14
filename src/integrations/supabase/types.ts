@@ -2036,6 +2036,47 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_item_occurrences: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          item_id: string
+          occurrence_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          item_id: string
+          occurrence_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          item_id?: string
+          occurrence_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_item_occurrences_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "plan_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_item_tags: {
         Row: {
           created_at: string

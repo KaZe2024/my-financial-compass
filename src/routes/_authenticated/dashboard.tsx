@@ -119,7 +119,7 @@ function Dashboard() {
 
   const assetsRows = useQuery({
     queryKey: ["assets", "owned"],
-    queryFn: async () => (await supabase.from("assets").select("id, type, purchase_date, purchase_value, current_value, status, archived")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("*")).data ?? [],
   });
   const assetEvents = useQuery({
     queryKey: ["asset_events", "dashboard"],
@@ -155,7 +155,8 @@ function Dashboard() {
   const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
   const cashToday = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
   const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows, through: periodTo });
-  const totalAssets = assetTotals.marketValue; // Valeur (réévaluée ou VNC) à la fin de période
+  // Aligné strictement sur la colonne VNC du module Actifs (overrides manuels inclus).
+  const totalAssets = assetTotals.bookValue;
   const totalDebt = computeObligationTotalAsOf(debtsRows.data ?? [], txRows, "debt", periodTo);
   const totalRec = computeObligationTotalAsOf(recRows.data ?? [], txRows, "receivable", periodTo);
   const { income, expense } = incomeExpenseForPeriod(txRows, periodFrom, periodTo);

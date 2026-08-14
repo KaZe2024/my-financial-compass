@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { offlineUpdate } from "@/lib/offline/mutations";
+import { offlineInsert, offlineUpdate, currentUserId } from "@/lib/offline/mutations";
 import { PlanItemDialog } from "@/components/planning/plan-item-dialog";
 import { PlanTypeManager } from "@/components/planning/plan-type-manager";
 import { DuplicateDayDialog } from "@/components/planning/duplicate-day-dialog";
@@ -14,6 +14,7 @@ import {
   addDays, endOfMonth, fmtDayLabel, fmtTimeRange, isClosed, monthGrid, occurrencesInRange,
   planItemTagsQO, planItemsQO, planProjectsQO, planTagsQO, planTypesQO, priorityMeta, qkPlanItems,
   recurrenceLabel, startOfMonth, startOfWeek, statusMeta, STATUSES, ymd, parseYmd, type PlanItem,
+  isRecurring, planItemOccurrencesQO, qkPlanItemOccurrences,
 } from "@/lib/planning";
 import {
   CalendarDays, CalendarRange, CalendarClock, ListChecks, Clock, ChevronLeft, ChevronRight,
@@ -47,6 +48,7 @@ function PlanningPage() {
   const tags = useQuery(planTagsQO);
   const itemTags = useQuery(planItemTagsQO);
   const projects = useQuery(planProjectsQO);
+  const occurrences = useQuery(planItemOccurrencesQO);
 
   const [mode, setMode] = useState<Mode>("week");
   const [style, setStyle] = useState<Style>("checklist");
@@ -74,6 +76,19 @@ function PlanningPage() {
     }
     return m;
   }, [itemTags.data]);
+
+  // Statut par jour pour les éléments récurrents : une habitude cochée « fait »
+  // le lundi ne doit pas marquer le mardi comme fait.
+  const occByKey = useMemo(() => {
+    const m = new Map<string, { id: string; status: string }>();
+    for (const o of occurrences.data ?? []) m.set(`${o.item_id}|${o.occurrence_date}`, { id: o.id, status: o.status });
+    return m;
+  }, [occurrences.data]);
+
+  const statusOf = (it: PlanItem, dateKey: string) => {
+    if (!isRecurring(it)) return it.status;
+    return (occByKey.get(`${it.id}|${dateKey}`)?.status ?? "todo") as PlanItem["status"];
+  };
 
   const range = useMemo(() => {
     if (mode === "month") {
@@ -121,14 +136,28 @@ function PlanningPage() {
   }, [filtered, range]);
 
   const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await offlineUpdate("plan_items", id, {
-        status,
-        completed_at: status === "done" ? new Date().toISOString() : null,
-      });
+    mutationFn: async ({ item, dateKey, status }: { item: PlanItem; dateKey: string; status: string }) => {
+      const completed_at = status === "done" ? new Date().toISOString() : null;
+      if (isRecurring(item) && dateKey !== "eis") {
+        const existing = occByKey.get(`${item.id}|${dateKey}`);
+        const res = existing
+          ? await offlineUpdate("plan_item_occurrences" as any, existing.id, { status, completed_at })
+          : await offlineInsert("plan_item_occurrences" as any, {
+              user_id: await currentUserId(),
+              item_id: item.id,
+              occurrence_date: dateKey,
+              status,
+              completed_at,
+            });
+        if (!res.ok) throw new Error(res.error ?? "Erreur");
+        return "occ" as const;
+      }
+      const res = await offlineUpdate("plan_items", item.id, { status, completed_at });
       if (!res.ok) throw new Error(res.error ?? "Erreur");
+      return "item" as const;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qkPlanItems }),
+    onSuccess: (kind) =>
+      qc.invalidateQueries({ queryKey: kind === "occ" ? qkPlanItemOccurrences : qkPlanItems }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -148,21 +177,21 @@ function PlanningPage() {
       : fmtDayLabel(range.from);
 
   const stats = useMemo(() => {
-    const all = Array.from(byDay.values()).flat();
-    const uniq = new Map(all.map((i) => [i.id, i]));
-    const list = Array.from(uniq.values());
+    const rows: { st: string }[] = [];
+    for (const [dateKey, list] of byDay) for (const it of list) rows.push({ st: statusOf(it, dateKey) });
     return {
-      total: list.length,
-      done: list.filter((i) => i.status === "done").length,
-      open: list.filter((i) => !isClosed(i.status)).length,
+      total: rows.length,
+      done: rows.filter((r) => r.st === "done").length,
+      open: rows.filter((r) => !isClosed(r.st as any)).length,
     };
-  }, [byDay]);
+  }, [byDay, occByKey]);
 
   const itemCard = (it: PlanItem, dateKey: string, compact = false) => {
     const t = it.type_id ? typeById.get(it.type_id) : null;
     const p = it.project_id ? projectById.get(it.project_id) : null;
-    const closed = isClosed(it.status);
-    const sm = statusMeta(it.status);
+    const st = statusOf(it, dateKey);
+    const closed = isClosed(st);
+    const sm = statusMeta(st);
     return (
       <button
         key={`${it.id}-${dateKey}`}
@@ -174,7 +203,7 @@ function PlanningPage() {
         style={t ? { borderLeft: `3px solid ${t.color}` } : undefined}
       >
         <div className="flex items-start gap-2">
-          <span className={cn("truncate text-xs font-medium", it.status === "done" && "line-through")}>{it.title}</span>
+          <span className={cn("truncate text-xs font-medium", st === "done" && "line-through")}>{it.title}</span>
           <span className={cn("ml-auto shrink-0 rounded-sm px-1 py-0.5 text-[9px]", sm.className)}>{sm.label}</span>
         </div>
         {!compact && (
@@ -200,16 +229,17 @@ function PlanningPage() {
   const checklistRow = (it: PlanItem, dateKey: string) => {
     const t = it.type_id ? typeById.get(it.type_id) : null;
     const p = it.project_id ? projectById.get(it.project_id) : null;
+    const st = statusOf(it, dateKey);
     return (
       <div key={`${it.id}-${dateKey}`} className="flex items-center gap-3 border-b border-border px-3 py-2 last:border-0">
         <input
           type="checkbox"
-          checked={it.status === "done"}
-          onChange={(e) => setStatus.mutate({ id: it.id, status: e.target.checked ? "done" : "todo" })}
+          checked={st === "done"}
+          onChange={(e) => setStatus.mutate({ item: it, dateKey, status: e.target.checked ? "done" : "todo" })}
           className="h-4 w-4 accent-primary"
         />
         <button onClick={() => openEdit(it)} className="min-w-0 flex-1 text-left">
-          <div className={cn("truncate text-sm", it.status === "done" && "text-muted-foreground line-through")}>{it.title}</div>
+          <div className={cn("truncate text-sm", st === "done" && "text-muted-foreground line-through")}>{it.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
             <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{fmtTimeRange(it)}</span>
             {t && <span style={{ color: t.color }}>{t.name}</span>}
@@ -222,7 +252,7 @@ function PlanningPage() {
             })}
           </div>
         </button>
-        <Select value={it.status} onValueChange={(v) => setStatus.mutate({ id: it.id, status: v })}>
+        <Select value={st} onValueChange={(v) => setStatus.mutate({ item: it, dateKey, status: v })}>
           <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             {STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}

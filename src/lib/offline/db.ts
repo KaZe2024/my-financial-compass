@@ -64,6 +64,7 @@ export const SYNCED_TABLES = [
   "plan_projects",
   "plan_items",
   "plan_item_tags",
+  "plan_item_occurrences",
   "documents",
   "document_events",
   "brainstorm_folders",

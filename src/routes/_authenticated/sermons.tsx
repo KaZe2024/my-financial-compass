@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { toast } from "sonner";
 import { offlineInsert, offlineUpdate, offlineDelete, currentUserId } from "@/lib/offline/mutations";
 import {
-  fmtDay, qkSermons, sermonsQO, ymdLocal,
-  type SermonNote, type SermonOutlinePoint,
+  fmtDay, qkSermons, sermonsQO, ymdLocal, flattenOutline, pruneOutline,
+  SERMON_OUTLINE_MAX_DEPTH, type SermonNote, type SermonOutlineNode,
 } from "@/lib/spiritual";
 import { Mic, Plus, Pencil, Trash2, Star, Search, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,6 +35,23 @@ export const Route = createFileRoute("/_authenticated/sermons")({
 
 type Draft = Partial<SermonNote> & { key_versesText?: string; tagsText?: string };
 
+const newNode = (): SermonOutlineNode => ({ heading: "", notes: "", verses: [], children: [] });
+
+/* --- helpers d'édition d'arbre (chemin = suite d'index) --- */
+function updateAt(nodes: SermonOutlineNode[], path: number[], fn: (n: SermonOutlineNode) => SermonOutlineNode): SermonOutlineNode[] {
+  const [i, ...rest] = path;
+  return nodes.map((n, j) => {
+    if (j !== i) return n;
+    if (!rest.length) return fn(n);
+    return { ...n, children: updateAt(n.children ?? [], rest, fn) };
+  });
+}
+function removeAt(nodes: SermonOutlineNode[], path: number[]): SermonOutlineNode[] {
+  const [i, ...rest] = path;
+  if (!rest.length) return nodes.filter((_, j) => j !== i);
+  return nodes.map((n, j) => (j === i ? { ...n, children: removeAt(n.children ?? [], rest) } : n));
+}
+
 const emptyDraft = (): Draft => ({
   preached_on: ymdLocal(new Date()),
   title: "",
@@ -44,13 +61,26 @@ const emptyDraft = (): Draft => ({
   main_text: "",
   key_versesText: "",
   big_idea: "",
-  outline: [{ heading: "", points: [""] }],
+  outline: [newNode()],
   applications: "",
   quotes: "",
   prayer: "",
   tagsText: "",
   favorite: false,
 });
+
+function outlineToLines(nodes: SermonOutlineNode[], prefix: number[]): string[] {
+  const out: string[] = [];
+  nodes.forEach((n, i) => {
+    const num = [...prefix, i + 1];
+    const indent = "  ".repeat(num.length - 1);
+    out.push(`${indent}${num.join(".")}. ${n.heading}`);
+    if (n.notes) out.push(...String(n.notes).split("\n").map((l) => `${indent}   ${l}`));
+    if ((n.verses ?? []).length) out.push(`${indent}   [${(n.verses ?? []).join(" · ")}]`);
+    out.push(...outlineToLines(n.children ?? [], num));
+  });
+  return out;
+}
 
 function sermonToText(s: SermonNote) {
   const lines = [
@@ -61,7 +91,7 @@ function sermonToText(s: SermonNote) {
     s.big_idea ? `\nIdée maîtresse : ${s.big_idea}` : "",
     (s.key_verses ?? []).length ? `Versets clés : ${s.key_verses.join(" · ")}` : "",
     "",
-    ...(s.outline ?? []).flatMap((o, i) => [`${i + 1}. ${o.heading}`, ...(o.points ?? []).filter(Boolean).map((p) => `   - ${p}`)]),
+    ...outlineToLines(s.outline ?? [], []),
     s.applications ? `\nApplications :\n${s.applications}` : "",
     s.quotes ? `\nCitations :\n${s.quotes}` : "",
     s.prayer ? `\nPrière :\n${s.prayer}` : "",
@@ -87,7 +117,7 @@ function SermonsPage() {
       if (seriesFilter !== "all" && (s.series ?? "") !== seriesFilter) return false;
       if (!q) return true;
       const hay = [s.title, s.preacher, s.church, s.series, s.main_text, s.big_idea, s.applications, s.quotes, ...(s.tags ?? []), ...(s.key_verses ?? []),
-        ...(s.outline ?? []).flatMap((o) => [o.heading, ...(o.points ?? [])])].join(" ").toLowerCase();
+        ...flattenOutline(s.outline)].join(" ").toLowerCase();
       return hay.includes(q);
     });
   }, [sermons, search, seriesFilter]);
@@ -101,7 +131,7 @@ function SermonsPage() {
         ...s,
         key_versesText: (s.key_verses ?? []).join(", "),
         tagsText: (s.tags ?? []).join(", "),
-        outline: (s.outline ?? []).length ? s.outline : [{ heading: "", points: [""] }],
+        outline: (s.outline ?? []).length ? s.outline : [newNode()],
       },
     });
   }
@@ -110,9 +140,7 @@ function SermonsPage() {
     const d = dialog.draft;
     if (!d.title?.trim()) return toast.error("Titre requis");
     const user_id = await currentUserId();
-    const outline: SermonOutlinePoint[] = (d.outline ?? [])
-      .map((o) => ({ heading: (o.heading ?? "").trim(), points: (o.points ?? []).map((p) => p.trim()).filter(Boolean) }))
-      .filter((o) => o.heading || o.points.length);
+    const outline: SermonOutlineNode[] = pruneOutline(d.outline ?? []);
     const payload = {
       user_id,
       preached_on: d.preached_on ?? ymdLocal(new Date()),
@@ -159,7 +187,7 @@ function SermonsPage() {
     URL.revokeObjectURL(url);
   }
 
-  const setOutline = (fn: (o: SermonOutlinePoint[]) => SermonOutlinePoint[]) =>
+  const setOutline = (fn: (o: SermonOutlineNode[]) => SermonOutlineNode[]) =>
     setDialog((s) => ({ ...s, draft: { ...s.draft, outline: fn(s.draft.outline ?? []) } }));
 
   return (
