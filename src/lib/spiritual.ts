@@ -46,7 +46,60 @@ export type BibleReadingLog = {
   updated_at: string;
 };
 
-export type SermonOutlinePoint = { heading: string; points: string[] };
+/**
+ * Nœud de plan de sermon : hiérarchie libre jusqu'à 4 niveaux, avec le contenu
+ * (notes) et les versets liés à ce point précis.
+ */
+export type SermonOutlineNode = {
+  heading: string;
+  notes?: string | null;
+  verses?: string[];
+  children?: SermonOutlineNode[];
+  /** Ancien format (liste de sous-points texte) — converti à la lecture. */
+  points?: string[];
+};
+
+/** Alias historique. */
+export type SermonOutlinePoint = SermonOutlineNode;
+
+export const SERMON_OUTLINE_MAX_DEPTH = 4;
+
+/** Convertit un plan (ancien ou nouveau format) en arbre normalisé. */
+export function normalizeOutline(raw: any, depth = 1): SermonOutlineNode[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((n: any) => {
+    const legacy = Array.isArray(n?.points) ? n.points.filter(Boolean).map((p: any) => ({ heading: String(p) })) : [];
+    const kids = Array.isArray(n?.children) ? n.children : [];
+    return {
+      heading: String(n?.heading ?? ""),
+      notes: n?.notes ?? null,
+      verses: Array.isArray(n?.verses) ? n.verses.map((v: any) => String(v)).filter(Boolean) : [],
+      children: depth >= SERMON_OUTLINE_MAX_DEPTH ? [] : normalizeOutline([...kids, ...legacy], depth + 1),
+    } as SermonOutlineNode;
+  });
+}
+
+/** Nettoie un plan avant enregistrement (supprime les nœuds totalement vides). */
+export function pruneOutline(nodes: SermonOutlineNode[]): SermonOutlineNode[] {
+  return nodes
+    .map((n) => ({
+      heading: (n.heading ?? "").trim(),
+      notes: (n.notes ?? "")?.toString().trim() || null,
+      verses: (n.verses ?? []).map((v) => v.trim()).filter(Boolean),
+      children: pruneOutline(n.children ?? []),
+    }))
+    .filter((n) => n.heading || n.notes || n.verses.length || (n.children ?? []).length);
+}
+
+/** Tout le texte du plan, à plat (recherche, quiz, export). */
+export function flattenOutline(nodes: SermonOutlineNode[] | undefined | null): string[] {
+  const out: string[] = [];
+  for (const n of nodes ?? []) {
+    out.push(n.heading, n.notes ?? "", ...(n.verses ?? []));
+    out.push(...flattenOutline(n.children));
+  }
+  return out.filter(Boolean);
+}
 
 export type SermonNote = {
   id: string;
@@ -59,7 +112,7 @@ export type SermonNote = {
   main_text: string | null;
   key_verses: string[];
   big_idea: string | null;
-  outline: SermonOutlinePoint[];
+  outline: SermonOutlineNode[];
   applications: string | null;
   quotes: string | null;
   prayer: string | null;
