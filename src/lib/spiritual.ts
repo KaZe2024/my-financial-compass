@@ -285,10 +285,12 @@ export const bibleLogsQO = queryOptions({
 export const qkSermons = ["sermon_notes"] as const;
 export const sermonsQO = queryOptions({
   queryKey: qkSermons,
-  queryFn: async () =>
-    (await offlineSelect<any>("sermon_notes" as any, () => all<any>("sermon_notes"), {
+  queryFn: async () => {
+    const rows = (await offlineSelect<any>("sermon_notes" as any, () => all<any>("sermon_notes"), {
       sort: byDateDesc("preached_on"),
-    })) as SermonNote[],
+    })) as any[];
+    return rows.map((r) => ({ ...r, outline: normalizeOutline(r.outline) })) as SermonNote[];
+  },
 });
 
 export const qkStudies = ["bible_studies"] as const;
