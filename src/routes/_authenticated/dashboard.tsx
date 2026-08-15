@@ -154,8 +154,9 @@ function Dashboard() {
   // Tout est daté sur la fin de la période sélectionnée → chaque carte bouge avec le sélecteur.
   const cash = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur, through: periodTo });
   const cashToday = sumAvailableCash(wallets.data ?? [], txRows, { baseCurrency: cur });
-  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows, through: periodTo });
-  // Aligné strictement sur la colonne VNC du module Actifs (overrides manuels inclus).
+  // Aligné strictement sur la colonne VNC du module Actifs : même base de calcul,
+  // sans troncature de période (le module Actifs raisonne toujours à date du jour).
+  const assetTotals = computeAssetTotals(assetsRows.data ?? [], assetEvents.data ?? [], { transactions: txRows });
   const totalAssets = assetTotals.bookValue;
   const totalDebt = computeObligationTotalAsOf(debtsRows.data ?? [], txRows, "debt", periodTo);
   const totalRec = computeObligationTotalAsOf(recRows.data ?? [], txRows, "receivable", periodTo);
@@ -302,13 +303,12 @@ function Dashboard() {
   const allocCash = cash;
   const assetAllocationRows = (assetsRows.data ?? [])
     .filter((a: any) => !a.archived)
-    .filter((a: any) => !a.purchase_date || a.purchase_date <= periodTo)
     .map((a: any) => ({
       type: a.type || "autre",
-      // Aligné sur la colonne VNC du module Actifs (bookValue), overrides manuels inclus.
-      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows, through: periodTo }).bookValue,
+      // Même valeur exacte que la colonne VNC du module Actifs (overrides manuels inclus).
+      current_value: computeAssetValue(a, assetEvents.data ?? [], { transactions: txRows }).bookValue,
     }))
-    .filter((r: any) => r.current_value > 0);
+    .filter((r: any) => r.current_value !== 0);
 
   const allocation = buildAllocation(assetAllocationRows, allocCash);
   const allocTotal = allocation.reduce((s, x) => s + x.value, 0);

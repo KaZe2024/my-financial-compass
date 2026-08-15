@@ -69,6 +69,23 @@ const emptyDraft = (): Draft => ({
   favorite: false,
 });
 
+function OutlineView({ nodes, depth = 1 }: { nodes: SermonOutlineNode[]; depth?: number }) {
+  return (
+    <ol className={cn("mt-1 space-y-1 pl-5", depth === 1 ? "list-decimal" : depth === 2 ? "list-[lower-alpha]" : "list-[lower-roman]")}>
+      {nodes.map((o, i) => (
+        <li key={i}>
+          <span className="font-medium">{o.heading}</span>
+          {(o.verses ?? []).length > 0 && (
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-primary">{(o.verses ?? []).join(" · ")}</span>
+          )}
+          {o.notes && <p className="mt-0.5 whitespace-pre-wrap text-muted-foreground">{o.notes}</p>}
+          {(o.children ?? []).length > 0 && <OutlineView nodes={o.children ?? []} depth={depth + 1} />}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function outlineToLines(nodes: SermonOutlineNode[], prefix: number[]): string[] {
   const out: string[] = [];
   nodes.forEach((n, i) => {
@@ -270,18 +287,7 @@ function SermonsPage() {
                       {(s.outline ?? []).length > 0 && (
                         <div>
                           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Plan</div>
-                          <ol className="mt-1 list-decimal space-y-1 pl-5">
-                            {s.outline.map((o, i) => (
-                              <li key={i}>
-                                <span className="font-medium">{o.heading}</span>
-                                {(o.points ?? []).length > 0 && (
-                                  <ul className="mt-0.5 list-disc pl-5 text-muted-foreground">
-                                    {o.points.map((p, j) => <li key={j}>{p}</li>)}
-                                  </ul>
-                                )}
-                              </li>
-                            ))}
-                          </ol>
+                          <OutlineView nodes={s.outline} />
                         </div>
                       )}
                       {s.applications && (
@@ -352,28 +358,8 @@ function SermonsPage() {
 
             <div className="grid gap-2">
               <Label>Plan du sermon</Label>
-              {(dialog.draft.outline ?? []).map((o, i) => (
-                <div key={i} className="space-y-2 rounded-sm border border-border p-2">
-                  <div className="flex gap-2">
-                    <Input placeholder={`Point ${i + 1}`} value={o.heading}
-                      onChange={(e) => setOutline((arr) => arr.map((x, j) => (j === i ? { ...x, heading: e.target.value } : x)))} />
-                    <Button size="icon" variant="ghost" onClick={() => setOutline((arr) => arr.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                  {(o.points ?? []).map((p, j) => (
-                    <div key={j} className="flex gap-2 pl-4">
-                      <Input placeholder="Sous-point / note" value={p}
-                        onChange={(e) => setOutline((arr) => arr.map((x, k) => (k === i ? { ...x, points: x.points.map((y, m) => (m === j ? e.target.value : y)) } : x)))} />
-                      <Button size="icon" variant="ghost" onClick={() => setOutline((arr) => arr.map((x, k) => (k === i ? { ...x, points: x.points.filter((_, m) => m !== j) } : x)))}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button size="sm" variant="ghost" onClick={() => setOutline((arr) => arr.map((x, k) => (k === i ? { ...x, points: [...(x.points ?? []), ""] } : x)))}>
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Sous-point
-                  </Button>
-                </div>
-              ))}
-              <Button size="sm" variant="outline" onClick={() => setOutline((arr) => [...arr, { heading: "", points: [""] }])}>
+              <OutlineEditor nodes={dialog.draft.outline ?? []} path={[]} setOutline={setOutline} />
+              <Button size="sm" variant="outline" onClick={() => setOutline((arr) => [...arr, newNode()])}>
                 <Plus className="mr-1 h-4 w-4" /> Ajouter un point
               </Button>
             </div>
@@ -401,6 +387,49 @@ function SermonsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/** Éditeur de plan récursif (jusqu'à 4 niveaux) avec notes et versets par point. */
+function OutlineEditor({
+  nodes, path, setOutline,
+}: {
+  nodes: SermonOutlineNode[];
+  path: number[];
+  setOutline: (fn: (o: SermonOutlineNode[]) => SermonOutlineNode[]) => void;
+}) {
+  const depth = path.length + 1;
+  return (
+    <div className="space-y-2">
+      {nodes.map((o, i) => {
+        const full = [...path, i];
+        const label = full.map((n) => n + 1).join(".");
+        return (
+          <div key={i} className={cn("space-y-2 rounded-sm border border-border p-2", depth > 1 && "bg-surface-2/30")}>
+            <div className="flex gap-2">
+              <Input placeholder={`Point ${label}`} value={o.heading}
+                onChange={(e) => setOutline((arr) => updateAt(arr, full, (n) => ({ ...n, heading: e.target.value })))} />
+              <Button size="icon" variant="ghost" onClick={() => setOutline((arr) => removeAt(arr, full))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+            <Textarea rows={2} placeholder="Contenu / note de ce point" value={o.notes ?? ""}
+              onChange={(e) => setOutline((arr) => updateAt(arr, full, (n) => ({ ...n, notes: e.target.value })))} />
+            <Input placeholder="Versets liés (séparés par des virgules)" value={(o.verses ?? []).join(", ")}
+              onChange={(e) => setOutline((arr) => updateAt(arr, full, (n) => ({ ...n, verses: e.target.value.split(",").map((v) => v.trim()).filter(Boolean) })))} />
+            {(o.children ?? []).length > 0 && (
+              <div className="pl-3">
+                <OutlineEditor nodes={o.children ?? []} path={full} setOutline={setOutline} />
+              </div>
+            )}
+            {depth < SERMON_OUTLINE_MAX_DEPTH && (
+              <Button size="sm" variant="ghost"
+                onClick={() => setOutline((arr) => updateAt(arr, full, (n) => ({ ...n, children: [...(n.children ?? []), newNode()] })))}>
+                <Plus className="mr-1 h-3.5 w-3.5" /> Sous-point (niveau {depth + 1})
+              </Button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
