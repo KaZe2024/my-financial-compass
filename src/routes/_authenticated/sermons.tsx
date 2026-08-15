@@ -270,18 +270,7 @@ function SermonsPage() {
                       {(s.outline ?? []).length > 0 && (
                         <div>
                           <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Plan</div>
-                          <ol className="mt-1 list-decimal space-y-1 pl-5">
-                            {s.outline.map((o, i) => (
-                              <li key={i}>
-                                <span className="font-medium">{o.heading}</span>
-                                {(o.points ?? []).length > 0 && (
-                                  <ul className="mt-0.5 list-disc pl-5 text-muted-foreground">
-                                    {o.points.map((p, j) => <li key={j}>{p}</li>)}
-                                  </ul>
-                                )}
-                              </li>
-                            ))}
-                          </ol>
+                          <OutlineView nodes={s.outline} />
                         </div>
                       )}
                       {s.applications && (
